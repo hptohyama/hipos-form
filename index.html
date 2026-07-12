@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<!--
+  Hiポス配布報告フォーム（唯一のソース = このファイル frontend/index.html）
+  GAS配信: このファイルの内容を GASプロジェクトに "Form"（HTML）という名前で貼る。
+  更新時は必ずこのファイルを直し、GASの Form に貼り直すこと（.gs と同じ運用）。
+  doGet は 'Form'→'index' の順で探すため、'index' 名で貼っても配信は可能。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Hiポス配布報告</title>
+<!--
+  Hiポス配布報告フォーム（配達員セルフサービス・3メニュー: 報告 / 履歴 / アカウント）
+
+  【設置手順】
+  1. 下の CONFIG の API_URL と OAUTH_CLIENT_ID を書き換える
+  2. GitHub Pages 等の静的ホスティングに配置する
+  3. 配置先オリジンを Google Cloud Console の OAuthクライアント「承認済みのJavaScript生成元」に登録する
+
+  【転送規約】POSTは Content-Type: text/plain;charset=utf-8 でJSON文字列を送る
+  （GASはOPTIONSプリフライトに応答できないため。設計書 §4.4）
+
+  外部読み込みは Google Identity Services（認証プロバイダ本体）のみ。ライブラリCDNは使わない。
+-->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --c-primary: #1a73e8; --c-primary-dark: #1557b0;
+    --c-ok: #137333; --c-ok-bg: #e6f4ea;
+    --c-err: #c5221f; --c-err-bg: #fce8e6;
+    --c-warn: #b06000; --c-warn-bg: #fff8e1;
+    --c-merge: #00838f; --c-merge-bg: #e0f7fa;
+    --c-border: #dadce0; --c-text: #202124; --c-sub: #5f6368;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+         background: #f8f9fa; color: var(--c-text); font-size: 16px; }
+  header { background: var(--c-primary); color: #fff; padding: 12px 16px; position: sticky; top: 0; z-index: 5; }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; }
+  header .sub { font-size: 12px; opacity: .85; margin-top: 2px; }
+  main { max-width: 560px; margin: 0 auto; padding: 12px 12px 88px; }
+  .card { background: #fff; border: 1px solid var(--c-border); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+  .card h2 { margin: 0 0 10px; font-size: 14px; color: var(--c-sub); font-weight: 600; }
+  label { display: block; font-size: 13px; color: var(--c-sub); margin: 10px 0 4px; }
+  input, select, textarea, button {
+    font-size: 16px; font-family: inherit; border-radius: 8px; border: 1px solid var(--c-border);
+    padding: 10px 12px; width: 100%; background: #fff; color: var(--c-text);
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--c-primary); border-color: transparent; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; min-width: 0; }
+  button { cursor: pointer; border: none; font-weight: 600; }
+  .btn-primary { background: var(--c-primary); color: #fff; padding: 14px; font-size: 17px; }
+  .btn-primary:disabled { background: #9ab8e8; }
+  .btn-ghost { background: #fff; border: 1px solid var(--c-border); color: var(--c-primary); }
+  .btn-small { width: auto; padding: 6px 12px; font-size: 13px; }
+  .town-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .town-row input.town { flex: 2.2; min-width: 0; }
+  .town-row input.qty { flex: 1; min-width: 0; text-align: right; }
+  .town-row button { flex: 0 0 40px; background: var(--c-err-bg); color: var(--c-err); padding: 10px 0; }
+  .total-bar { display: flex; justify-content: space-between; align-items: center;
+               padding: 10px 12px; border-radius: 8px; background: #f1f3f4; margin-top: 8px; font-size: 14px; }
+  .total-bar.match { background: var(--c-ok-bg); color: var(--c-ok); }
+  .total-bar.mismatch { background: var(--c-err-bg); color: var(--c-err); }
+  .msg { padding: 12px; border-radius: 8px; margin: 10px 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  .msg-ok { background: var(--c-ok-bg); color: var(--c-ok); }
+  .msg-err { background: var(--c-err-bg); color: var(--c-err); }
+  .msg-warn { background: var(--c-warn-bg); color: var(--c-warn); }
+  .msg-merge { background: var(--c-merge-bg); color: var(--c-merge); }
+  .summary { display: flex; gap: 8px; margin-top: 10px; }
+  .summary .box { flex: 1; background: #f1f3f4; border-radius: 8px; padding: 10px; text-align: center; }
+  .summary .num { font-size: 22px; font-weight: 700; color: var(--c-primary); }
+  .summary .lbl { font-size: 11px; color: var(--c-sub); }
+  .hidden { display: none !important; }
+  .case-info { font-size: 13px; color: var(--c-sub); background: #f1f3f4; border-radius: 8px; padding: 8px 10px; margin-top: 6px; line-height: 1.5; }
+  details { margin-top: 10px; }
+  details summary { font-size: 13px; color: var(--c-sub); cursor: pointer; }
+  .signin-note { font-size: 13px; color: var(--c-sub); line-height: 1.6; }
+  #gsiButton { display: flex; justify-content: center; margin: 12px 0; }
+  .footer-note { font-size: 11px; color: var(--c-sub); text-align: center; margin-top: 16px; }
+  .reg-staff { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .reg-chk { display: flex; align-items: center; gap: 8px; border: 1px solid var(--c-border); border-radius: 8px; padding: 10px; font-size: 14px; cursor: pointer; }
+  .reg-chk input[type=checkbox] { width: 20px; height: 20px; flex: 0 0 20px; padding: 0; margin: 0; }
+  .ban-item { border: 1px solid var(--c-border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+  .ban-item .addr { font-size: 13px; font-weight: 600; line-height: 1.4; }
+  .ban-item .note { font-size: 12px; color: var(--c-sub); margin-top: 3px; }
+  .ban-item .caution { color: var(--c-err); font-weight: 700; }
+  .ban-choices { display: flex; gap: 8px; margin-top: 8px; }
+  .ban-choices button { flex: 1; padding: 10px 4px; border: 1px solid var(--c-border); background: #fff; font-size: 13px; }
+  .ban-choices button.sel-avoid { background: var(--c-ok-bg); color: var(--c-ok); border-color: var(--c-ok); font-weight: 700; }
+  .ban-choices button.sel-dist { background: var(--c-err-bg); color: var(--c-err); border-color: var(--c-err); font-weight: 700; }
+  .home-ban { border: 1px solid #f0d488; background: #fffbe9; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: 13px; line-height: 1.5; }
+  .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent;
+          border-radius: 50%; animation: sp 0.8s linear infinite; vertical-align: -3px; margin-right: 6px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  /* 本日の担当カード */
+  .assign { border: 1px solid var(--c-border); border-radius: 10px; padding: 12px; margin-bottom: 8px; cursor: pointer; background:#fff; }
+  .assign:active { background: #f1f3f4; }
+  .assign .store { font-weight: 700; font-size: 15px; }
+  .assign .meta { font-size: 12px; color: var(--c-sub); margin-top: 3px; }
+  .assign .badge { float: right; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+  .badge-todo { background: var(--c-warn-bg); color: var(--c-warn); }
+  .badge-done { background: var(--c-ok-bg); color: var(--c-ok); }
+  /* 履歴 */
+  .rep { border: 1px solid var(--c-border); border-radius: 10px; padding: 12px; margin-bottom: 8px; background:#fff; }
+  .rep .top { display: flex; justify-content: space-between; align-items: center; }
+  .rep .store { font-weight: 700; }
+  .rep .meta { font-size: 12px; color: var(--c-sub); margin-top: 3px; }
+  .st-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 700; white-space: nowrap; }
+  .st-APPLIED { background: var(--c-ok-bg); color: var(--c-ok); }
+  .st-REVERSED { background: #f1f3f4; color: var(--c-sub); }
+  .st-REJECTED { background: var(--c-err-bg); color: var(--c-err); }
+  .rep .actions { margin-top: 10px; display: none; }
+  .rep.open .actions { display: block; }
+  .rep .actions button { margin-top: 6px; }
+  /* 下部固定ナビ */
+  #bottomNav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff;
+               border-top: 1px solid var(--c-border); z-index: 10; max-width: 560px; margin: 0 auto; }
+  #bottomNav button { flex: 1; background: transparent; color: var(--c-sub); padding: 8px 4px 10px;
+                      font-size: 11px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  #bottomNav button.active { color: var(--c-primary); }
+  #bottomNav button .ic { font-size: 20px; line-height: 1; }
+  .empty { text-align: center; color: var(--c-sub); font-size: 14px; padding: 24px 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hiポス配布報告</h1>
+  <div class="sub" id="userBar">未サインイン</div>
+</header>
+<main>
+
+  <!-- ═══ サインイン ═══ -->
+  <div class="card" id="authCard">
+    <h2>サインイン</h2>
+    <p class="signin-note">配布報告には本人確認が必要です。会社に登録済みのGoogleアカウントでサインインしてください。</p>
+    <div id="gsiButton"></div>
+    <div id="gsiFail" class="hidden">
+      <div class="msg msg-warn">個別トークンでログインします。管理者から配布されたトークンを入力してください。<br>（練習環境ではこちらを使います。Googleログインを使う運用の場合は管理者にお問い合わせください）</div>
+      <label>個別トークン</label>
+      <input type="password" id="staffToken" autocomplete="off" placeholder="管理者から配布されたトークン">
+      <button class="btn-primary" style="margin-top:8px" onclick="App.tokenSignIn()">トークンで開始</button>
+    </div>
+  </div>
+
+  <!-- ═══ 未登録者の案内（配達員マスタに未登録） ═══ -->
+  <div class="view hidden" id="unregView">
+    <div class="card">
+      <h2>配達員登録がありません</h2>
+      <div class="msg msg-warn">このGoogleアカウントは、まだ配達員として登録されていません。<br>下のメールアドレスを管理者に伝えて、登録を依頼してください。</div>
+      <label>あなたのメールアドレス</label>
+      <input id="unregEmail" readonly>
+      <button class="btn-primary" style="margin-top:8px" onclick="App.copyEmail()">📋 メールアドレスをコピー</button>
+      <div class="case-info" style="margin-top:10px">登録後、この画面を再読み込みすると報告できるようになります。</div>
+      <button class="btn-ghost" style="margin-top:8px" onclick="location.reload()">再読み込み</button>
+    </div>
+  </div>
+
+  <!-- ═══ ① 報告（ホーム） ═══ -->
+  <div class="view hidden" id="homeView">
+
+    <!-- 本日の担当 -->
+    <div class="card">
+      <h2>本日の担当</h2>
+      <div id="todayList"><div class="empty">読み込み中…</div></div>
+      <div class="summary" id="homeSummary"></div>
+    </div>
+
+    <!-- 本日の配布禁止（当日の予定町に該当する禁止物件） -->
+    <div class="card hidden" id="homeBanCard" style="border-color:#f0b400">
+      <h2>🚫 本日の配布禁止</h2>
+      <div id="homeBanWarn"></div>
+      <div id="homeBanList"></div>
+    </div>
+
+    <!-- 報告フォーム -->
+    <form id="reportForm" onsubmit="App.submit(event)">
+      <div class="card">
+        <h2>① 催事（案件）</h2>
+        <select id="caseSelect" required></select>
+        <div class="case-info" id="caseInfo">催事を選択してください</div>
+        <details id="overrideBox">
+          <summary>エリア・帰属月を手動指定（通常は不要）</summary>
+          <div class="case-info">※ 催事にエリア・帰属月が設定済みの場合は<b>催事側の設定が優先</b>されます。</div>
+          <label>集計エリア</label>
+          <select id="overrideArea"><option value="">（催事から自動）</option></select>
+          <label>帰属月（YYYY.MM）</label>
+          <input id="overrideMonth" placeholder="例 2026.07" pattern="\d{4}\.\d{2}">
+        </details>
+      </div>
+
+      <div class="card">
+        <h2>② 配布日</h2>
+        <div class="row">
+          <div><label>開始</label><input type="date" id="distStart" required></div>
+          <div><label>終了</label><input type="date" id="distEnd" required></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>③ 町×部数</h2>
+        <div id="townRows"></div>
+        <button type="button" class="btn-ghost" onclick="App.addTownRow()">＋ 行を追加</button>
+        <datalist id="townList"></datalist>
+        <label>合計部数（自分で数えた値を入力）</label>
+        <input type="number" id="totalReported" min="0" step="1" required inputmode="numeric"
+               placeholder="自動転記されません。必ず自分の合計を入力">
+        <div class="total-bar" id="totalBar">
+          <span>入力行の自動合計</span><strong id="autoTotal">0</strong>
+        </div>
+      </div>
+
+      <div class="card hidden" id="banCheckCard" style="border-color:#c5221f">
+        <h2>🚫 配布禁止物件の確認（必須）</h2>
+        <div class="case-info">入力中の町に<b>配布禁止物件</b>があります。物件ごとに「回避した／配ってしまった」を選んでください。<b>選ぶまで送信できません。</b></div>
+        <div id="banCheckList"></div>
+      </div>
+
+      <div class="card">
+        <h2>④ 勤務実績</h2>
+        <div class="case-info">旧TimeTreeメモ末尾の「375部/1h・休憩/1h・勤務/8h」にあたる項目です。未入力でも送信できます。</div>
+        <div class="row">
+          <div><label>部数毎時（部/1h）</label>
+            <input type="number" id="workCph" min="0" step="1" inputmode="numeric" placeholder="例 375"></div>
+          <div><label>休憩時間（h）</label>
+            <input type="number" id="workBreakH" min="0" step="0.5" inputmode="decimal" placeholder="例 1"></div>
+        </div>
+        <label>勤務時間（h）</label>
+        <input type="number" id="workWorkH" min="0" step="0.5" inputmode="decimal" placeholder="例 8">
+      </div>
+
+      <div class="card">
+        <h2 id="gpsHeading">⑤ GPS軌跡画像（最大10枚）</h2>
+        <input type="file" id="gpsFiles" accept="image/*" multiple onchange="App.onGpsSelect(this)">
+        <div id="gpsList" style="margin-top:8px"></div>
+        <div class="case-info">GPSアプリの軌跡スクリーンショットを選択してください。<br>報告の送信後に自動で一括アップロードされ、管理者がドライブで確認できます。</div>
+        <div id="gpsProgress"></div>
+      </div>
+
+      <div id="resultArea"></div>
+      <button type="submit" class="btn-primary" id="submitBtn">報告を送信</button>
+      <div class="footer-note">送信後すぐに、あなたの本日・今月の合計が表示されます</div>
+    </form>
+  </div>
+
+  <!-- ═══ ② 報告履歴 ═══ -->
+  <div class="view hidden" id="historyView">
+    <div class="card">
+      <h2>報告履歴（直近60日）</h2>
+      <div id="reportsList"><div class="empty">読み込み中…</div></div>
+    </div>
+    <input type="file" id="gpsAddInput" accept="image/*" multiple class="hidden" onchange="App.onGpsAddSelect(this)">
+  </div>
+
+  <!-- ═══ ③ アカウント ═══ -->
+  <div class="view hidden" id="accountView">
+    <div class="card">
+      <h2>ログイン情報</h2>
+      <div id="accountBody"></div>
+      <button class="btn-ghost" style="margin-top:12px" onclick="App.logout()">ログアウト</button>
+    </div>
+  </div>
+
+  <!-- ═══ ④ 予定登録（管理者のみ） ═══ -->
+  <div class="view hidden" id="registerView">
+    <div class="card">
+      <h2>配布予定の一括登録（管理者）</h2>
+      <div class="case-info">案件と担当者を選ぶと、源泉カレンダー「Hiポス予定入力」に<b>担当者ごとの予定を自動作成</b>します（TimeTreeへの手入力の置き換え）。作成後、各配達員のフォームに自動で反映されます。</div>
+    </div>
+
+    <div class="card">
+      <h2>① 案件（催事）</h2>
+      <select id="regCase"><option value="">— 催事を選択 —</option></select>
+      <div class="case-info" id="regCaseInfo">催事を選択してください</div>
+      <div id="regCalWrap" style="display:none">
+        <label>登録先カレンダー（拠点）</label>
+        <select id="regCal"></select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>② 配布日（全員共通）</h2>
+      <div class="row">
+        <div><label>開始</label><input type="date" id="regStart"></div>
+        <div><label>終了</label><input type="date" id="regEnd"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>③ 配布エリア（全員共通）</h2>
+      <div class="case-info">1行に1町。案件の配布エリアを自動で読み込みます（編集できます）。</div>
+      <textarea id="regTowns" rows="6" placeholder="押熊町&#10;東登美ケ丘(1)&#10;東登美ケ丘(2)" style="margin-top:6px"></textarea>
+    </div>
+
+    <div class="card">
+      <h2>④ 配布担当（複数選択）</h2>
+      <div id="regStaffList" class="reg-staff"><div class="empty">読み込み中…</div></div>
+    </div>
+
+    <details class="card">
+      <summary>🚚 送迎のみの担当・連絡事項（任意）</summary>
+      <label style="margin-top:12px">送迎のみ（配布なし）の担当</label>
+      <div id="regSogeiList" class="reg-staff"></div>
+      <label>連絡事項（全予定のメモに追記されます）</label>
+      <textarea id="regNote" rows="3" placeholder="例：新事務所に集合、社用車で移動"></textarea>
+    </details>
+
+    <div id="regResult"></div>
+    <button type="button" class="btn-primary" id="regSubmit" onclick="App.submitRegister()">この内容でカレンダーに登録</button>
+    <div class="footer-note">登録後、スタッフ用の予定と報告リンクが自動で作成されます</div>
+  </div>
+
+  <!-- ═══ ⑤ スタッフ登録（管理者のみ） ═══ -->
+  <div class="view hidden" id="staffView">
+    <div class="card">
+      <h2>スタッフ登録（管理者）</h2>
+      <div class="case-info">新しいアルバイトスタッフを登録します。<b>氏名</b>と<b>会社で使うGoogleアカウント（Gmail）</b>を入れて登録すると、そのスタッフはGoogleサインインで報告できるようになります。</div>
+    </div>
+
+    <div class="card">
+      <label>氏名 <span style="color:var(--c-err)">*</span></label>
+      <input type="text" id="stName" placeholder="例：山田 太郎" autocomplete="off">
+      <label style="margin-top:12px">Googleアカウント（Gmail） <span style="color:var(--c-err)">*</span></label>
+      <input type="email" id="stEmail" placeholder="例：yamada@gmail.com" autocomplete="off">
+      <details style="margin-top:12px">
+        <summary>詳細設定（任意・ふつうは空欄でOK）</summary>
+        <label style="margin-top:10px">集計タブの表記名<br><span class="footer-note">空欄なら氏名を使います。集計表の列見出しと表記が違うときだけ入力。</span></label>
+        <input type="text" id="stTabName" placeholder="集計表の列見出しと同じ表記" autocomplete="off">
+        <label style="margin-top:10px">拠点（任意）</label>
+        <input type="text" id="stHome" placeholder="例：稲毛" autocomplete="off">
+      </details>
+      <div id="stResult"></div>
+      <button type="button" class="btn-primary" id="stSubmit" style="margin-top:14px" onclick="App.submitStaff()">このスタッフを登録</button>
+      <div class="footer-note">※ 集計に反映するには、集計タブ側にそのスタッフの列（表記名）が別途必要です。</div>
+    </div>
+
+    <div class="card">
+      <h2>登録済みスタッフ</h2>
+      <div id="stRoster"><div class="empty">読み込み中…</div></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- 下部固定ナビ -->
+<nav id="bottomNav" class="hidden">
+  <button type="button" data-tab="home" onclick="App.switchTab('home')"><span class="ic">📝</span>報告</button>
+  <button type="button" data-tab="history" onclick="App.switchTab('history')"><span class="ic">📋</span>履歴</button>
+  <button type="button" data-tab="account" onclick="App.switchTab('account')"><span class="ic">👤</span>アカウント</button>
+  <button type="button" data-tab="register" id="navRegister" onclick="App.switchTab('register')" style="display:none"><span class="ic">🗓️</span>予定登録</button>
+  <button type="button" data-tab="staff" id="navStaff" onclick="App.switchTab('staff')" style="display:none"><span class="ic">👥</span>スタッフ登録</button>
+</nav>
+
+<script>
+// ════════════════════════════════════════════════════
+// CONFIG — 設置時にここを書き換える
+// ════════════════════════════════════════════════════
+var CONFIG = {
+  API_URL: 'https://script.google.com/macros/s/AKfycbyRdNFAOyr6z1lmZNn0edwTfiMdsBEZrC4f3kfdgIU75eFGBNPjVm832lKSXVoHUwMXag/exec',
+  OAUTH_CLIENT_ID: '【OAuthクライアントID】.apps.googleusercontent.com'
+};
+
+// カレンダーのリンク（?case=案件番号）から催事を自動選択するための値。
+// GAS配信時はサーバ(doGet)がこのプレースホルダを案件番号に文字列置換する（テンプレート機能は使わない）。
+var PRESET_CASE = '__HIPOS_PRESET_CASE__';
+// 静的ホスティング時はプレースホルダが未置換のまま残る → URLの ?case= から読む
+if (PRESET_CASE.indexOf('HIPOS_PRESET') >= 0) {
+  try { PRESET_CASE = new URLSearchParams(location.search).get('case') || ''; } catch (e) { PRESET_CASE = ''; }
+}
+PRESET_CASE = PRESET_CASE.replace(/[^A-Za-z0-9]/g, '');
+
+var App = (function() {
+  var state = {
+    idToken: null, tokenExp: 0, staffToken: null,
+    deviceId: null, reportUuid: null,
+    email: '', cases: [], areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
+    banList: [], banChoices: {},   // 選択中案件の配布禁止物件と 回避/誤配 の選択（raw→'AVOIDED'|'DISTRIBUTED'）
+    correcting: false,             // 履歴からの取消→修正の実行中フラグ（二重押し防止）
+    submitting: false, retryCount: 0,
+    gpsFiles: [], gpsMax: 10, gpsUploading: false,
+    gpsAddTarget: null,   // 履歴からGPS追加する対象 reportUuid
+    restoringDetail: false, // 修正プリフィル中フラグ（caseTowns応答の誤上書き防止）
+    tab: 'home'
+  };
+
+  // ─── ユーティリティ ───
+  function uuid() {
+    var b = new Uint8Array(16);
+    crypto.getRandomValues(b);
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+    var h = Array.prototype.map.call(b, function(x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+  }
+  function $(id) { return document.getElementById(id); }
+  function hasValidClientId() {
+    var id = CONFIG.OAUTH_CLIENT_ID || '';
+    return id.indexOf('【') < 0 && id.indexOf('.apps.googleusercontent.com') > 0;
+  }
+  function todayIso() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+  }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch(e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch(e) { /* 非永続環境は縮退動作 */ } }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch(e) {} }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(m) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m];
+    });
+  }
+
+  /** 空欄は null（未入力）として送る。0 と区別される（勤務実績用） */
+  function numOrNull(v) {
+    var s = String(v == null ? '' : v).trim();
+    if (s === '') return null;
+    var n = Number(s);
+    return isNaN(n) ? null : n;
+  }
+
+  // ─── API呼び出し（転送規約: text/plain + JSON本文） ───
+  function api(payload) {
+    payload.apiVersion = 1;
+    if (state.idToken) payload.idToken = state.idToken;
+    else if (state.staffToken) payload.staffToken = state.staffToken;
+    return fetch(CONFIG.API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); });
+  }
+
+  // ─── 認証 ───
+  function initGsi() {
+    if (!window.google || !google.accounts || !google.accounts.id) { showGsiFail(); return; }
+    try {
+      google.accounts.id.initialize({
+        client_id: CONFIG.OAUTH_CLIENT_ID,
+        callback: function(resp) { onSignIn(resp.credential); },
+        auto_select: true
+      });
+      google.accounts.id.renderButton($('gsiButton'), { theme: 'filled_blue', size: 'large', width: 280, text: 'signin_with' });
+    } catch (e) { showGsiFail(); }
+  }
+  function showGsiFail() { $('gsiFail').classList.remove('hidden'); }
+
+  function onSignIn(credential) {
+    state.idToken = credential;
+    try {
+      var claims = JSON.parse(atob(credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      state.tokenExp = (claims.exp || 0) * 1000;
+      state.email = claims.email || '';
+      $('userBar').textContent = claims.email || 'サインイン済み';
+      lsSet('hipos_id_token', credential);
+    } catch (e) { $('userBar').textContent = 'サインイン済み'; }
+    afterAuth();
+  }
+
+  function tokenSignIn() {
+    var t = $('staffToken').value.trim();
+    if (!t) { alert('トークンを入力してください'); return; }
+    state.staffToken = t;
+    lsSet('hipos_staff_token', t);
+    $('userBar').textContent = '個別トークンで利用中';
+    afterAuth();
+  }
+
+  function tryRestoreSession() {
+    var t = lsGet('hipos_id_token');
+    if (t) {
+      try {
+        var claims = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+        if (claims.exp * 1000 > Date.now() + 60000) { onSignIn(t); return true; }
+      } catch (e) { /* fallthrough */ }
+    }
+    var st = lsGet('hipos_staff_token');
+    if (st) { state.staffToken = st; afterAuth(); return true; }   // 復元時はトークンを入力欄に出さない
+    return false;
+  }
+
+  function logout() {
+    lsDel('hipos_id_token'); lsDel('hipos_staff_token');
+    try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
+    location.reload();
+  }
+
+  function copyEmail() {
+    var v = $('unregEmail').value;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(v).then(function() { alert('メールアドレスをコピーしました'); },
+        function() { window.prompt('コピーしてください', v); });
+    } else { window.prompt('コピーしてください', v); }
+  }
+
+  // ─── 認証後の初期分岐 ───
+  function afterAuth() {
+    api({ action: 'whoami' }).then(function(who) {
+      if (!who.ok) { showAuthError(who); return; }
+      state.email = who.email || state.email;
+      state.isAdmin = !!who.isAdmin;
+      state.registered = !!who.registered;
+      state.staff = who.staff || null;
+
+      if (!state.registered) {
+        // 未登録者 → 案内画面（管理者にメールを伝えて登録依頼）
+        $('authCard').classList.add('hidden');
+        $('unregEmail').value = state.email || '(メール取得できず)';
+        $('userBar').textContent = (state.email || '') + '（未登録）';
+        showOnly('unregView');
+        return;
+      }
+
+      $('userBar').textContent = state.staff.name + '（' + state.staff.staffId + '）' + (state.isAdmin ? '・管理者' : '');
+      $('authCard').classList.add('hidden');
+      $('bottomNav').classList.remove('hidden');
+      if (state.isAdmin) {   // 管理者のみ「予定登録」「スタッフ登録」タブ
+        $('navRegister').style.display = '';
+        $('navStaff').style.display = '';
+      }
+      loadCases();
+    }).catch(function(e) {
+      showAuthError({ message: '接続できません: ' + e.message });
+    });
+  }
+
+  function showAuthError(res) {
+    $('authCard').classList.remove('hidden');
+    var box = $('gsiButton');
+    box.insertAdjacentHTML('afterend',
+      '<div class="msg msg-err">' + esc(res.message || res.code || '認証に失敗しました') + '</div>');
+  }
+
+  function loadCases() {
+    api({ action: 'cases' }).then(function(res) {
+      if (!res.ok) { showResult(res); return; }
+      state.cases = res.cases || [];
+      state.areas = res.areas || [];
+      state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ返る）
+      state.calendars = res.calendars || [];       // 予定登録の登録先カレンダー（管理者のみ返る）
+      state.gpsMax = Number(res.gpsMax) || 10;
+      $('gpsHeading').textContent = '⑤ GPS軌跡画像（最大' + state.gpsMax + '枚）';
+      renderCases();
+      renderAreas();
+      switchTab('home');
+      // カレンダーのリンク（?case=）から来た場合は該当催事を自動選択
+      if (PRESET_CASE) {
+        var sel = $('caseSelect');
+        for (var i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === PRESET_CASE) { sel.value = PRESET_CASE; onCaseChange(); break; }
+        }
+      }
+    }).catch(function(e) {
+      showResult({ ok: false, code: 'E_NETWORK', message: '接続できません: ' + e.message });
+    });
+  }
+
+  // ─── タブ切替 ───
+  function showOnly(viewId) {
+    ['homeView', 'historyView', 'accountView', 'registerView', 'staffView', 'unregView'].forEach(function(v) {
+      $(v).classList.toggle('hidden', v !== viewId);
+    });
+  }
+  function switchTab(name) {
+    state.tab = name;
+    var map = { home: 'homeView', history: 'historyView', account: 'accountView', register: 'registerView', staff: 'staffView' };
+    showOnly(map[name]);
+    var btns = document.querySelectorAll('#bottomNav button');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-tab') === name);
+    }
+    window.scrollTo(0, 0);
+    if (name === 'home') loadToday();
+    else if (name === 'history') loadReports();
+    else if (name === 'account') renderAccount();
+    else if (name === 'register') loadRegister();
+    else if (name === 'staff') loadStaff();
+  }
+
+  // ─── ホーム: 本日の担当 ───
+  function loadToday() {
+    var tabAtRequest = state.tab;
+    api({ action: 'myToday' }).then(function(res) {
+      if (state.tab !== tabAtRequest) return;   // 応答到着前にタブが変わっていたら破棄
+      if (!res.ok) { $('todayList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
+      var list = res.todayAssignments || [];
+      if (list.length === 0) {
+        $('todayList').innerHTML = '<div class="empty">本日の割当はありません。<br>下の「催事」から選んで報告できます。</div>';
+      } else {
+        $('todayList').innerHTML = list.map(function(a) {
+          var badge = a.reported ? '<span class="badge badge-done">報告済</span>' :
+                      a.role === '送迎' ? '<span class="badge" style="background:#e8eaed;color:#5f6368">送迎</span>' :
+                      '<span class="badge badge-todo">未報告</span>';
+          var townLabel = (a.townCount || 0) > 0
+            ? (a.townCount + '町')
+            : '<span style="color:var(--c-warn)">町リスト未設定（町名は手入力）</span>';
+          return '<div class="assign" onclick="App.pickCase(\'' + esc(a.caseNo) + '\')">' + badge +
+            '<div class="store">' + esc(a.storeClean || a.caseNo) + '</div>' +
+            '<div class="meta">' + esc(a.areaDisplay || '') + ' ／ ' + esc(a.caseNo) +
+            ' ／ ' + townLabel + '</div></div>';
+        }).join('');
+      }
+      var s = res.mySummary || {};
+      $('homeSummary').innerHTML =
+        '<div class="box"><div class="num">' + (s.todayQty || 0) + '</div><div class="lbl">本日合計（部）</div></div>' +
+        '<div class="box"><div class="num">' + (s.monthQty || 0) + '</div><div class="lbl">今月合計（部）</div></div>' +
+        '<div class="box"><div class="num">' + (s.monthReports || 0) + '</div><div class="lbl">今月の報告数</div></div>';
+      renderHomeBans(res.todayBans || [], res.unsubmittedBans || []);
+    }).catch(function() {
+      $('todayList').innerHTML = '<div class="empty">読み込みに失敗しました</div>';
+    });
+  }
+
+  // ホームの「本日の配布禁止」＋未提出警告
+  function renderHomeBans(bans, unsub) {
+    var card = $('homeBanCard');
+    if ((!bans || bans.length === 0) && (!unsub || unsub.length === 0)) {
+      card.classList.add('hidden'); return;
+    }
+    card.classList.remove('hidden');
+    $('homeBanWarn').innerHTML = (unsub && unsub.length)
+      ? '<div class="msg msg-warn">⚠️ 回避確認が未提出の案件があります：' +
+          unsub.map(function(u) { return esc(u.storeClean) + '（禁止' + u.count + '件）'; }).join('、') +
+          '<br>報告時に各物件の「回避した／配ってしまった」を選んでください。</div>'
+      : '';
+    $('homeBanList').innerHTML = (bans && bans.length)
+      ? bans.map(function(b) {
+          return '<div class="home-ban">' + (b.caution ? '⚠️' : '🚫') + ' <b>' + esc(b.raw) + '</b>' +
+            (b.note ? '<br><span style="color:#8a6d00">' + esc(b.note) + '</span>' : '') +
+            (b.mapUrl ? ' <a href="' + esc(b.mapUrl) + '" target="_blank" rel="noopener">🗺</a>' : '') + '</div>';
+        }).join('')
+      : '<div class="case-info">本日の予定町に配布禁止物件はありません。</div>';
+  }
+
+  function pickCase(caseNo) {
+    var sel = $('caseSelect');
+    var found = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === caseNo) { sel.value = caseNo; found = true; break; }
+    }
+    if (!found) { alert('この案件は選択リストにありません（受付終了の可能性）'); return; }
+    onCaseChange();
+    $('caseSelect').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function renderCases() {
+    var sel = $('caseSelect');
+    sel.innerHTML = '<option value="">— 催事を選択 —</option>';
+    var home = state.staff ? state.staff.homeArea : '';
+    var sorted = state.cases.slice().sort(function(a, b) {
+      var ah = a.areaId === home ? 0 : 1, bh = b.areaId === home ? 0 : 1;
+      if (ah !== bh) return ah - bh;
+      return String(b.distStart).localeCompare(String(a.distStart));
+    });
+    sorted.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c.caseNo;
+      opt.textContent = c.storeClean + '（' + c.areaDisplay + '・' + c.caseNo + '）';
+      sel.appendChild(opt);
+    });
+    sel.onchange = onCaseChange;
+  }
+
+  function renderAreas() {
+    var sel = $('overrideArea');
+    sel.innerHTML = '<option value="">（催事から自動）</option>';
+    state.areas.forEach(function(a) {
+      var opt = document.createElement('option');
+      opt.value = a.areaId; opt.textContent = a.display;
+      sel.appendChild(opt);
+    });
+  }
+
+  function currentCase() {
+    var no = $('caseSelect').value;
+    for (var i = 0; i < state.cases.length; i++) {
+      if (state.cases[i].caseNo === no) return state.cases[i];
+    }
+    return null;
+  }
+
+  function onCaseChange() {
+    var c = currentCase();
+    if (!c) { $('caseInfo').textContent = '催事を選択してください'; return; }
+    $('caseInfo').innerHTML =
+      '店舗: <b>' + esc(c.storeClean) + '</b> ／ エリア: <b>' + esc(c.areaDisplay) + '</b>' +
+      ' ／ 帰属月: <b>' + esc(c.month || '(配布日から自動)') + '</b>' +
+      (c.distStart ? '<br>予定期間: ' + esc(c.distStart) + ' 〜 ' + esc(c.distEnd) : '') +
+      (c.material ? '<br>配布物: ' + esc(c.material) : '');
+    // 案件の町リスト（配布エリアU列）＋町名サジェスト＋配布禁止物件を一括取得してプリフィル
+    api({ action: 'caseTowns', caseNo: c.caseNo }).then(function(res) {
+      if (!res.ok) return;
+      state.banList = res.banList || [];      // この案件の配布禁止物件（入力町で絞って表示）
+      state.banChoices = {};
+      renderBanCheck();
+      var dl = $('townList');
+      dl.innerHTML = '';
+      (res.towns || []).forEach(function(t) {
+        if (!t.display) return;
+        var opt = document.createElement('option'); opt.value = t.display; dl.appendChild(opt);
+      });
+      // 入力済みの行がある場合は上書きしない（誤消去・修正プリフィルの保護）
+      if (state.restoringDetail) return;
+      if (readLines().length > 0) return;
+      var pre = res.prefill || [];
+      if (pre.length > 0) {
+        $('townRows').innerHTML = '';
+        pre.forEach(function(t) { addTownRow(t.display, null); });
+        addTownRow();
+        recalc();
+        $('caseInfo').innerHTML += '<br>📋 <b>配布エリアを読み込みました（' + pre.length + '町）</b> — 各町の部数を入力してください';
+      }
+    });
+  }
+
+  // ─── 町×部数の行UI ───
+  function addTownRow(town, qty) {
+    var div = document.createElement('div');
+    div.className = 'town-row';
+    div.innerHTML =
+      '<input class="town" list="townList" placeholder="町名（例 東川崎町(1)）" value="' + esc(town || '') + '">' +
+      '<input class="qty" type="number" min="0" step="1" inputmode="numeric" placeholder="部数" value="' + (qty != null ? qty : '') + '">' +
+      '<button type="button" tabindex="-1">×</button>';
+    div.querySelector('button').onclick = function() { div.remove(); recalc(); };
+    div.querySelector('.qty').oninput = recalc;
+    div.querySelector('.town').oninput = recalc;   // 町名の入力/消去でも合計・警告を再評価
+    $('townRows').appendChild(div);
+  }
+
+  function readLines() {
+    var lines = [];
+    var rows = $('townRows').querySelectorAll('.town-row');
+    for (var i = 0; i < rows.length; i++) {
+      var town = rows[i].querySelector('.town').value.trim();
+      var qtyRaw = rows[i].querySelector('.qty').value;
+      if (!town) continue;
+      lines.push({ town: town, qty: qtyRaw === '' ? 0 : Number(qtyRaw) });
+    }
+    return lines;
+  }
+
+  /** 町名が空のまま部数だけ入っている行があるか（その行は無効＝合計に入らないため警告する） */
+  function hasEmptyTownWithQty() {
+    var rows = $('townRows').querySelectorAll('.town-row');
+    for (var i = 0; i < rows.length; i++) {
+      var town = rows[i].querySelector('.town').value.trim();
+      var qty = rows[i].querySelector('.qty').value;
+      if (!town && qty !== '') return true;
+    }
+    return false;
+  }
+
+  function recalc() {
+    var sum = readLines().reduce(function(s, l) { return s + (Number(l.qty) || 0); }, 0);
+    $('autoTotal').textContent = sum;
+    var reported = $('totalReported').value;
+    var bar = $('totalBar');
+    bar.classList.remove('match', 'mismatch');
+    var warn = $('emptyTownWarn');
+    if (hasEmptyTownWithQty()) {
+      if (!warn) {
+        bar.insertAdjacentHTML('afterend',
+          '<div id="emptyTownWarn" class="msg msg-warn">⚠ 町名が入っていない行の部数は合計に入りません。町名を入力するか、×で行を削除してください。</div>');
+      }
+    } else if (warn) {
+      warn.remove();
+    }
+    if (reported !== '') bar.classList.add(Number(reported) === sum ? 'match' : 'mismatch');
+    renderBanCheck();   // 入力町が変わると該当する配布禁止物件も変わる
+  }
+
+  // ─── 配布禁止物件の回避チェック ───
+  // サーバの BanSync.townKey と同じ突合キー（NFKC＋空白除去＋ヶ→ケ＋丁目除去）
+  function townKeyJs(town) {
+    var s = String(town == null ? '' : town).normalize('NFKC').replace(/\s+/g, '').replace(/ヶ/g, 'ケ');
+    return s.replace(/[（(]\s*\d+\s*[）)]\s*$/, '').replace(/\d+丁目$/, '').replace(/\d+$/, '');
+  }
+  /** 入力中の町に該当する禁止物件（表示・検証の対象） */
+  function applicableBans() {
+    var keys = {};
+    readLines().forEach(function(l) { keys[townKeyJs(l.town)] = true; });
+    return (state.banList || []).filter(function(b) { return keys[b.townKey]; });
+  }
+  function renderBanCheck() {
+    var card = $('banCheckCard');
+    var list = applicableBans();
+    if (list.length === 0) { card.classList.add('hidden'); $('banCheckList').innerHTML = ''; return; }
+    card.classList.remove('hidden');
+    $('banCheckList').innerHTML = list.map(function(b) {
+      var sel = state.banChoices[b.raw];
+      return '<div class="ban-item">' +
+        '<div class="addr">' + (b.caution ? '<span class="caution">⚠️要注意 </span>' : '') + esc(b.raw) + '</div>' +
+        (b.note ? '<div class="note">' + esc(b.note) + '</div>' : '') +
+        (b.mapUrl ? '<div class="note"><a href="' + esc(b.mapUrl) + '" target="_blank" rel="noopener">🗺 地図で確認</a></div>' : '') +
+        '<div class="ban-choices" data-raw="' + esc(b.raw) + '">' +
+          '<button type="button" class="' + (sel === 'AVOIDED' ? 'sel-avoid' : '') + '" onclick="App.setBan(this,\'AVOIDED\')">✅ 回避した</button>' +
+          '<button type="button" class="' + (sel === 'DISTRIBUTED' ? 'sel-dist' : '') + '" onclick="App.setBan(this,\'DISTRIBUTED\')">⚠️ 配ってしまった</button>' +
+        '</div></div>';
+    }).join('');
+  }
+  function setBan(btn, result) {
+    var raw = btn.parentNode.getAttribute('data-raw');
+    state.banChoices[raw] = result;
+    renderBanCheck();
+  }
+
+  // ─── 送信 ───
+  function submit(ev) {
+    ev.preventDefault();
+    if (state.submitting) return;
+    var c = currentCase();
+    if (!c) { alert('催事を選択してください'); return; }
+    var lines = readLines();
+    if (lines.length === 0) { alert('町×部数を1行以上入力してください'); return; }
+    if (hasEmptyTownWithQty()) {
+      alert('町名が入っていない行に部数があります。\n・町名を入力するか\n・×ボタンでその行を削除してから送信してください');
+      return;
+    }
+    // 配布禁止物件の回避確認（未選択があると送信できない）
+    var abans = applicableBans();
+    var unpicked = abans.filter(function(b) { return !state.banChoices[b.raw]; });
+    if (unpicked.length > 0) {
+      alert('配布禁止物件の確認が必要です。\n各物件に「回避した／配ってしまった」を選んでから送信してください（残り ' + unpicked.length + ' 件）。');
+      renderBanCheck();
+      $('banCheckCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    var avoidances = abans.map(function(b) { return { key: b.raw, result: state.banChoices[b.raw] }; });
+    if (!state.reportUuid) state.reportUuid = uuid();
+    state.retryCount = 0;
+
+    var payload = {
+      action: 'submitReport', deviceId: state.deviceId, reportUuid: state.reportUuid,
+      avoidances: avoidances,
+      report: {
+        caseNo: c.caseNo, distStart: $('distStart').value, distEnd: $('distEnd').value,
+        lines: lines, totalReported: Number($('totalReported').value),
+        material: '',
+        // 勤務実績（任意・M4.5でUI復活。空欄は null = 未入力として保存され 0 と区別される）
+        work: { copiesPerHour: numOrNull($('workCph').value),
+                breakH: numOrNull($('workBreakH').value),
+                workH: numOrNull($('workWorkH').value) },
+        note: '',
+        overrides: { areaId: $('overrideArea').value || null, month: $('overrideMonth').value.trim() || null }
+      }
+    };
+    doSend(payload);
+  }
+
+  function doSend(payload) {
+    setSubmitting(true, '送信中…');
+    api(payload).then(function(res) {
+      setSubmitting(false);
+      showResult(res);
+      if (res.ok && res.code === 'APPLIED') {
+        var doneUuid = payload.reportUuid;
+        state.reportUuid = null;
+        if (!res.idempotentReplay) {
+          if (state.gpsFiles.length > 0) uploadGpsSequential(doneUuid);
+          else clearFormAfterSuccess();
+        }
+      } else if (res.code === 'E_LOCK_TIMEOUT' && res.retryable) {
+        if (state.retryCount >= 3) {
+          showResult({ ok: false, code: 'E_LOCK_TIMEOUT',
+            message: '混雑が続いています。少し時間をおいて、もう一度「報告を送信」を押してください（同じ内容で安全に再送されます）' });
+          return;
+        }
+        state.retryCount++;
+        var wait = (res.retryAfterSec || 5) * 1000;
+        setSubmitting(true, '混雑中… ' + (wait / 1000) + '秒後に自動再送（' + state.retryCount + '/3）');
+        setTimeout(function() { doSend(payload); }, wait);
+      } else if (!res.ok) {
+        state.reportUuid = null;
+      }
+    }).catch(function(e) {
+      setSubmitting(false);
+      showResult({ ok: false, code: 'E_NETWORK',
+        message: '送信できませんでした（電波状況を確認してください）。入力内容は保持されています。もう一度「報告を送信」を押すと安全に再送されます。\n詳細: ' + e.message });
+    });
+  }
+
+  function setSubmitting(flag, label) {
+    state.submitting = flag;
+    var btn = $('submitBtn');
+    btn.disabled = flag;
+    btn.innerHTML = flag ? '<span class="spin"></span>' + esc(label || '送信中…') : '報告を送信';
+  }
+
+  function showResult(res) {
+    var area = $('resultArea');
+    var cls, body;
+    if (res.ok) {
+      cls = res.mergeNotice ? 'msg-merge' : 'msg-ok';
+      var a = res.applied || {};
+      body = '✅ 反映しました' + (res.idempotentReplay ? '（再送 — 二重加算はありません）' : '') +
+        '\n店舗: ' + (a.storeClean || '') + ' ／ タブ: ' + (a.tabName || '') +
+        '\n期間: ' + (a.period || '') + ' ／ 合計 ' + (a.calcTotal != null ? a.calcTotal : '') + '部（' + (a.cells != null ? a.cells : '?') + 'セル）';
+      if (a.addedTowns && a.addedTowns.length) body += '\n新規町: ' + a.addedTowns.join('、');
+      if (a.skippedZero && a.skippedZero.length) body += '\n0部スキップ: ' + a.skippedZero.join('、');
+      (res.warnings || []).forEach(function(w) { body += '\n⚠ ' + w; });
+      var html = '<div class="msg ' + cls + '">' + esc(body) + '</div>';
+      if (res.mySummary) {
+        html += '<div class="summary">' +
+          '<div class="box"><div class="num">' + res.mySummary.todayQty + '</div><div class="lbl">本日合計（部）</div></div>' +
+          '<div class="box"><div class="num">' + res.mySummary.monthQty + '</div><div class="lbl">今月合計（部）</div></div>' +
+          '<div class="box"><div class="num">' + res.mySummary.monthReports + '</div><div class="lbl">今月の報告数</div></div></div>';
+      }
+      area.innerHTML = html;
+    } else {
+      body = '⚠ ' + (res.message || 'エラーが発生しました') + '\n[' + (res.code || 'E_UNKNOWN') + ']';
+      area.innerHTML = '<div class="msg msg-err">' + esc(body) + '</div>';
+    }
+    area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function clearFormAfterSuccess() {
+    $('townRows').innerHTML = '';
+    addTownRow(); addTownRow(); addTownRow();
+    $('totalReported').value = '';
+    state.banChoices = {};
+    renderBanCheck();
+    $('workCph').value = '';
+    $('workBreakH').value = '';
+    $('workWorkH').value = '';
+    state.gpsFiles = [];
+    $('gpsFiles').value = '';
+    renderGpsList();
+    recalc();
+  }
+
+  // ─── GPS軌跡画像（報告フォーム用） ───
+  function onGpsSelect(input) {
+    var files = Array.prototype.slice.call(input.files || []);
+    var overflow = false;
+    files.forEach(function(f) {
+      var dup = state.gpsFiles.some(function(g) { return g.name === f.name && g.size === f.size; });
+      if (dup) return;
+      if (state.gpsFiles.length >= state.gpsMax) { overflow = true; return; }
+      state.gpsFiles.push(f);
+    });
+    input.value = '';
+    renderGpsList();
+    if (overflow) alert('GPS画像は1報告あたり最大' + state.gpsMax + '枚までです（超過分は追加されませんでした）');
+  }
+
+  function removeGpsFile(idx) { state.gpsFiles.splice(idx, 1); renderGpsList(); }
+
+  function renderGpsList() {
+    var box = $('gpsList');
+    if (state.gpsFiles.length === 0) { box.innerHTML = ''; return; }
+    var html = state.gpsFiles.map(function(f, i) {
+      var kb = Math.round(f.size / 1024);
+      return '<div class="town-row"><input class="town" value="📷 ' + esc(f.name) + '（' + kb + 'KB）" readonly>' +
+             '<button type="button" onclick="App.removeGpsFile(' + i + ')">×</button></div>';
+    }).join('');
+    box.innerHTML = html + '<div class="case-info">選択中: ' + state.gpsFiles.length + '/' + state.gpsMax + '枚</div>';
+  }
+
+  function shrinkImage(file) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onerror = function() { reject(new Error('読み込み失敗')); };
+      reader.onload = function() {
+        var img = new Image();
+        img.onload = function() {
+          try {
+            var MAX = 1600, w = img.width, h = img.height;
+            if (Math.max(w, h) > MAX) { var s = MAX / Math.max(w, h); w = Math.round(w*s); h = Math.round(h*s); }
+            var canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.8), mimeType: 'image/jpeg' });
+          } catch (e) { fallback(); }
+        };
+        img.onerror = fallback;
+        img.src = reader.result;
+        function fallback() {
+          if (file.size < 4 * 1024 * 1024) resolve({ dataUrl: reader.result, mimeType: file.type || 'image/jpeg' });
+          else reject(new Error('この画像形式は縮小できず、サイズも大きすぎます（4MB未満にしてください）'));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function uploadGpsSequential(reportUuid) {
+    if (state.gpsUploading) return;
+    state.gpsUploading = true;
+    var files = state.gpsFiles.slice(), total = files.length, okCount = 0, failed = [];
+    var prog = $('gpsProgress');
+    var next = function(i) {
+      if (i >= files.length) {
+        state.gpsUploading = false;
+        if (failed.length === 0) {
+          prog.innerHTML = '<div class="msg msg-ok">📷 GPS画像 ' + okCount + '/' + total + ' 枚のアップロードが完了しました</div>';
+          state.gpsFiles = []; renderGpsList(); clearFormAfterSuccess();
+          prog.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          state.gpsFiles = failed.slice(); renderGpsList();
+          prog.innerHTML = '<div class="msg msg-err">📷 ' + failed.length + '枚のアップロードに失敗しました（' + okCount + '枚は成功）。電波の良い場所で下のボタンから再試行してください</div>' +
+            '<button type="button" class="btn-primary" onclick="App.retryGps(\'' + reportUuid + '\')">失敗した画像を再アップロード</button>';
+        }
+        return;
+      }
+      prog.innerHTML = '<div class="msg msg-warn">📷 GPS画像をアップロード中… ' + (i + 1) + '/' + total + '枚</div>';
+      shrinkImage(files[i]).then(function(imgData) {
+        return api({ action: 'uploadGpsImage', reportUuid: reportUuid, seq: i + 1,
+          fileName: files[i].name, mimeType: imgData.mimeType, base64: imgData.dataUrl });
+      }).then(function(res) {
+        if (res && res.ok) okCount++; else failed.push(files[i]);
+        next(i + 1);
+      }).catch(function() { failed.push(files[i]); next(i + 1); });
+    };
+    next(0);
+  }
+
+  function retryGps(reportUuid) { $('gpsProgress').innerHTML = ''; uploadGpsSequential(reportUuid); }
+
+  // ─── 履歴 ───
+  function loadReports() {
+    $('reportsList').innerHTML = '<div class="empty">読み込み中…</div>';
+    var tabAtRequest = state.tab;
+    api({ action: 'myReports' }).then(function(res) {
+      if (state.tab !== tabAtRequest) return;   // 応答到着前にタブが変わっていたら破棄
+      if (!res.ok) { $('reportsList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
+      renderReports(res.reports || []);
+    }).catch(function() {
+      $('reportsList').innerHTML = '<div class="empty">読み込みに失敗しました</div>';
+    });
+  }
+
+  function statusLabel(s) {
+    return s === 'APPLIED' ? '反映済' : s === 'REVERSED' ? '取消済' : s === 'REJECTED' ? '未受理' : s;
+  }
+
+  function renderReports(reports) {
+    if (reports.length === 0) { $('reportsList').innerHTML = '<div class="empty">まだ報告がありません</div>'; return; }
+    $('reportsList').innerHTML = reports.map(function(r) {
+      var canRev = !!r.canSelfReverse;
+      var revBtn = canRev
+        ? '<button type="button" class="btn-ghost" onclick="App.correctReport(\'' + esc(r.reportUuid) + '\')">✏️ 数字を修正（取消して再入力）</button>'
+        : (r.status === 'APPLIED' ? '<div class="case-info">この報告の自己修正はできません（期限切れ・回数上限・受付終了など）。管理者にご依頼ください。</div>' : '');
+      var gpsBtn = (r.status === 'APPLIED')
+        ? '<button type="button" class="btn-ghost" onclick="App.addGpsToReport(\'' + esc(r.reportUuid) + '\')">📷 GPS画像を追加</button>'
+        : '';
+      var period = r.distStart === r.distEnd ? r.distStart : (r.distStart + '〜' + r.distEnd);
+      return '<div class="rep" id="rep-' + esc(r.reportUuid) + '">' +
+        '<div class="top" onclick="App.toggleRep(\'' + esc(r.reportUuid) + '\')">' +
+          '<div><div class="store">' + esc(r.caseNo) + '</div>' +
+          '<div class="meta">' + esc(period) + ' ／ ' + (r.calcTotal || 0) + '部' +
+          (r.tabName ? ' ／ ' + esc(r.tabName) : '') + '</div></div>' +
+          '<span class="st-badge st-' + esc(r.status) + '">' + statusLabel(r.status) + '</span>' +
+        '</div>' +
+        '<div class="actions">' + revBtn + gpsBtn + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function toggleRep(reportUuid) {
+    var el = $('rep-' + reportUuid);
+    if (el) el.classList.toggle('open');
+  }
+
+  function correctReport(reportUuid) {
+    if (state.correcting) return;
+    if (!confirm('この報告を取り消して、数字を修正しますか？\n（取消後、同じ案件の入力画面に旧内容が読み込まれます）')) return;
+    state.correcting = true;
+
+    // 待機表示（該当カード直下にスピナー）。取消は集計から減算する実処理のため数秒かかる。
+    var card = $('rep-' + reportUuid);
+    if (card) {
+      var ex = $('correctBusy'); if (ex) ex.remove();
+      card.insertAdjacentHTML('beforeend',
+        '<div id="correctBusy" class="msg msg-warn"><span class="spin"></span>取消して読み込み中…（数秒かかります。閉じずにお待ちください）</div>');
+    }
+    var done = function() { state.correcting = false; var b = $('correctBusy'); if (b) b.remove(); };
+
+    // 旧内容の取得と取消を並行実行（順番待ちを避けて短縮）。detailは取消前・後どちらでも同じ内容。
+    Promise.all([
+      api({ action: 'reportDetail', reportUuid: reportUuid }),
+      api({ action: 'selfReverse',  reportUuid: reportUuid })
+    ]).then(function(res) {
+      done();
+      var detail = res[0], rev = res[1];
+      if (!rev.ok) { alert('取消できませんでした: ' + (rev.message || rev.code)); return; }
+      if (!detail || !detail.ok) {
+        alert('取り消しました。ただし旧内容を読み込めませんでした。\nお手数ですが「報告」タブから入力し直してください。');
+        switchTab('home'); return;
+      }
+      prefillFromDetail(detail);
+      switchTab('home');
+      $('resultArea').innerHTML = '<div class="msg msg-warn">前回の報告を取り消しました。数字を修正して「報告を送信」を押してください。</div>';
+      $('resultArea').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }).catch(function(e) {
+      done();
+      alert('通信エラーで取消の結果が確認できませんでした: ' + e.message +
+        '\n「履歴」を再読み込みして、取り消せているかご確認ください。');
+    });
+  }
+
+  function prefillFromDetail(detail) {
+    state.reportUuid = null;       // 修正は「新しい報告」として送る
+    state.restoringDetail = true;  // 以降のcaseTowns応答による町行の上書きを禁止（レース保護）
+    $('caseSelect').value = detail.caseNo;
+    $('distStart').value = detail.distStart || todayIso();
+    $('distEnd').value = detail.distEnd || todayIso();
+    $('townRows').innerHTML = '';
+    (detail.lines || []).forEach(function(l) { addTownRow(l.town, l.qty); });
+    if (!(detail.lines || []).length) { addTownRow(); addTownRow(); }
+    $('totalReported').value = detail.totalReported != null ? detail.totalReported : '';
+    onCaseChange();   // caseInfo・サジェスト更新（restoringDetail中はプリフィルは走らない）
+    recalc();
+    // caseTowns応答が返るまで少し待ってからフラグ解除（誤上書き防止）
+    setTimeout(function() { state.restoringDetail = false; }, 4000);
+  }
+
+  // 履歴からGPS追加: 対象reportUuidを覚えてファイル選択を開く
+  function addGpsToReport(reportUuid) {
+    state.gpsAddTarget = reportUuid;
+    $('gpsAddInput').click();
+  }
+  function onGpsAddSelect(input) {
+    var files = Array.prototype.slice.call(input.files || []);
+    input.value = '';
+    if (files.length === 0 || !state.gpsAddTarget) return;
+    var target = state.gpsAddTarget, total = files.length, okCount = 0, failed = 0, i = 0;
+
+    // 進捗は該当の履歴カード直下に表示（alertはアップロードを止めてしまうため使わない）
+    var card = $('rep-' + target);
+    var old = $('gpsAddProgress');
+    if (old) old.remove();
+    if (card) {
+      card.insertAdjacentHTML('beforeend',
+        '<div id="gpsAddProgress" class="msg msg-warn">📷 GPS画像をアップロード中… 1/' + total + '枚</div>');
+    }
+    var prog = function(html, cls) {
+      var el = $('gpsAddProgress');
+      if (el) { el.className = 'msg ' + cls; el.innerHTML = html; }
+    };
+
+    var next = function() {
+      if (i >= files.length) {
+        if (failed === 0) {
+          prog('✅ GPS画像 ' + okCount + '/' + total + ' 枚を追加しました', 'msg-ok');
+        } else {
+          prog('⚠ ' + failed + '枚が失敗しました（成功' + okCount + '枚）。電波の良い場所で「GPS画像を追加」からやり直してください', 'msg-err');
+        }
+        return;
+      }
+      prog('📷 GPS画像をアップロード中… ' + (i + 1) + '/' + total + '枚', 'msg-warn');
+      shrinkImage(files[i]).then(function(img) {
+        return api({ action: 'uploadGpsImage', reportUuid: target, seq: i + 1,
+          fileName: files[i].name, mimeType: img.mimeType, base64: img.dataUrl });
+      }).then(function(res) {
+        if (res && res.ok) okCount++; else failed++;
+        i++; next();
+      }).catch(function() { failed++; i++; next(); });
+    };
+    next();
+  }
+
+  // ─── 予定登録（管理者） ───
+  function loadRegister() {
+    // 案件ドロップダウン（本人拠点を上に・配布日降順）
+    var sel = $('regCase');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">— 催事を選択 —</option>';
+    var home = state.staff ? state.staff.homeArea : '';
+    state.cases.slice().sort(function(a, b) {
+      var ah = a.areaId === home ? 0 : 1, bh = b.areaId === home ? 0 : 1;
+      if (ah !== bh) return ah - bh;
+      return String(b.distStart).localeCompare(String(a.distStart));
+    }).forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c.caseNo;
+      opt.textContent = c.storeClean + '（' + c.areaDisplay + '・' + c.caseNo + '）';
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+    sel.onchange = onRegCaseChange;
+
+    // 登録先カレンダー（拠点が複数あるときだけ表示）
+    if (state.calendars && state.calendars.length > 1) {
+      $('regCalWrap').style.display = '';
+      var cs = $('regCal');
+      cs.innerHTML = '';
+      state.calendars.forEach(function(c) {
+        var o = document.createElement('option');
+        o.value = c.srcCalId; o.textContent = c.base || c.srcCalId;
+        cs.appendChild(o);
+      });
+    } else {
+      $('regCalWrap').style.display = 'none';
+    }
+
+    renderRegStaff();
+  }
+
+  function renderRegStaff() {
+    var html = (state.staffList || []).map(function(s) {
+      return '<label class="reg-chk"><input type="checkbox" value="' + esc(s.staffId) + '"> ' + esc(s.name) + '</label>';
+    }).join('');
+    $('regStaffList').innerHTML = html || '<div class="empty">配達員がいません（配達員マスタを確認してください）</div>';
+    $('regSogeiList').innerHTML = html || '';
+  }
+
+  function onRegCaseChange() {
+    var caseNo = $('regCase').value;
+    if (!caseNo) { $('regCaseInfo').textContent = '催事を選択してください'; return; }
+    // full=true で「本人の予定」ではなく案件の全配布エリアを取得する
+    api({ action: 'caseTowns', caseNo: caseNo, full: true }).then(function(res) {
+      if (!res.ok) {
+        $('regCaseInfo').innerHTML = '<span style="color:var(--c-warn)">' + esc(res.message || res.code) + '</span>';
+        return;
+      }
+      $('regCaseInfo').innerHTML =
+        '店舗: <b>' + esc(res.storeClean) + '</b> ／ エリア: <b>' + esc(res.areaDisplay || '') + '</b>' +
+        (res.distStart ? '<br>予定期間: ' + esc(res.distStart) + ' 〜 ' + esc(res.distEnd) : '') +
+        (res.material ? '<br>配布物: ' + esc(res.material) : '');
+      if (res.distStart) $('regStart').value = res.distStart;
+      if (res.distEnd) $('regEnd').value = res.distEnd;
+      var pre = (res.prefill || []).map(function(t) { return t.display; }).filter(Boolean);
+      $('regTowns').value = pre.join('\n');
+    }).catch(function(e) {
+      $('regCaseInfo').innerHTML = '<span style="color:var(--c-err)">接続できません: ' + esc(e.message) + '</span>';
+    });
+  }
+
+  function gatherChecked(containerId) {
+    var out = [];
+    var ins = $(containerId).querySelectorAll('input[type=checkbox]');
+    for (var i = 0; i < ins.length; i++) if (ins[i].checked) out.push(ins[i].value);
+    return out;
+  }
+  function clearChecked(containerId) {
+    var ins = $(containerId).querySelectorAll('input[type=checkbox]');
+    for (var i = 0; i < ins.length; i++) ins[i].checked = false;
+  }
+
+  function submitRegister() {
+    if (state.submitting) return;
+    var caseNo = $('regCase').value;
+    if (!caseNo) { alert('催事を選択してください'); return; }
+    var dist = gatherChecked('regStaffList');
+    var sogei = gatherChecked('regSogeiList');
+    if (dist.length === 0 && sogei.length === 0) { alert('担当者を1人以上選んでください'); return; }
+    var towns = $('regTowns').value.split(/\r?\n/).map(function(t) { return t.trim(); }).filter(Boolean);
+
+    var payload = {
+      action: 'registerAssignEvents', caseNo: caseNo,
+      distStart: $('regStart').value, distEnd: $('regEnd').value,
+      towns: towns, staffIds: dist, sogeiStaffIds: sogei,
+      note: $('regNote').value,
+      srcCalId: ($('regCal') && $('regCalWrap').style.display !== 'none') ? $('regCal').value : ''
+    };
+
+    var btn = $('regSubmit');
+    state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>登録＋同期中…';
+    api(payload).then(function(res) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'この内容でカレンダーに登録';
+      var area = $('regResult');
+      if (res.ok) {
+        var body = '✅ ' + (res.message || '登録しました');
+        if (res.created && res.created.length) body += '\n登録: ' + res.created.join('、');
+        if (res.skipped && res.skipped.length) body += '\nスキップ（既存）: ' + res.skipped.join('、');
+        if (res.errors && res.errors.length) body += '\n⚠ 失敗: ' + res.errors.join('、');
+        body += res.synced ? '\n\n✅ 同期済み — 各配達員のフォームに反映されました'
+                           : '\n\n※ 同期は次回の自動実行（1時間おき）で反映されます';
+        area.innerHTML = '<div class="msg msg-ok">' + esc(body) + '</div>';
+        clearChecked('regStaffList'); clearChecked('regSogeiList'); $('regNote').value = '';
+      } else {
+        area.innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E_UNKNOWN') + ']') + '</div>';
+      }
+      area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }).catch(function(e) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'この内容でカレンダーに登録';
+      $('regResult').innerHTML = '<div class="msg msg-err">' + esc('接続できません（入力は保持されています）: ' + e.message) + '</div>';
+    });
+  }
+
+  // ─── スタッフ登録（管理者） ───
+  function loadStaff() {
+    $('stRoster').innerHTML = '<div class="empty">読み込み中…</div>';
+    api({ action: 'listStaff' }).then(function(res) {
+      if (!res.ok) { $('stRoster').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
+      renderRoster(res.staff || []);
+    }).catch(function(e) {
+      $('stRoster').innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function renderRoster(list) {
+    if (!list.length) { $('stRoster').innerHTML = '<div class="empty">まだ登録がありません</div>'; return; }
+    $('stRoster').innerHTML = '<div class="case-info">在籍 ' + list.length + '名</div>' +
+      list.map(function(s) {
+        return '<div class="assign"><div class="store">' + esc(s.name) + '</div>' +
+          '<div class="meta">' + esc(s.staffId) + ' ／ ' + esc(s.email || '(メール未登録)') +
+          (s.homeArea ? ' ／ ' + esc(s.homeArea) : '') + '</div></div>';
+      }).join('');
+  }
+
+  function submitStaff() {
+    if (state.submitting) return;
+    var name = $('stName').value.trim();
+    var email = $('stEmail').value.trim();
+    if (!name) { alert('氏名を入力してください'); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { alert('Gmailの形式が正しくありません'); return; }
+    var payload = {
+      action: 'registerStaff', name: name, email: email,
+      tabName: $('stTabName').value.trim(), homeArea: $('stHome').value.trim()
+    };
+    var btn = $('stSubmit');
+    state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>登録中…';
+    api(payload).then(function(res) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'このスタッフを登録';
+      if (res.ok) {
+        $('stResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + res.message) + '</div>';
+        $('stName').value = ''; $('stEmail').value = ''; $('stTabName').value = ''; $('stHome').value = '';
+        if (res.staff) state.staffList.push({ staffId: res.staff.staffId, name: res.staff.name });  // 予定登録の候補にも反映
+        loadStaff();
+      } else {
+        $('stResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E_UNKNOWN') + ']') + '</div>';
+      }
+      $('stResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }).catch(function(e) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'このスタッフを登録';
+      $('stResult').innerHTML = '<div class="msg msg-err">' + esc('接続できません: ' + e.message) + '</div>';
+    });
+  }
+
+  // ─── アカウント ───
+  function renderAccount() {
+    var s = state.staff || {};
+    $('accountBody').innerHTML =
+      '<div class="case-info" style="line-height:1.9">' +
+      '氏名: <b>' + esc(s.name || '') + '</b><br>' +
+      'メール: <b>' + esc(state.email || '') + '</b><br>' +
+      'ID: <b>' + esc(s.staffId || '') + '</b><br>' +
+      '拠点: <b>' + esc(s.homeArea || '(未設定)') + '</b>' +
+      (state.isAdmin ? '<br>権限: <b>管理者</b>' : '') +
+      '</div>';
+  }
+
+  // ─── 初期化 ───
+  function init() {
+    state.deviceId = lsGet('hipos_device_id');
+    if (!state.deviceId) { state.deviceId = uuid(); lsSet('hipos_device_id', state.deviceId); }
+    $('distStart').value = todayIso();
+    $('distEnd').value = todayIso();
+    addTownRow(); addTownRow(); addTownRow();
+    $('totalReported').oninput = recalc;
+    if (!tryRestoreSession()) {
+      if (!hasValidClientId()) {
+        showGsiFail();
+      } else {
+        var tries = 0;
+        var timer = setInterval(function() {
+          tries++;
+          if (window.google && google.accounts && google.accounts.id) { clearInterval(timer); initGsi(); }
+          else if (tries > 40) { clearInterval(timer); showGsiFail(); }
+        }, 250);
+      }
+    }
+  }
+  document.addEventListener('DOMContentLoaded', init);
+
+  return {
+    submit: submit, addTownRow: addTownRow, tokenSignIn: tokenSignIn,
+    onGpsSelect: onGpsSelect, removeGpsFile: removeGpsFile, retryGps: retryGps,
+    switchTab: switchTab, pickCase: pickCase,
+    toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
+    onGpsAddSelect: onGpsAddSelect, logout: logout, copyEmail: copyEmail,
+    submitRegister: submitRegister, setBan: setBan,
+    submitStaff: submitStaff
+  };
+})();
+</script>
+</body>
+</html>
