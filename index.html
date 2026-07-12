@@ -122,6 +122,30 @@
   #bottomNav button.active { color: var(--c-primary); }
   #bottomNav button .ic { font-size: 20px; line-height: 1; }
   .empty { text-align: center; color: var(--c-sub); font-size: 14px; padding: 24px 12px; }
+
+  /* ─── シフト入力カレンダー（スマホ最適化） ─── */
+  .shift-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .shift-title { font-size: 17px; font-weight: 700; color: var(--c-text); }
+  .shift-nav { background: #f1f3f4; color: var(--c-primary); border: none; border-radius: 8px;
+               width: 44px; height: 40px; font-size: 22px; line-height: 1; cursor: pointer; }
+  .shift-nav:disabled { color: var(--c-border); background: #f8f9fa; cursor: default; }
+  .shift-dow, .shift-grid { display: grid; grid-template-columns: repeat(7, 1fr) 0.66fr; gap: 4px; }
+  .shift-dow { margin-bottom: 4px; }
+  .shift-dow span { text-align: center; font-size: 11px; color: var(--c-sub); padding: 2px 0; }
+  .shift-dow span:first-child { color: var(--c-err); }
+  .shift-dow span:nth-child(7) { color: var(--c-primary); }
+  .shift-day { aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center;
+               border-radius: 8px; font-size: 15px; border: 1px solid var(--c-border);
+               background: #fff; color: var(--c-text); cursor: pointer; user-select: none;
+               -webkit-tap-highlight-color: transparent; transition: background .08s; }
+  .shift-day.empty { border: none; background: transparent; cursor: default; }
+  .shift-day.dis { color: #c9ccd1; background: #f8f9fa; cursor: default; }
+  .shift-day.today { border-color: var(--c-primary); font-weight: 700; }
+  .shift-day.sel { background: var(--c-primary); color: #fff; border-color: var(--c-primary); font-weight: 700; }
+  .shift-wkcount { display: flex; align-items: center; justify-content: center;
+                   font-size: 12px; color: var(--c-primary); font-weight: 700; }
+  .shift-summary { margin-top: 12px; padding: 12px; background: var(--c-ok-bg); color: var(--c-ok);
+                   border-radius: 8px; font-size: 15px; font-weight: 700; text-align: center; }
 </style>
 </head>
 <body>
@@ -266,6 +290,30 @@
     </div>
   </div>
 
+  <!-- ═══ シフト入力（出勤希望・全スタッフ） ═══ -->
+  <div class="view hidden" id="shiftView">
+    <div class="card">
+      <h2>シフト入力（出勤希望）</h2>
+      <div class="case-info" id="shiftBaseInfo">出勤したい日をタップして選び、下の「送信」を押してください（10:00〜19:00）。</div>
+      <div id="shiftUnset" class="msg msg-warn hidden" style="margin-top:8px">拠点が未設定のため送信できません。管理者に連絡してください。</div>
+    </div>
+
+    <div class="card">
+      <div class="shift-cal-head">
+        <button type="button" class="shift-nav" id="shiftPrev" onclick="App.shiftMonth(-1)">‹</button>
+        <div class="shift-title" id="shiftMonthLabel">—</div>
+        <button type="button" class="shift-nav" id="shiftNext" onclick="App.shiftMonth(1)">›</button>
+      </div>
+      <div class="shift-dow"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span class="shift-wk">計</span></div>
+      <div id="shiftGrid" class="shift-grid"></div>
+      <div class="shift-summary" id="shiftSummary">読み込み中…</div>
+    </div>
+
+    <div id="shiftResult"></div>
+    <button type="button" class="btn-primary" id="shiftSubmit" onclick="App.submitShifts()">この内容で送信</button>
+    <div class="footer-note">送信すると拠点のカレンダーに10:00〜19:00で自動登録されます。日を外して再送信すると取消されます。</div>
+  </div>
+
   <!-- ═══ ④ 予定登録（管理者のみ） ═══ -->
   <div class="view hidden" id="registerView">
     <div class="card">
@@ -352,6 +400,7 @@
   <button type="button" data-tab="home" onclick="App.switchTab('home')"><span class="ic">📝</span>報告</button>
   <button type="button" data-tab="history" onclick="App.switchTab('history')"><span class="ic">📋</span>履歴</button>
   <button type="button" data-tab="account" onclick="App.switchTab('account')"><span class="ic">👤</span>アカウント</button>
+  <button type="button" data-tab="shift" onclick="App.switchTab('shift')"><span class="ic">📅</span>シフト</button>
   <button type="button" data-tab="register" id="navRegister" onclick="App.switchTab('register')" style="display:none"><span class="ic">🗓️</span>予定登録</button>
   <button type="button" data-tab="staff" id="navStaff" onclick="App.switchTab('staff')" style="display:none"><span class="ic">👥</span>スタッフ登録</button>
 </nav>
@@ -385,6 +434,7 @@ var App = (function() {
     gpsFiles: [], gpsMax: 10, gpsUploading: false,
     gpsAddTarget: null,   // 履歴からGPS追加する対象 reportUuid
     restoringDetail: false, // 修正プリフィル中フラグ（caseTowns応答の誤上書き防止）
+    shift: { win: null, today: '', selected: {}, base: '', configured: false, viewY: 0, viewM: 0 },
     tab: 'home'
   };
 
@@ -567,13 +617,13 @@ var App = (function() {
 
   // ─── タブ切替 ───
   function showOnly(viewId) {
-    ['homeView', 'historyView', 'accountView', 'registerView', 'staffView', 'unregView'].forEach(function(v) {
+    ['homeView', 'historyView', 'accountView', 'shiftView', 'registerView', 'staffView', 'unregView'].forEach(function(v) {
       $(v).classList.toggle('hidden', v !== viewId);
     });
   }
   function switchTab(name) {
     state.tab = name;
-    var map = { home: 'homeView', history: 'historyView', account: 'accountView', register: 'registerView', staff: 'staffView' };
+    var map = { home: 'homeView', history: 'historyView', account: 'accountView', shift: 'shiftView', register: 'registerView', staff: 'staffView' };
     showOnly(map[name]);
     var btns = document.querySelectorAll('#bottomNav button');
     for (var i = 0; i < btns.length; i++) {
@@ -585,6 +635,7 @@ var App = (function() {
     else if (name === 'account') renderAccount();
     else if (name === 'register') loadRegister();
     else if (name === 'staff') loadStaff();
+    else if (name === 'shift') loadShifts();
   }
 
   // ─── ホーム: 本日の担当 ───
@@ -1338,6 +1389,115 @@ var App = (function() {
     });
   }
 
+  // ─── シフト入力（出勤希望・カレンダー選択） ───
+  function shiftPad(n) { return (n < 10 ? '0' : '') + n; }
+  function shiftMonthIdx(y, m) { return y * 12 + m; }
+
+  function loadShifts() {
+    $('shiftSummary').textContent = '読み込み中…';
+    $('shiftGrid').innerHTML = '';
+    api({ action: 'myShifts' }).then(function(res) {
+      if (!res.ok) { $('shiftSummary').textContent = res.message || res.code || 'エラー'; return; }
+      var sh = state.shift;
+      sh.win = res.window; sh.today = res.today;
+      sh.base = res.base || ''; sh.configured = !!res.baseConfigured;
+      sh.selected = {};
+      (res.dates || []).forEach(function(d) { sh.selected[d] = true; });
+      var t = String(res.today).split('-');
+      sh.viewY = Number(t[0]); sh.viewM = Number(t[1]) - 1;
+      renderShiftHeader();
+      renderShiftCal();
+    }).catch(function(e) { $('shiftSummary').textContent = '接続できません: ' + e.message; });
+  }
+
+  function renderShiftHeader() {
+    var sh = state.shift;
+    if (sh.configured) {
+      $('shiftBaseInfo').innerHTML = '出勤したい日をタップして選び、下の「送信」を押してください（10:00〜19:00）。'
+        + (sh.base ? '<br>拠点: <b>' + esc(sh.base) + '</b>' : '');
+      $('shiftUnset').classList.add('hidden');
+      $('shiftSubmit').disabled = false;
+    } else {
+      $('shiftUnset').classList.remove('hidden');
+      $('shiftSubmit').disabled = true;
+    }
+  }
+
+  function renderShiftCal() {
+    var sh = state.shift;
+    if (!sh.win) return;
+    var y = sh.viewY, m = sh.viewM;   // m: 0-based
+    $('shiftMonthLabel').textContent = y + '年 ' + (m + 1) + '月';
+
+    var tp = sh.today.split('-'); var minIdx = shiftMonthIdx(Number(tp[0]), Number(tp[1]) - 1);
+    var ep = sh.win.end.split('-'); var maxIdx = shiftMonthIdx(Number(ep[0]), Number(ep[1]) - 1);
+    var curIdx = shiftMonthIdx(y, m);
+    $('shiftPrev').disabled = (curIdx <= minIdx);
+    $('shiftNext').disabled = (curIdx >= maxIdx);
+
+    var startDow = new Date(y, m, 1).getDay();          // 0=日
+    var daysInMonth = new Date(y, m + 1, 0).getDate();
+    var win = sh.win, today = sh.today;
+
+    var html = '', dayNum = 1 - startDow, monthSel = 0;
+    while (dayNum <= daysInMonth) {
+      var weekSel = 0, rowHtml = '';
+      for (var col = 0; col < 7; col++, dayNum++) {
+        if (dayNum < 1 || dayNum > daysInMonth) { rowHtml += '<div class="shift-day empty"></div>'; continue; }
+        var iso = y + '-' + shiftPad(m + 1) + '-' + shiftPad(dayNum);
+        var cls = 'shift-day';
+        if (iso === today) cls += ' today';
+        if (iso < win.start || iso > win.end) { rowHtml += '<div class="' + cls + ' dis">' + dayNum + '</div>'; continue; }
+        if (sh.selected[iso]) { cls += ' sel'; weekSel++; monthSel++; }
+        rowHtml += '<div class="' + cls + '" onclick="App.toggleShiftDay(\'' + iso + '\')">' + dayNum + '</div>';
+      }
+      rowHtml += '<div class="shift-wkcount">' + (weekSel ? weekSel : '') + '</div>';
+      html += rowHtml;
+    }
+    $('shiftGrid').innerHTML = html;
+    $('shiftSummary').textContent = '今月 ' + monthSel + '日 選択　／　全期間 ' + Object.keys(sh.selected).length + '日';
+  }
+
+  function shiftMonth(delta) {
+    var sh = state.shift;
+    if (!sh.win) return;
+    var idx = shiftMonthIdx(sh.viewY, sh.viewM) + delta;
+    var tp = sh.today.split('-'); var minIdx = shiftMonthIdx(Number(tp[0]), Number(tp[1]) - 1);
+    var ep = sh.win.end.split('-'); var maxIdx = shiftMonthIdx(Number(ep[0]), Number(ep[1]) - 1);
+    if (idx < minIdx) idx = minIdx;
+    if (idx > maxIdx) idx = maxIdx;
+    sh.viewY = Math.floor(idx / 12); sh.viewM = idx % 12;
+    renderShiftCal();
+  }
+
+  function toggleShiftDay(iso) {
+    var sh = state.shift;
+    if (sh.selected[iso]) delete sh.selected[iso]; else sh.selected[iso] = true;
+    renderShiftCal();
+  }
+
+  function submitShifts() {
+    var sh = state.shift;
+    if (!sh.configured) { alert('拠点が未設定です。管理者に連絡してください。'); return; }
+    if (state.submitting) return;
+    var dates = Object.keys(sh.selected).sort();
+    var btn = $('shiftSubmit');
+    state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>送信中…';
+    api({ action: 'submitShifts', dates: dates }).then(function(res) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'この内容で送信';
+      if (res.ok) {
+        $('shiftResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + res.message) + '</div>';
+        loadShifts();   // サーバの実状態で再描画（部分失敗も反映）
+      } else {
+        $('shiftResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E_UNKNOWN') + ']') + '</div>';
+      }
+      $('shiftResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }).catch(function(e) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'この内容で送信';
+      $('shiftResult').innerHTML = '<div class="msg msg-err">' + esc('接続できません: ' + e.message) + '</div>';
+    });
+  }
+
   // ─── アカウント ───
   function renderAccount() {
     var s = state.staff || {};
@@ -1383,7 +1543,8 @@ var App = (function() {
     toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
     onGpsAddSelect: onGpsAddSelect, logout: logout, copyEmail: copyEmail,
     submitRegister: submitRegister, setBan: setBan,
-    submitStaff: submitStaff
+    submitStaff: submitStaff,
+    shiftMonth: shiftMonth, toggleShiftDay: toggleShiftDay, submitShifts: submitShifts
   };
 })();
 </script>
