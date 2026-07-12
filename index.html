@@ -136,11 +136,15 @@
     <h2>サインイン</h2>
     <p class="signin-note">配布報告には本人確認が必要です。会社に登録済みのGoogleアカウントでサインインしてください。</p>
     <div id="gsiButton"></div>
+    <div id="gsiPending" class="signin-note hidden" style="text-align:center;margin-top:8px">Googleログインを準備中です…</div>
+    <div style="text-align:center;margin-top:16px">
+      <a href="#" id="tokenToggle" style="font-size:13px;color:var(--c-sub);cursor:pointer" onclick="App.showTokenLogin();return false;">ログインできない場合はこちら</a>
+    </div>
     <div id="gsiFail" class="hidden">
-      <div class="msg msg-warn">個別トークンでログインします。管理者から配布されたトークンを入力してください。<br>（練習環境ではこちらを使います。Googleログインを使う運用の場合は管理者にお問い合わせください）</div>
-      <label>個別トークン</label>
+      <label style="margin-top:14px">個別トークン</label>
       <input type="password" id="staffToken" autocomplete="off" placeholder="管理者から配布されたトークン">
       <button class="btn-primary" style="margin-top:8px" onclick="App.tokenSignIn()">トークンで開始</button>
+      <div class="footer-note">Googleログインができない場合の予備手段です。管理者から配布された個別トークンを入力してください。</div>
     </div>
   </div>
 
@@ -358,7 +362,7 @@
 // ════════════════════════════════════════════════════
 var CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbyRdNFAOyr6z1lmZNn0edwTfiMdsBEZrC4f3kfdgIU75eFGBNPjVm832lKSXVoHUwMXag/exec',
-  OAUTH_CLIENT_ID: '【OAuthクライアントID】.apps.googleusercontent.com'
+  OAUTH_CLIENT_ID: '654669981739-o1iosejqh7dmvumciaannkn84rv6jdhs.apps.googleusercontent.com'
 };
 
 // カレンダーのリンク（?case=案件番号）から催事を自動選択するための値。
@@ -442,7 +446,14 @@ var App = (function() {
       google.accounts.id.renderButton($('gsiButton'), { theme: 'filled_blue', size: 'large', width: 280, text: 'signin_with' });
     } catch (e) { showGsiFail(); }
   }
-  function showGsiFail() { $('gsiFail').classList.remove('hidden'); }
+  function showGsiFail() { showTokenLogin(); }   // Googleが使えない時は個別トークン欄を開く
+
+  function showTokenLogin() {
+    $('gsiFail').classList.remove('hidden');
+    var tl = $('tokenToggle'); if (tl) tl.classList.add('hidden');
+    var gp = $('gsiPending'); if (gp) gp.classList.add('hidden');
+    try { $('staffToken').focus(); } catch (e) {}
+  }
 
   function onSignIn(credential) {
     state.idToken = credential;
@@ -1349,22 +1360,24 @@ var App = (function() {
     addTownRow(); addTownRow(); addTownRow();
     $('totalReported').oninput = recalc;
     if (!tryRestoreSession()) {
-      if (!hasValidClientId()) {
-        showGsiFail();
-      } else {
+      if (hasValidClientId()) {
+        // Googleログインを主導線として初期化（読み込めない時だけトークンにフォールバック）
         var tries = 0;
         var timer = setInterval(function() {
           tries++;
           if (window.google && google.accounts && google.accounts.id) { clearInterval(timer); initGsi(); }
           else if (tries > 40) { clearInterval(timer); showGsiFail(); }
         }, 250);
+      } else {
+        // OAuthクライアントID未設定（準備中）: Google枠に「準備中」を出し、トークンは小さな導線から
+        $('gsiPending').classList.remove('hidden');
       }
     }
   }
   document.addEventListener('DOMContentLoaded', init);
 
   return {
-    submit: submit, addTownRow: addTownRow, tokenSignIn: tokenSignIn,
+    submit: submit, addTownRow: addTownRow, tokenSignIn: tokenSignIn, showTokenLogin: showTokenLogin,
     onGpsSelect: onGpsSelect, removeGpsFile: removeGpsFile, retryGps: retryGps,
     switchTab: switchTab, pickCase: pickCase,
     toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
