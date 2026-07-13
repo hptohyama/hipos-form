@@ -645,12 +645,13 @@ var App = (function() {
 
   // ─── 認証後の初期分岐 ───
   function afterAuth() {
-    api({ action: 'whoami' }).then(function(who) {
-      if (!who.ok) { showAuthError(who); return; }
-      state.email = who.email || state.email;
-      state.isAdmin = !!who.isAdmin;
-      state.registered = !!who.registered;
-      state.staff = who.staff || null;
+    // ログイン直後の初期読込は bootstrap 1回に集約（旧: whoami→cases→myToday→myShiftCycles の4往復）。
+    api({ action: 'bootstrap' }).then(function(res) {
+      if (!res.ok) { showAuthError(res); return; }
+      state.email = res.email || state.email;
+      state.isAdmin = !!res.isAdmin;
+      state.registered = !!res.registered;
+      state.staff = res.staff || null;
 
       if (!state.registered) {
         // 未登録者 → 案内画面（管理者にメールを伝えて登録依頼）
@@ -672,7 +673,33 @@ var App = (function() {
       } else {               // スタッフ: シフト（提出）を表示（管理者専用タブは非表示のまま）
         $('navShift').style.display = '';
       }
-      loadCases();
+
+      // 案件・エリア等（bootstrapに同梱）
+      state.cases = res.cases || [];
+      state.areas = res.areas || [];
+      state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ）
+      state.calendars = res.calendars || [];       // 予定登録の登録先カレンダー（管理者のみ）
+      state.gpsMax = Number(res.gpsMax) || 10;
+      $('gpsHeading').textContent = '⑤ GPS軌跡画像（最大' + state.gpsMax + '枚）';
+      renderCases();
+      renderAreas();
+      switchTab('home', true);          // ホームは同梱データで即描画（追加のAPI往復なし）
+      renderTodayFrom(res.myToday);
+
+      // シフト警告（スタッフのみ・bootstrapに同梱）
+      if (!state.isAdmin && res.shift) {
+        state.shiftData = res.shift;
+        buildShiftView();
+        renderShiftAlerts();
+      }
+
+      // カレンダーのリンク（?case=）から来た場合は該当催事を自動選択
+      if (PRESET_CASE) {
+        var sel = $('caseSelect');
+        for (var i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === PRESET_CASE) { sel.value = PRESET_CASE; onCaseChange(); break; }
+        }
+      }
     }).catch(function(e) {
       showAuthError({ message: '接続できません: ' + e.message });
     });
@@ -685,38 +712,13 @@ var App = (function() {
       '<div class="msg msg-err">' + esc(res.message || res.code || '認証に失敗しました') + '</div>');
   }
 
-  function loadCases() {
-    api({ action: 'cases' }).then(function(res) {
-      if (!res.ok) { showResult(res); return; }
-      state.cases = res.cases || [];
-      state.areas = res.areas || [];
-      state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ返る）
-      state.calendars = res.calendars || [];       // 予定登録の登録先カレンダー（管理者のみ返る）
-      state.gpsMax = Number(res.gpsMax) || 10;
-      $('gpsHeading').textContent = '⑤ GPS軌跡画像（最大' + state.gpsMax + '枚）';
-      renderCases();
-      renderAreas();
-      switchTab('home');
-      if (!state.isAdmin) loadShiftAlerts();   // シフト警告はスタッフのみ（管理者は提出しないので取得しない）
-      // カレンダーのリンク（?case=）から来た場合は該当催事を自動選択
-      if (PRESET_CASE) {
-        var sel = $('caseSelect');
-        for (var i = 0; i < sel.options.length; i++) {
-          if (sel.options[i].value === PRESET_CASE) { sel.value = PRESET_CASE; onCaseChange(); break; }
-        }
-      }
-    }).catch(function(e) {
-      showResult({ ok: false, code: 'E_NETWORK', message: '接続できません: ' + e.message });
-    });
-  }
-
   // ─── タブ切替 ───
   function showOnly(viewId) {
     ['homeView', 'historyView', 'accountView', 'shiftView', 'shiftAdminView', 'registerView', 'staffView', 'unregView'].forEach(function(v) {
       $(v).classList.toggle('hidden', v !== viewId);
     });
   }
-  function switchTab(name) {
+  function switchTab(name, skipLoad) {
     state.tab = name;
     var map = { home: 'homeView', history: 'historyView', account: 'accountView', shift: 'shiftView', shiftadmin: 'shiftAdminView', register: 'registerView', staff: 'staffView' };
     showOnly(map[name]);
@@ -725,6 +727,7 @@ var App = (function() {
       btns[i].classList.toggle('active', btns[i].getAttribute('data-tab') === name);
     }
     window.scrollTo(0, 0);
+    if (skipLoad) return;   // 初期のbootstrapで既に描画済みなら再取得しない（往復削減）
     if (name === 'home') loadToday();
     else if (name === 'history') loadReports();
     else if (name === 'account') renderAccount();
@@ -739,33 +742,39 @@ var App = (function() {
     var tabAtRequest = state.tab;
     api({ action: 'myToday' }).then(function(res) {
       if (state.tab !== tabAtRequest) return;   // 応答到着前にタブが変わっていたら破棄
-      if (!res.ok) { $('todayList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
-      var list = res.todayAssignments || [];
-      if (list.length === 0) {
-        $('todayList').innerHTML = '<div class="empty">本日の割当はありません。<br>下の「催事」から選んで報告できます。</div>';
-      } else {
-        $('todayList').innerHTML = list.map(function(a) {
-          var badge = a.reported ? '<span class="badge badge-done">報告済</span>' :
-                      a.role === '送迎' ? '<span class="badge" style="background:#e8eaed;color:#5f6368">送迎</span>' :
-                      '<span class="badge badge-todo">未報告</span>';
-          var townLabel = (a.townCount || 0) > 0
-            ? (a.townCount + '町')
-            : '<span style="color:var(--c-warn)">町リスト未設定（町名は手入力）</span>';
-          return '<div class="assign" onclick="App.pickCase(\'' + esc(a.caseNo) + '\')">' + badge +
-            '<div class="store">' + esc(a.storeClean || a.caseNo) + '</div>' +
-            '<div class="meta">' + esc(a.areaDisplay || '') + ' ／ ' + esc(a.caseNo) +
-            ' ／ ' + townLabel + '</div></div>';
-        }).join('');
-      }
-      var s = res.mySummary || {};
-      $('homeSummary').innerHTML =
-        '<div class="box"><div class="num">' + (s.todayQty || 0) + '</div><div class="lbl">本日合計（部）</div></div>' +
-        '<div class="box"><div class="num">' + (s.monthQty || 0) + '</div><div class="lbl">今月合計（部）</div></div>' +
-        '<div class="box"><div class="num">' + (s.monthReports || 0) + '</div><div class="lbl">今月の報告数</div></div>';
-      renderHomeBans(res.todayBans || [], res.unsubmittedBans || []);
+      renderTodayFrom(res);
     }).catch(function() {
       $('todayList').innerHTML = '<div class="empty">読み込みに失敗しました</div>';
     });
+  }
+
+  // myToday応答（またはbootstrap同梱の同形データ）からホームを描画
+  function renderTodayFrom(res) {
+    if (!res) { $('todayList').innerHTML = '<div class="empty">読み込みに失敗しました</div>'; return; }
+    if (!res.ok) { $('todayList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
+    var list = res.todayAssignments || [];
+    if (list.length === 0) {
+      $('todayList').innerHTML = '<div class="empty">本日の割当はありません。<br>下の「催事」から選んで報告できます。</div>';
+    } else {
+      $('todayList').innerHTML = list.map(function(a) {
+        var badge = a.reported ? '<span class="badge badge-done">報告済</span>' :
+                    a.role === '送迎' ? '<span class="badge" style="background:#e8eaed;color:#5f6368">送迎</span>' :
+                    '<span class="badge badge-todo">未報告</span>';
+        var townLabel = (a.townCount || 0) > 0
+          ? (a.townCount + '町')
+          : '<span style="color:var(--c-warn)">町リスト未設定（町名は手入力）</span>';
+        return '<div class="assign" onclick="App.pickCase(\'' + esc(a.caseNo) + '\')">' + badge +
+          '<div class="store">' + esc(a.storeClean || a.caseNo) + '</div>' +
+          '<div class="meta">' + esc(a.areaDisplay || '') + ' ／ ' + esc(a.caseNo) +
+          ' ／ ' + townLabel + '</div></div>';
+      }).join('');
+    }
+    var s = res.mySummary || {};
+    $('homeSummary').innerHTML =
+      '<div class="box"><div class="num">' + (s.todayQty || 0) + '</div><div class="lbl">本日合計（部）</div></div>' +
+      '<div class="box"><div class="num">' + (s.monthQty || 0) + '</div><div class="lbl">今月合計（部）</div></div>' +
+      '<div class="box"><div class="num">' + (s.monthReports || 0) + '</div><div class="lbl">今月の報告数</div></div>';
+    renderHomeBans(res.todayBans || [], res.unsubmittedBans || []);
   }
 
   // ホームの「本日の配布禁止」＋未提出警告
