@@ -363,8 +363,6 @@
         <div id="shiftGrid2" class="sgrid"></div>
         <div class="ssum" id="shiftSum"></div>
         <div id="shiftWeekWarn"></div>
-        <label>備考（任意）</label>
-        <textarea id="shiftNote" rows="2" placeholder="例：8/10は15時までなら出られます"></textarea>
       </div>
       <div id="shiftFormResult"></div>
       <button type="button" class="btn-primary" id="shiftSend" onclick="App.submitShiftCycle()">この内容で提出</button>
@@ -433,12 +431,24 @@
       <input type="text" id="stName" placeholder="例：山田 太郎" autocomplete="off">
       <label style="margin-top:12px">Googleアカウント（Gmail） <span style="color:var(--c-err)">*</span></label>
       <input type="email" id="stEmail" placeholder="例：yamada@gmail.com" autocomplete="off">
+      <label style="margin-top:12px">拠点 <span style="color:var(--c-err)">*</span></label>
+      <select id="stHome">
+        <option value="">— 拠点を選択 —</option>
+        <option value="関西">関西</option>
+        <option value="東戸塚">東戸塚</option>
+        <option value="稲毛">稲毛</option>
+        <option value="五香">五香</option>
+      </select>
+      <label style="margin-top:12px">権限 <span style="color:var(--c-err)">*</span></label>
+      <select id="stPerm">
+        <option value="配布員">配布員</option>
+        <option value="管理者">管理者（配布報告なし）</option>
+        <option value="管理者（配布報告あり）">管理者（配布報告あり）</option>
+      </select>
       <details style="margin-top:12px">
         <summary>詳細設定（任意・ふつうは空欄でOK）</summary>
         <label style="margin-top:10px">集計タブの表記名<br><span class="footer-note">空欄なら氏名を使います。集計表の列見出しと表記が違うときだけ入力。</span></label>
         <input type="text" id="stTabName" placeholder="集計表の列見出しと同じ表記" autocomplete="off">
-        <label style="margin-top:10px">拠点（任意）</label>
-        <input type="text" id="stHome" placeholder="例：稲毛" autocomplete="off">
       </details>
       <div id="stResult"></div>
       <button type="button" class="btn-primary" id="stSubmit" style="margin-top:14px" onclick="App.submitStaff()">このスタッフを登録</button>
@@ -480,8 +490,8 @@
 
 <!-- 下部固定ナビ -->
 <nav id="bottomNav" class="hidden">
-  <button type="button" data-tab="home" onclick="App.switchTab('home')"><span class="ic">📝</span>報告</button>
-  <button type="button" data-tab="history" onclick="App.switchTab('history')"><span class="ic">📋</span>履歴</button>
+  <button type="button" data-tab="home" id="navReport" onclick="App.switchTab('home')"><span class="ic">📝</span>報告</button>
+  <button type="button" data-tab="history" id="navHistory" onclick="App.switchTab('history')"><span class="ic">📋</span>履歴</button>
   <button type="button" data-tab="account" onclick="App.switchTab('account')"><span class="ic">👤</span>アカウント</button>
   <button type="button" data-tab="shift" id="navShift" onclick="App.switchTab('shift')"><span class="ic">📅</span>シフト<span class="navdot hidden" id="navShiftDot"></span></button>
   <button type="button" data-tab="register" id="navRegister" onclick="App.switchTab('register')" style="display:none"><span class="ic">🗓️</span>予定登録</button>
@@ -672,6 +682,8 @@ var App = (function() {
   function applyWhoami(res) {
     state.email = res.email || state.email;
     state.isAdmin = !!res.isAdmin;
+    // canReport: サーバが返さない旧デプロイでは undefined → 従来どおり全員報告可(true)に倒す
+    state.canReport = (res.canReport === undefined) ? true : !!res.canReport;
     state.registered = !!res.registered;
     state.staff = res.staff || null;
     if (!state.registered) {
@@ -682,17 +694,20 @@ var App = (function() {
       showOnly('unregView');
       return false;
     }
-    $('userBar').textContent = state.staff.name + '（' + state.staff.staffId + '）' + (state.isAdmin ? '・管理者' : '');
+    var permLabel = state.isAdmin ? (state.canReport ? '・管理者(報告あり)' : '・管理者') : '';
+    $('userBar').textContent = state.staff.name + '（' + state.staff.staffId + '）' + permLabel;
     $('authCard').classList.add('hidden');
     $('bottomNav').classList.remove('hidden');
-    if (state.isAdmin) {   // 管理者: 予定登録・スタッフ登録・シフト管理を表示／シフト（提出）は非表示
-      $('navRegister').style.display = '';
-      $('navStaff').style.display = '';
-      $('navShiftAdmin').style.display = '';
-      $('navShift').style.display = 'none';
-    } else {               // スタッフ: シフト（提出）を表示（管理者専用タブは非表示のまま）
-      $('navShift').style.display = '';
-    }
+    // 権限3種でタブを出し分け:
+    //   報告/履歴 = 配布報告する人のみ（配布員・管理者(報告あり)）
+    //   シフト(提出) = 配布員のみ（管理者は自分のシフトは出さない＝シフト管理で他人を登録）
+    //   予定登録/スタッフ登録/シフト管理 = 管理者のみ
+    $('navReport').style.display = state.canReport ? '' : 'none';
+    $('navHistory').style.display = state.canReport ? '' : 'none';
+    $('navShift').style.display = (!state.isAdmin) ? '' : 'none';
+    $('navRegister').style.display = state.isAdmin ? '' : 'none';
+    $('navStaff').style.display = state.isAdmin ? '' : 'none';
+    $('navShiftAdmin').style.display = state.isAdmin ? '' : 'none';
     return true;
   }
 
@@ -717,11 +732,22 @@ var App = (function() {
     }
   }
 
+  // 初期表示タブ: 報告する人=ホーム／報告しない管理者=予定登録
+  function defaultTab() {
+    if (state.canReport) return 'home';
+    if (state.isAdmin) return 'register';
+    return 'account';
+  }
+
   function applyBootstrap(res) {
     if (!applyWhoami(res)) return;   // 未登録は案内画面で終了
     applyCases(res);
-    switchTab('home', true);          // ホームは同梱データで即描画（追加のAPI往復なし）
-    renderTodayFrom(res.myToday);
+    if (state.canReport) {
+      switchTab('home', true);        // ホームは同梱データで即描画（追加のAPI往復なし）
+      renderTodayFrom(res.myToday);
+    } else {
+      switchTab(defaultTab());        // 報告しない管理者は予定登録などへ
+    }
     if (!state.isAdmin && res.shift) {   // シフト警告（スタッフのみ・bootstrapに同梱）
       state.shiftData = res.shift;
       buildShiftView();
@@ -738,7 +764,7 @@ var App = (function() {
       api({ action: 'cases' }).then(function(res) {
         if (!res.ok) { showResult(res); return; }
         applyCases(res);
-        switchTab('home');   // myToday を取得して描画
+        switchTab(defaultTab());   // 報告する人はhome(myToday取得)・報告しない管理者は予定登録
         if (!state.isAdmin) loadShiftAlerts();
         handlePreset();
       }).catch(function(e) {
@@ -1525,7 +1551,8 @@ var App = (function() {
       list.map(function(s) {
         return '<div class="assign"><div class="store">' + esc(s.name) + '</div>' +
           '<div class="meta">' + esc(s.staffId) + ' ／ ' + esc(s.email || '(メール未登録)') +
-          (s.homeArea ? ' ／ ' + esc(s.homeArea) : '') + '</div></div>';
+          (s.homeArea ? ' ／ ' + esc(s.homeArea) : ' ／ <span style="color:var(--c-warn)">拠点未設定</span>') +
+          (s.perm ? ' ／ ' + esc(s.perm) : '') + '</div></div>';
       }).join('');
   }
 
@@ -1533,11 +1560,14 @@ var App = (function() {
     if (state.submitting) return;
     var name = $('stName').value.trim();
     var email = $('stEmail').value.trim();
+    var homeArea = $('stHome').value;
+    var perm = $('stPerm').value;
     if (!name) { alert('氏名を入力してください'); return; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { alert('Gmailの形式が正しくありません'); return; }
+    if (!homeArea) { alert('拠点を選んでください（関西／東戸塚／稲毛／五香）'); return; }
     var payload = {
       action: 'registerStaff', name: name, email: email,
-      tabName: $('stTabName').value.trim(), homeArea: $('stHome').value.trim()
+      tabName: $('stTabName').value.trim(), homeArea: homeArea, perm: perm
     };
     var btn = $('stSubmit');
     state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>登録中…';
@@ -1545,7 +1575,7 @@ var App = (function() {
       state.submitting = false; btn.disabled = false; btn.textContent = 'このスタッフを登録';
       if (res.ok) {
         $('stResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + res.message) + '</div>';
-        $('stName').value = ''; $('stEmail').value = ''; $('stTabName').value = ''; $('stHome').value = '';
+        $('stName').value = ''; $('stEmail').value = ''; $('stTabName').value = ''; $('stHome').value = ''; $('stPerm').value = '配布員';
         if (res.staff) state.staffList.push({ staffId: res.staff.staffId, name: res.staff.name });  // 予定登録の候補にも反映
         loadStaff();
       } else {
@@ -1809,7 +1839,7 @@ var App = (function() {
     var introMsg = (v.mode === 'monthly')
       ? '翌月ぶんのシフト提出です（毎月19日19時締切・1週間に最大' + v.maxPerWeek + '日まで）。'
       : '<b>①前半・②後半それぞれ</b>提出してください（1週間に最大' + v.maxPerWeek + '日まで）。';
-    $('shiftIntro').innerHTML = v.year + '年' + v.month + '月のアナウンスです。' + introMsg +
+    $('shiftIntro').innerHTML = v.year + '年' + v.month + '月のアナウンスです。<br>' + introMsg +
       (v.base ? '<br>拠点: <b>' + esc(v.base) + '</b>' : '');
     $('shiftUnset').classList.toggle('hidden', !!v.baseConfigured);
 
@@ -1888,9 +1918,7 @@ var App = (function() {
     var days = {};
     if (useDraft) days = draft.days;
     else if (c.days) Object.keys(c.days).forEach(function(k) { days[k] = c.days[k]; });
-    state.shiftForm = { no: no, key: c.key, cycle: c, days: days,
-                        note: useDraft && typeof draft.note === 'string' ? draft.note : (c.note || '') };
-    $('shiftNote').value = state.shiftForm.note;
+    state.shiftForm = { no: no, key: c.key, cycle: c, days: days, note: '' };   // 備考欄は廃止
     $('shiftFormResult').innerHTML = '';
     $('shiftDone').innerHTML = '';
     renderShiftFormHead();
@@ -1922,8 +1950,7 @@ var App = (function() {
   function shiftSaveDraft() {
     var f = state.shiftForm;
     if (!f) return;
-    f.note = $('shiftNote').value;
-    lsSet(shiftDraftKey(f.key), JSON.stringify({ days: f.days, note: f.note, at: Date.now() }));
+    lsSet(shiftDraftKey(f.key), JSON.stringify({ days: f.days, note: '', at: Date.now() }));
   }
 
   function shiftSelected(f, iso) {   // 選択中（〇）か。旧データの午前/午後も選択扱い→再提出で終日に揃う
@@ -1961,7 +1988,7 @@ var App = (function() {
     $('shiftGrid2').innerHTML = html;
     var sum = $('shiftSum');
     sum.className = 'ssum s' + f.no;
-    sum.textContent = '出勤できる日: ' + total + '日 ／ ' + dates.length + '日中';
+    sum.textContent = '出勤できる日: ' + total + '日（1週間に最大' + maxPerWeek + '日まで）';
     // 週5日上限: 6日以上の週があれば警告＋提出ボタン無効（サーバも同判定で二重防御）
     var over = formWeekOverflow(f);
     var warnEl = $('shiftWeekWarn');
@@ -2003,7 +2030,7 @@ var App = (function() {
     });
     if (!confirm(f.cycle.label + 'のシフトを提出します。\n\n出勤できる日: ' + ok + '日\n出られない日: ' + ng + '日\n\nよろしいですか？')) return;
 
-    var payload = { action: 'submitShiftCycle', cycleKey: f.key, days: send, note: $('shiftNote').value.trim() };
+    var payload = { action: 'submitShiftCycle', cycleKey: f.key, days: send, note: '' };
     var btn = $('shiftSend');
     state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>送信中…';
     api(payload).then(function(res) {
@@ -2162,7 +2189,7 @@ var App = (function() {
       'メール: <b>' + esc(state.email || '') + '</b><br>' +
       'ID: <b>' + esc(s.staffId || '') + '</b><br>' +
       '拠点: <b>' + esc(s.homeArea || '(未設定)') + '</b>' +
-      (state.isAdmin ? '<br>権限: <b>管理者</b>' : '') +
+      '<br>権限: <b>' + esc(state.isAdmin ? (state.canReport ? '管理者（配布報告あり）' : '管理者') : '配布員') + '</b>' +
       '</div>';
   }
 
@@ -2176,7 +2203,6 @@ var App = (function() {
     $('totalReported').oninput = recalc;
     $('workWorkH').oninput = updateCph;        // 勤務時間を直すと部数毎時も再計算
     resetWorkFields();                          // 勤務実績の初期値（休憩1h・勤務8h）
-    $('shiftNote').oninput = shiftSaveDraft;   // 備考も下書きとして端末に自動保存
     setInterval(refreshShiftDisplays, 60000);  // JST判定を1分ごとに再評価（8日0時・19時跨ぎで表示が自動切替）
     if (!tryRestoreSession()) {
       if (hasValidClientId()) {
