@@ -440,7 +440,7 @@
   <button type="button" data-tab="home" onclick="App.switchTab('home')"><span class="ic">📝</span>報告</button>
   <button type="button" data-tab="history" onclick="App.switchTab('history')"><span class="ic">📋</span>履歴</button>
   <button type="button" data-tab="account" onclick="App.switchTab('account')"><span class="ic">👤</span>アカウント</button>
-  <button type="button" data-tab="shift" onclick="App.switchTab('shift')"><span class="ic">📅</span>シフト<span class="navdot hidden" id="navShiftDot"></span></button>
+  <button type="button" data-tab="shift" id="navShift" onclick="App.switchTab('shift')"><span class="ic">📅</span>シフト<span class="navdot hidden" id="navShiftDot"></span></button>
   <button type="button" data-tab="register" id="navRegister" onclick="App.switchTab('register')" style="display:none"><span class="ic">🗓️</span>予定登録</button>
   <button type="button" data-tab="staff" id="navStaff" onclick="App.switchTab('staff')" style="display:none"><span class="ic">👥</span>スタッフ登録</button>
 </nav>
@@ -615,9 +615,12 @@ var App = (function() {
       $('userBar').textContent = state.staff.name + '（' + state.staff.staffId + '）' + (state.isAdmin ? '・管理者' : '');
       $('authCard').classList.add('hidden');
       $('bottomNav').classList.remove('hidden');
-      if (state.isAdmin) {   // 管理者のみ「予定登録」「スタッフ登録」タブ
+      if (state.isAdmin) {   // 管理者: 予定登録・スタッフ登録を表示／シフトは非表示（管理者はシフト提出しない）
         $('navRegister').style.display = '';
         $('navStaff').style.display = '';
+        $('navShift').style.display = 'none';
+      } else {               // スタッフ: シフトを表示（予定登録・スタッフ登録は管理者専用のまま）
+        $('navShift').style.display = '';
       }
       loadCases();
     }).catch(function(e) {
@@ -644,7 +647,7 @@ var App = (function() {
       renderCases();
       renderAreas();
       switchTab('home');
-      loadShiftAlerts();   // シフト未提出の警告（ホーム＋ナビ赤丸）をバックグラウンドで取得
+      if (!state.isAdmin) loadShiftAlerts();   // シフト警告はスタッフのみ（管理者は提出しないので取得しない）
       // カレンダーのリンク（?case=）から来た場合は該当催事を自動選択
       if (PRESET_CASE) {
         var sel = $('caseSelect');
