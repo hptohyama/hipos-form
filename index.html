@@ -168,6 +168,8 @@
   .sday2.sel2 { background: #e8710a; border-color: #e8710a; color: #fff; }
   .swk { display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; }
   .swk.w1 { color: #1a73e8; } .swk.w2 { color: #e8710a; }
+  .swk.over { color: #fff; background: #c5221f; border-radius: 6px; }   /* 週6日以上=上限超過 */
+  .sday2.empty { border: none; background: transparent; cursor: default; pointer-events: none; }   /* 月グリッドの余白 */
   .ssum { margin-top: 10px; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 700; text-align: center; }
   .ssum.s1 { background: #e8f0fe; color: #174ea6; }
   .ssum.s2 { background: #fdefe0; color: #8a4504; }
@@ -187,6 +189,7 @@
             -webkit-tap-highlight-color: transparent; }
   .sa-day.empty { border: none; background: transparent; cursor: default; }
   .sa-day.dis { color: #c9ccd1; background: #f8f9fa; cursor: default; }
+  .sa-day.pastsel { background: #e8f0fe; color: #7ba7f0; border-color: #cfe0fb; }   /* 過去の登録済み(変更不可) */
   .sa-day.today { border-color: var(--c-primary); }
   .sa-day.sel { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
   #bottomNav button { position: relative; }
@@ -363,6 +366,7 @@
         <div class="sgrid-dow"><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span><span>計</span></div>
         <div id="shiftGrid2" class="sgrid"></div>
         <div class="ssum" id="shiftSum"></div>
+        <div id="shiftWeekWarn"></div>
         <label>備考（任意）</label>
         <textarea id="shiftNote" rows="2" placeholder="例：8/10は15時までなら出られます"></textarea>
       </div>
@@ -1008,10 +1012,12 @@ var App = (function() {
       if (res.ok && res.code === 'APPLIED') {
         var doneUuid = payload.reportUuid;
         state.reportUuid = null;
-        if (!res.idempotentReplay) {
-          if (state.gpsFiles.length > 0) uploadGpsSequential(doneUuid);
-          else clearFormAfterSuccess();
-        }
+        // GPS添付は報告本体の冪等性とは別経路。初回送信がサーバ到達後に応答だけ電波断で消失し、
+        // 同一UUIDで再送 → サーバが idempotentReplay を返すケースでも、まだ送っていないGPSは送る
+        // （添付画像の無言消失を防ぐ）。初回で完全成功していれば clearFormAfterSuccess で gpsFiles は
+        // 空になっており、ここで再アップロードは走らない。
+        if (state.gpsFiles.length > 0) uploadGpsSequential(doneUuid);
+        else clearFormAfterSuccess();
       } else if (res.code === 'E_LOCK_TIMEOUT' && res.retryable) {
         if (state.retryCount >= 3) {
           showResult({ ok: false, code: 'E_LOCK_TIMEOUT',
@@ -1488,12 +1494,9 @@ var App = (function() {
     return ['日', '月', '火', '水', '木', '金', '土'][new Date(+p[0], +p[1] - 1, +p[2]).getDay()];
   }
   function fmtMdw(iso) { return fmtMd(iso) + '(' + dowJp(iso) + ')'; }
-  function periodDatesOf(c) {   // 期間14日ぶんの日付
-    var out = [], p = c.periodStart.split('-');
-    for (var i = 0; i < 14; i++) {
-      var d = new Date(+p[0], +p[1] - 1, +p[2] + i);
-      out.push(d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2));
-    }
+  function periodDatesOf(c) {   // 期間全日（サイクル=14日 / 月間=その月の日数）。periodStart〜periodEnd
+    var out = [], d = c.periodStart;
+    while (d <= c.periodEnd) { out.push(d); d = isoAddDays(d, 1); }
     return out;
   }
   function shiftDraftKey(key) {
@@ -1515,6 +1518,16 @@ var App = (function() {
       return { date: d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2),
                time: ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2) };
     }
+  }
+
+  // JST時刻文字列を epoch ms に変換する。サーバの提出日時(Canon.nowIso)は既に '…T…+09:00' 形式で
+  // オフセットを含むため、二重に '+09:00' を付けない（付くと Date.parse が NaN になり、下書き採否判定が
+  // 常に不成立＝提出済みサイクルの新しい下書きが必ず捨てられる不具合になる）。オフセットの無い旧形式のみ補う。
+  function parseJstMs(s) {
+    var iso = String(s == null ? '' : s).trim().replace(' ', 'T');
+    if (!iso) return NaN;
+    if (!/[Zz]$/.test(iso) && !/[+\-]\d\d:?\d\d$/.test(iso)) iso += '+09:00';
+    return Date.parse(iso);
   }
 
   // ── サイクル日付の自動計算（サーバShift.gsと同一ロジックのミラー） ──
@@ -1560,12 +1573,51 @@ var App = (function() {
              canSubmit: canSubmit, warn: warn, daysLeft: dl, countdown: countdown };
   }
 
+  // 関東(月1回)のローカルミラー: アナウンス月M → 締切M/19・期間=翌月1日〜末日・受付M/1（サーバ monthlyPlan と一致）
+  function jsMonthly(y, m) {
+    var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+    var ny = (m === 12) ? y + 1 : y, nm = (m === 12) ? 1 : m + 1;
+    var last = new Date(ny, nm, 0).getDate();
+    return { opensOn: y + '-' + pad(m) + '-01',
+      cycles: [{ no: 1, key: y + '-' + pad(m) + '-M', label: nm + '月シフト',
+        deadlineDate: y + '-' + pad(m) + '-19',
+        periodStart: ny + '-' + pad(nm) + '-01', periodEnd: ny + '-' + pad(nm) + '-' + pad(last) }] };
+  }
+  // iso日付が属する週(月曜始まり)の月曜のiso
+  function isoMondayOf(iso) {
+    var p = iso.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]);
+    var dow = d.getDay(); var diff = (dow === 0) ? -6 : (1 - dow);
+    var m = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
+    return m.getFullYear() + '-' + ('0' + (m.getMonth() + 1)).slice(-2) + '-' + ('0' + m.getDate()).slice(-2);
+  }
+  // 週(月〜日)ごとの出勤(不可以外)日数が上限超の週（サーバ Shift.weekOverflow と同一判定）
+  function shiftWeekOverflow(days, max) {
+    max = max || 5;
+    var byWeek = {};
+    Object.keys(days || {}).forEach(function(d) {
+      if (days[d] === '不可') return;
+      var w = isoMondayOf(d); byWeek[w] = (byWeek[w] || 0) + 1;
+    });
+    var over = [];
+    Object.keys(byWeek).forEach(function(w) { if (byWeek[w] > max) over.push({ weekStart: w, count: byWeek[w] }); });
+    over.sort(function(a, b) { return a.weekStart < b.weekStart ? -1 : 1; });
+    return over;
+  }
+  // 編集中フォームの選択(〇)から週上限超過を判定
+  function formWeekOverflow(f) {
+    var max = (state.shiftView && state.shiftView.maxPerWeek) || 5;
+    var sel = {};
+    periodDatesOf(f.cycle).forEach(function(iso) { if (shiftSelected(f, iso)) sel[iso] = '終日'; });
+    return shiftWeekOverflow(sel, max);
+  }
+
   // ── 表示用ビュー = ローカルJST判定 × サーバの提出データ（サーバは提出時に再検証する） ──
   function buildShiftView() {
     var res = state.shiftData;
     var now = jstNow();
     var ym = now.date.split('-');
-    var loc = jsCycles(+ym[0], +ym[1]);   // アナウンス月M=今日(JST)の月
+    var mode = (res && res.mode) || 'cycle';   // 拠点で 月2回サイクル / 月1回 を切替（サーバ由来）
+    var loc = (mode === 'monthly') ? jsMonthly(+ym[0], +ym[1]) : jsCycles(+ym[0], +ym[1]);
     var byKey = {};
     ((res && res.cycles) || []).forEach(function(c) { byKey[c.key] = c; });
     var mismatch = false;
@@ -1584,8 +1636,9 @@ var App = (function() {
     });
     state.shiftView = {
       year: +ym[0], month: +ym[1], opensOn: loc.opensOn, now: now,
+      mode: mode, maxPerWeek: (res && res.maxPerWeek) || 5,
       base: res ? (res.base || '') : '', baseConfigured: !!(res && res.baseConfigured),
-      cycles: cycles, mismatch: mismatch
+      cycles: cycles, mismatch: mismatch, otherDays: (res && res.otherDays) || []
     };
     return state.shiftView;
   }
@@ -1620,6 +1673,12 @@ var App = (function() {
     if (!state.shiftData) return;
     var v = buildShiftView();
     if (v.mismatch) {   // 月が替わった → サーバから提出状態を取り直す（5分に1回まで）
+      // 旧月サイクルのフォームを開いたまま凍結させない。開いていたら一覧へ戻す。
+      if (state.tab === 'shift' && state.shiftForm) {
+        state.shiftForm = null;
+        showShiftList();
+        var sd = $('shiftDone'); if (sd) sd.innerHTML = '<div class="msg msg-warn">月が替わったため最新の提出状況に更新しました。</div>';
+      }
       if (!state.shiftLastRefetch || Date.now() - state.shiftLastRefetch > 300000) {
         state.shiftLastRefetch = Date.now();
         loadShiftAlerts();
@@ -1676,12 +1735,16 @@ var App = (function() {
   function renderShiftList() {
     var v = state.shiftView;
     if (!v) return;
-    $('shiftIntro').innerHTML = v.year + '年' + v.month + '月ぶんの提出です。<b>①前半・②後半それぞれ</b>提出してください。' +
+    var introMsg = (v.mode === 'monthly')
+      ? '翌月ぶんのシフト提出です（毎月19日19時締切・1週間に最大' + v.maxPerWeek + '日まで）。'
+      : '<b>①前半・②後半それぞれ</b>提出してください（1週間に最大' + v.maxPerWeek + '日まで）。';
+    $('shiftIntro').innerHTML = v.year + '年' + v.month + '月のアナウンスです。' + introMsg +
       (v.base ? '<br>拠点: <b>' + esc(v.base) + '</b>' : '');
     $('shiftUnset').classList.toggle('hidden', !!v.baseConfigured);
 
     $('shiftCards').innerHTML = (v.cycles || []).map(function(c) {
       var n = c.no, st = c.state;
+      var pdays = periodDatesOf(c).length;
       var badge;
       if (st.beforeOpen) badge = '<span class="badge-big bb-wait">受付前</span>';
       else if (st.submitted) badge = '<span class="badge-big bb-done">提出済み ✓</span>';
@@ -1707,11 +1770,23 @@ var App = (function() {
         '<div class="cyc-head"><span class="nm">' + esc(c.label) + '</span>' + badge + '</div>' +
         '<div class="cyc-body">' +
         '<div class="cyc-row"><span class="k">提出期日</span><span class="v">' + esc(fmtMdw(c.deadlineDate)) + ' 19:00' + chip + '</span></div>' +
-        '<div class="cyc-row"><span class="k">勤務期間</span><span class="v">' + esc(fmtMdw(c.periodStart)) + '〜' + esc(fmtMdw(c.periodEnd)) + '<br><span style="font-weight:400;color:var(--c-sub);font-size:12px">14日間</span></span></div>' +
+        '<div class="cyc-row"><span class="k">勤務期間</span><span class="v">' + esc(fmtMdw(c.periodStart)) + '〜' + esc(fmtMdw(c.periodEnd)) + '<br><span style="font-weight:400;color:var(--c-sub);font-size:12px">' + pdays + '日間</span></span></div>' +
         (st.submitted && c.submittedAt ? '<div class="cyc-row"><span class="k">提出日時</span><span class="v">' + esc(String(c.submittedAt).replace('T', ' ').slice(0, 16)) + '</span></div>' : '') +
         warnHtml(c) + btn +
         '</div></div>';
     }).join('');
+
+    // サイクル外の出勤予定（管理者がサイクル期間外に登録した分）を読み取り専用で表示
+    var od = v.otherDays || [];
+    if (od.length) {
+      $('shiftCards').insertAdjacentHTML('beforeend',
+        '<div class="card"><h2 style="font-size:15px">その他の出勤予定</h2>' +
+        '<div class="case-info">管理者が登録した、上記サイクル以外の出勤予定です（10:00〜19:00）。変更は担当者へご連絡ください。</div>' +
+        '<div style="margin-top:8px">' + od.map(function(o) {
+          return '<div class="cyc-row"><span class="k">' + esc(fmtMdw(o.date)) + '</span><span class="v">出勤' +
+            (o.kubun && o.kubun !== '終日' ? '（' + esc(o.kubun) + '）' : '') + '</span></div>';
+        }).join('') + '</div></div>');
+    }
   }
 
   function showShiftList() {
@@ -1725,14 +1800,25 @@ var App = (function() {
     var c = null;
     (v.cycles || []).forEach(function(x) { if (x.no === no) c = x; });
     if (!c || !c.state.canSubmit) return;
-    // 優先: 端末の下書き → サーバの提出済み内容 → 空
-    var days = {};
+    // 下書きとサーバ提出済みのどちらを採用するか。
+    // 未提出=下書き優先。提出済み=下書きが提出後に作られた(新しい)時だけ下書き、そうでなければサーバ内容を優先。
+    // （古い/放棄された下書きが、別端末での正しい提出を上書きするのを防ぐ）。
     var draft = null;
     try { draft = JSON.parse(lsGet(shiftDraftKey(c.key)) || 'null'); } catch (e) { draft = null; }
-    if (draft && draft.days) days = draft.days;
+    var useDraft = false;
+    if (draft && draft.days) {
+      if (!c.submitted) useDraft = true;
+      else {
+        var subMs = c.submittedAt ? parseJstMs(c.submittedAt) : 0;
+        if (draft.at && subMs && draft.at > subMs) useDraft = true;   // 下書きが提出より新しい時のみ
+        else { try { lsDel(shiftDraftKey(c.key)); } catch (e2) {} }   // 古い下書きは破棄
+      }
+    }
+    var days = {};
+    if (useDraft) days = draft.days;
     else if (c.days) Object.keys(c.days).forEach(function(k) { days[k] = c.days[k]; });
     state.shiftForm = { no: no, key: c.key, cycle: c, days: days,
-                        note: (draft && typeof draft.note === 'string') ? draft.note : (c.note || '') };
+                        note: useDraft && typeof draft.note === 'string' ? draft.note : (c.note || '') };
     $('shiftNote').value = state.shiftForm.note;
     $('shiftFormResult').innerHTML = '';
     $('shiftDone').innerHTML = '';
@@ -1776,29 +1862,45 @@ var App = (function() {
 
   function renderShiftGrid() {
     var f = state.shiftForm, c = f.cycle;
-    var dates = periodDatesOf(c);   // 月曜開始・14日（ちょうど2週間）
+    var dates = periodDatesOf(c);   // サイクル=14日 / 月間=その月の日数
     var selCls = f.no === 1 ? 'sel1' : 'sel2';
-    var html = '', total = 0, months = [];
-    for (var w = 0; w < 2; w++) {
-      var weekSel = 0;
+    var maxPerWeek = (state.shiftView && state.shiftView.maxPerWeek) || 5;
+    var inPeriod = {}; dates.forEach(function(d) { inPeriod[d] = true; });
+    var last = dates[dates.length - 1];
+    var cur = isoMondayOf(dates[0]);   // 先頭日の週の月曜から並べる（月間は月初前を空セルで詰める）
+    var html = '', total = 0, months = [], guard = 0;
+    while (cur <= last && guard < 60) {
+      guard++;
+      var weekSel = 0, cells = '';
       for (var i = 0; i < 7; i++) {
-        var iso = dates[w * 7 + i];
+        var iso = isoAddDays(cur, i);
+        if (!inPeriod[iso]) { cells += '<div class="sday2 empty"></div>'; continue; }   // 期間外は空セル
         var p = iso.split('-');
-        var mo = Number(p[1]);
-        if (months.indexOf(mo) < 0) months.push(mo);   // 期間にまたがる月を収集
+        var mo = Number(p[1]); if (months.indexOf(mo) < 0) months.push(mo);   // 期間にまたがる月を収集
         var sel = shiftSelected(f, iso);
         if (sel) { weekSel++; total++; }
-        html += '<div class="sday2' + (sel ? ' ' + selCls : '') +
-                '" onclick="App.toggleShiftDay(\'' + iso + '\')">' + esc(String(Number(p[2]))) + '</div>';   // 日にちのみ
+        cells += '<div class="sday2' + (sel ? ' ' + selCls : '') +
+                 '" onclick="App.toggleShiftDay(\'' + iso + '\')">' + esc(String(Number(p[2]))) + '</div>';   // 日にちのみ
       }
-      html += '<div class="swk w' + f.no + '">' + (weekSel ? String(weekSel) : '') + '</div>';   // 週の合計は数字だけ
+      html += cells + '<div class="swk w' + f.no + (weekSel > maxPerWeek ? ' over' : '') + '">' + (weekSel ? String(weekSel) : '') + '</div>';
+      cur = isoAddDays(cur, 7);
     }
     // カレンダー上の月見出し（例「8月」／月をまたぐと「8月・9月」）
     $('shiftMonthLabel').textContent = months.map(function(m) { return m + '月'; }).join('・');
     $('shiftGrid2').innerHTML = html;
     var sum = $('shiftSum');
     sum.className = 'ssum s' + f.no;
-    sum.textContent = '出勤できる日: ' + total + '日 ／ 14日中';
+    sum.textContent = '出勤できる日: ' + total + '日 ／ ' + dates.length + '日中';
+    // 週5日上限: 6日以上の週があれば警告＋提出ボタン無効（サーバも同判定で二重防御）
+    var over = formWeekOverflow(f);
+    var warnEl = $('shiftWeekWarn');
+    if (warnEl) warnEl.innerHTML = over.length
+      ? '<div class="warnbox warn-r">⚠ 1週間に勤務できるのは最大' + maxPerWeek + '日です。' +
+        over.map(function(o) { return fmtMd(o.weekStart) + 'の週=' + o.count + '日'; }).join('・') +
+        '。6日以上の週を減らすと提出できます。</div>'
+      : '';
+    var sendBtn = $('shiftSend');
+    if (sendBtn) sendBtn.disabled = (over.length > 0) || !(c.state && c.state.canSubmit);
   }
 
   function toggleShiftDay(iso) {
@@ -1812,6 +1914,14 @@ var App = (function() {
   function submitShiftCycle() {
     var f = state.shiftForm;
     if (!f || state.submitting) return;
+    // 週5日上限（6日以上の週があると提出不可）。サーバも E_SHIFT_WEEK_OVERFLOW で弾く。
+    var over = formWeekOverflow(f);
+    if (over.length > 0) {
+      alert('1週間に勤務できるのは最大' + ((state.shiftView && state.shiftView.maxPerWeek) || 5) + '日です。\n' +
+            over.map(function(o) { return fmtMd(o.weekStart) + 'の週が' + o.count + '日'; }).join('\n') +
+            '\n\n6日以上の週を減らしてから提出してください。');
+      return;
+    }
     var dates = periodDatesOf(f.cycle);
     // タップ済み=〇（終日10-19時）・未選択=×（不可）として全14日を送る
     var send = {};
@@ -1886,6 +1996,8 @@ var App = (function() {
       f.name = res.staffName || ''; f.base = res.base || ''; f.configured = !!res.baseConfigured;
       f.selected = {}; f.dirty = false;
       (res.dates || []).forEach(function(d) { f.selected[d] = true; });
+      f.baseline = (res.dates || []).slice();   // 読込時点の出勤日=管理者が見た状態。保存時に送り、
+                                                 // 読込後にスタッフが追加した日をサーバが誤削除しないためのガードに使う。
       var bi = $('saBaseInfo');
       bi.classList.remove('hidden');
       bi.innerHTML = f.configured
@@ -1898,6 +2010,7 @@ var App = (function() {
   function saMonth(delta) {
     var f = state.saForm;
     if (!f) return;
+    if (state.submitting) return;   // 保存中の月移動は応答レース（保存結果の月取り違え）を招くので無視
     if (f.dirty && !confirm('保存していない変更があります。破棄して月を移動しますか？')) return;
     var idx = f.viewY * 12 + f.viewM + delta;
     f.viewY = Math.floor(idx / 12); f.viewM = idx % 12;
@@ -1907,6 +2020,7 @@ var App = (function() {
   function renderSaCal() {
     var f = state.saForm;
     if (!f) return;
+    f.today = todayIso();   // 開きっぱなしで日付が変わっても過去日判定を最新に（境界ズレ防止）
     var y = f.viewY, m = f.viewM;   // m: 0-based
     $('saMonthLabel').textContent = y + '年 ' + (m + 1) + '月';
     var tp = f.today.split('-');
@@ -1914,19 +2028,28 @@ var App = (function() {
     $('saPrev').disabled = (y * 12 + m <= minIdx);   // 過去月には戻さない
     var startDow = new Date(y, m, 1).getDay();       // 0=日
     var daysInMonth = new Date(y, m + 1, 0).getDate();
-    var html = '', total = 0;
+    var monthPrefix = y + '-' + ('0' + (m + 1)).slice(-2) + '-';
+    // 当月の出勤数は過去日も含めて数える（過去分は変更不可だが実際に保存・維持される）
+    var total = 0, pastSel = 0;
+    Object.keys(f.selected).forEach(function(iso) { if (iso.indexOf(monthPrefix) === 0) total++; });
+    var html = '';
     for (var i = 0; i < startDow; i++) html += '<div class="sa-day empty"></div>';
     for (var d = 1; d <= daysInMonth; d++) {
-      var iso = y + '-' + ('0' + (m + 1)).slice(-2) + '-' + ('0' + d).slice(-2);
+      var iso = monthPrefix + ('0' + d).slice(-2);
       var cls = 'sa-day';
       if (iso === f.today) cls += ' today';
-      if (iso < f.today) { html += '<div class="' + cls + ' dis">' + d + '</div>'; continue; }   // 過去日は不可
-      if (f.selected[iso]) { cls += ' sel'; total++; }
+      if (iso < f.today) {   // 過去日は変更不可。登録済みなら「登録済み(過去)」と分かる薄色表示
+        cls += ' dis';
+        if (f.selected[iso]) { cls += ' pastsel'; pastSel++; }
+        html += '<div class="' + cls + '">' + d + '</div>';
+        continue;
+      }
+      if (f.selected[iso]) cls += ' sel';
       html += '<div class="' + cls + '" onclick="App.toggleSaDay(\'' + iso + '\')">' + d + '</div>';
     }
     $('saGrid').innerHTML = html;
     var sum = $('saSum');
-    sum.textContent = '出勤: ' + total + '日（' + (m + 1) + '月）' + (f.dirty ? ' ・未保存' : '');
+    sum.textContent = '出勤: ' + total + '日（' + (m + 1) + '月' + (pastSel ? '・うち過去 ' + pastSel + '日' : '') + '）' + (f.dirty ? ' ・未保存' : '');
   }
 
   function toggleSaDay(iso) {
@@ -1944,7 +2067,7 @@ var App = (function() {
     var dates = Object.keys(f.selected).sort();
     var btn = $('saSave');
     state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>保存中…';
-    api({ action: 'adminSubmitStaffShifts', staffId: f.staffId, year: f.viewY, month: f.viewM + 1, dates: dates }).then(function(res) {
+    api({ action: 'adminSubmitStaffShifts', staffId: f.staffId, year: f.viewY, month: f.viewM + 1, dates: dates, baseline: (f.baseline || []) }).then(function(res) {
       state.submitting = false; btn.disabled = false; btn.textContent = 'この月の内容で保存';
       if (res.ok) {
         $('saResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + res.message) + '</div>';
