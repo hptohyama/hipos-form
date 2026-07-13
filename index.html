@@ -646,60 +646,91 @@ var App = (function() {
   // ─── 認証後の初期分岐 ───
   function afterAuth() {
     // ログイン直後の初期読込は bootstrap 1回に集約（旧: whoami→cases→myToday→myShiftCycles の4往復）。
+    // ただし GASが未対応（旧デプロイでbootstrap無し）や一時エラーの場合は従来の個別取得へ自動フォールバック
+    // する（フロントとサーバのデプロイ順に依存せず、必ず起動できるようにする）。
     api({ action: 'bootstrap' }).then(function(res) {
-      if (!res.ok) { showAuthError(res); return; }
-      state.email = res.email || state.email;
-      state.isAdmin = !!res.isAdmin;
-      state.registered = !!res.registered;
-      state.staff = res.staff || null;
+      if (res && res.ok && res.registered !== undefined) { applyBootstrap(res); return; }
+      // 認証系のはっきりしたエラーはそのまま案内（フォールバックしても同じ結果）
+      if (res && !res.ok && String(res.code || '').indexOf('E_AUTH') === 0) { showAuthError(res); return; }
+      legacyAfterAuth();   // 旧デプロイ（不明なaction）・内部エラー等 → 従来の個別取得
+    }).catch(function() { legacyAfterAuth(); });
+  }
 
-      if (!state.registered) {
-        // 未登録者 → 案内画面（管理者にメールを伝えて登録依頼）
-        $('authCard').classList.add('hidden');
-        $('unregEmail').value = state.email || '(メール取得できず)';
-        $('userBar').textContent = (state.email || '') + '（未登録）';
-        showOnly('unregView');
-        return;
-      }
-
-      $('userBar').textContent = state.staff.name + '（' + state.staff.staffId + '）' + (state.isAdmin ? '・管理者' : '');
+  // whoami相当（bootstrap上位 or whoami応答）を反映。戻り値=在籍登録済みか（未登録は案内画面にして false）。
+  function applyWhoami(res) {
+    state.email = res.email || state.email;
+    state.isAdmin = !!res.isAdmin;
+    state.registered = !!res.registered;
+    state.staff = res.staff || null;
+    if (!state.registered) {
       $('authCard').classList.add('hidden');
-      $('bottomNav').classList.remove('hidden');
-      if (state.isAdmin) {   // 管理者: 予定登録・スタッフ登録・シフト管理を表示／シフト（提出）は非表示
-        $('navRegister').style.display = '';
-        $('navStaff').style.display = '';
-        $('navShiftAdmin').style.display = '';
-        $('navShift').style.display = 'none';
-      } else {               // スタッフ: シフト（提出）を表示（管理者専用タブは非表示のまま）
-        $('navShift').style.display = '';
-      }
+      $('unregEmail').value = state.email || '(メール取得できず)';
+      $('userBar').textContent = (state.email || '') + '（未登録）';
+      showOnly('unregView');
+      return false;
+    }
+    $('userBar').textContent = state.staff.name + '（' + state.staff.staffId + '）' + (state.isAdmin ? '・管理者' : '');
+    $('authCard').classList.add('hidden');
+    $('bottomNav').classList.remove('hidden');
+    if (state.isAdmin) {   // 管理者: 予定登録・スタッフ登録・シフト管理を表示／シフト（提出）は非表示
+      $('navRegister').style.display = '';
+      $('navStaff').style.display = '';
+      $('navShiftAdmin').style.display = '';
+      $('navShift').style.display = 'none';
+    } else {               // スタッフ: シフト（提出）を表示（管理者専用タブは非表示のまま）
+      $('navShift').style.display = '';
+    }
+    return true;
+  }
 
-      // 案件・エリア等（bootstrapに同梱）
-      state.cases = res.cases || [];
-      state.areas = res.areas || [];
-      state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ）
-      state.calendars = res.calendars || [];       // 予定登録の登録先カレンダー（管理者のみ）
-      state.gpsMax = Number(res.gpsMax) || 10;
-      $('gpsHeading').textContent = '⑤ GPS軌跡画像（最大' + state.gpsMax + '枚）';
-      renderCases();
-      renderAreas();
-      switchTab('home', true);          // ホームは同梱データで即描画（追加のAPI往復なし）
-      renderTodayFrom(res.myToday);
+  // cases相当（bootstrap上位 or cases応答）を反映
+  function applyCases(res) {
+    state.cases = res.cases || [];
+    state.areas = res.areas || [];
+    state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ）
+    state.calendars = res.calendars || [];       // 予定登録の登録先カレンダー（管理者のみ）
+    state.gpsMax = Number(res.gpsMax) || 10;
+    $('gpsHeading').textContent = '⑤ GPS軌跡画像（最大' + state.gpsMax + '枚）';
+    renderCases();
+    renderAreas();
+  }
 
-      // シフト警告（スタッフのみ・bootstrapに同梱）
-      if (!state.isAdmin && res.shift) {
-        state.shiftData = res.shift;
-        buildShiftView();
-        renderShiftAlerts();
-      }
+  // カレンダーのリンク（?case=）から来た場合は該当催事を自動選択
+  function handlePreset() {
+    if (!PRESET_CASE) return;
+    var sel = $('caseSelect');
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === PRESET_CASE) { sel.value = PRESET_CASE; onCaseChange(); break; }
+    }
+  }
 
-      // カレンダーのリンク（?case=）から来た場合は該当催事を自動選択
-      if (PRESET_CASE) {
-        var sel = $('caseSelect');
-        for (var i = 0; i < sel.options.length; i++) {
-          if (sel.options[i].value === PRESET_CASE) { sel.value = PRESET_CASE; onCaseChange(); break; }
-        }
-      }
+  function applyBootstrap(res) {
+    if (!applyWhoami(res)) return;   // 未登録は案内画面で終了
+    applyCases(res);
+    switchTab('home', true);          // ホームは同梱データで即描画（追加のAPI往復なし）
+    renderTodayFrom(res.myToday);
+    if (!state.isAdmin && res.shift) {   // シフト警告（スタッフのみ・bootstrapに同梱）
+      state.shiftData = res.shift;
+      buildShiftView();
+      renderShiftAlerts();
+    }
+    handlePreset();
+  }
+
+  // 旧デプロイ（bootstrap未対応）・一時エラー時の従来フロー（whoami→cases→home）
+  function legacyAfterAuth() {
+    api({ action: 'whoami' }).then(function(who) {
+      if (!who.ok) { showAuthError(who); return; }
+      if (!applyWhoami(who)) return;
+      api({ action: 'cases' }).then(function(res) {
+        if (!res.ok) { showResult(res); return; }
+        applyCases(res);
+        switchTab('home');   // myToday を取得して描画
+        if (!state.isAdmin) loadShiftAlerts();
+        handlePreset();
+      }).catch(function(e) {
+        showResult({ ok: false, code: 'E_NETWORK', message: '接続できません: ' + e.message });
+      });
     }).catch(function(e) {
       showAuthError({ message: '接続できません: ' + e.message });
     });
