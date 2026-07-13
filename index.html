@@ -154,7 +154,7 @@
   .warn-r { background: #fce8e6; color: #c5221f; }
   /* 提出フォーム（期間2週間のカレンダーグリッド・タップで出勤日を選択） */
   .sgrid-month { text-align: center; font-size: 16px; font-weight: 700; color: var(--c-text); margin: 12px 0 8px; }
-  .sgrid-dow, .sgrid { display: grid; grid-template-columns: repeat(7, 1fr) 0.7fr; gap: 4px; }
+  .sgrid-dow, .sgrid { display: grid; grid-template-columns: repeat(7, 1fr) 0.85fr; gap: 4px; align-items: stretch; }
   .sgrid-dow { margin-bottom: 4px; }
   .sgrid-dow span { text-align: center; font-size: 11px; color: var(--c-sub); padding: 2px 0; }
   .sgrid-dow span:nth-child(6) { color: #1a73e8; }   /* 土 */
@@ -171,6 +171,24 @@
   .ssum { margin-top: 10px; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 700; text-align: center; }
   .ssum.s1 { background: #e8f0fe; color: #174ea6; }
   .ssum.s2 { background: #fdefe0; color: #8a4504; }
+  /* 管理者用シフト管理（月カレンダー・スタッフをプルダウンで選んで登録） */
+  .sa-head { display: flex; align-items: center; justify-content: space-between; margin: 6px 0 8px; }
+  .sa-title { font-size: 17px; font-weight: 700; color: var(--c-text); }
+  .sa-nav { background: #f1f3f4; color: var(--c-primary); border: none; border-radius: 8px; width: 44px; height: 40px; font-size: 22px; line-height: 1; cursor: pointer; }
+  .sa-nav:disabled { color: var(--c-border); background: #f8f9fa; cursor: default; }
+  .sa-dow, .sa-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .sa-dow { margin-bottom: 4px; }
+  .sa-dow span { text-align: center; font-size: 11px; color: var(--c-sub); }
+  .sa-dow span:first-child { color: #c5221f; }
+  .sa-dow span:last-child { color: var(--c-primary); }
+  .sa-day { aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; font-size: 14px; font-weight: 600; border: 1px solid var(--c-border);
+            background: #fff; color: var(--c-text); cursor: pointer; user-select: none;
+            -webkit-tap-highlight-color: transparent; }
+  .sa-day.empty { border: none; background: transparent; cursor: default; }
+  .sa-day.dis { color: #c9ccd1; background: #f8f9fa; cursor: default; }
+  .sa-day.today { border-color: var(--c-primary); }
+  .sa-day.sel { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
   #bottomNav button { position: relative; }
   .navdot { position: absolute; top: 4px; right: calc(50% - 20px); width: 9px; height: 9px;
             border-radius: 50%; background: #c5221f; }
@@ -433,6 +451,31 @@
     </div>
   </div>
 
+  <!-- ═══ シフト管理（管理者・スタッフのシフトを代理登録） ═══ -->
+  <div class="view hidden" id="shiftAdminView">
+    <div class="card">
+      <h2>シフト管理（管理者）</h2>
+      <div class="case-info">スタッフを選び、出勤日をカレンダーで<b>タップして登録</b>します（もう一度タップで取消）。勤務時間は <b>10:00〜19:00</b> 固定。そのスタッフの拠点「シフト管理」カレンダーに自動反映されます。</div>
+      <label style="margin-top:12px">スタッフ</label>
+      <select id="saStaff"><option value="">— スタッフを選択 —</option></select>
+      <div id="saBaseInfo" class="case-info hidden" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card hidden" id="saCalCard">
+      <div class="sa-head">
+        <button type="button" class="sa-nav" id="saPrev" onclick="App.saMonth(-1)">‹</button>
+        <div class="sa-title" id="saMonthLabel">—</div>
+        <button type="button" class="sa-nav" id="saNext" onclick="App.saMonth(1)">›</button>
+      </div>
+      <div class="sa-dow"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+      <div id="saGrid" class="sa-grid"></div>
+      <div class="ssum s1" id="saSum" style="margin-top:12px">読み込み中…</div>
+      <div id="saResult"></div>
+      <button type="button" class="btn-primary" id="saSave" style="margin-top:12px" onclick="App.saSave()">この月の内容で保存</button>
+      <div class="footer-note">保存すると、選んだ日はカレンダーに10:00〜19:00で登録され、外した日は取消されます。月ごとに保存してください。</div>
+    </div>
+  </div>
+
 </main>
 
 <!-- 下部固定ナビ -->
@@ -443,6 +486,7 @@
   <button type="button" data-tab="shift" id="navShift" onclick="App.switchTab('shift')"><span class="ic">📅</span>シフト<span class="navdot hidden" id="navShiftDot"></span></button>
   <button type="button" data-tab="register" id="navRegister" onclick="App.switchTab('register')" style="display:none"><span class="ic">🗓️</span>予定登録</button>
   <button type="button" data-tab="staff" id="navStaff" onclick="App.switchTab('staff')" style="display:none"><span class="ic">👥</span>スタッフ登録</button>
+  <button type="button" data-tab="shiftadmin" id="navShiftAdmin" onclick="App.switchTab('shiftadmin')" style="display:none"><span class="ic">🗂️</span>シフト管理</button>
 </nav>
 
 <script>
@@ -476,6 +520,7 @@ var App = (function() {
     restoringDetail: false, // 修正プリフィル中フラグ（caseTowns応答の誤上書き防止）
     shiftData: null,        // myShiftCycles の応答（サイクル2枠＋提出状態）
     shiftForm: null,        // 編集中フォーム {no, key, cycle, days:{date:kubun}, note}
+    saForm: null,           // 管理者シフト管理 {staffId, name, base, configured, viewY, viewM, selected:{}, today, dirty}
     tab: 'home'
   };
 
@@ -615,11 +660,12 @@ var App = (function() {
       $('userBar').textContent = state.staff.name + '（' + state.staff.staffId + '）' + (state.isAdmin ? '・管理者' : '');
       $('authCard').classList.add('hidden');
       $('bottomNav').classList.remove('hidden');
-      if (state.isAdmin) {   // 管理者: 予定登録・スタッフ登録を表示／シフトは非表示（管理者はシフト提出しない）
+      if (state.isAdmin) {   // 管理者: 予定登録・スタッフ登録・シフト管理を表示／シフト（提出）は非表示
         $('navRegister').style.display = '';
         $('navStaff').style.display = '';
+        $('navShiftAdmin').style.display = '';
         $('navShift').style.display = 'none';
-      } else {               // スタッフ: シフトを表示（予定登録・スタッフ登録は管理者専用のまま）
+      } else {               // スタッフ: シフト（提出）を表示（管理者専用タブは非表示のまま）
         $('navShift').style.display = '';
       }
       loadCases();
@@ -662,13 +708,13 @@ var App = (function() {
 
   // ─── タブ切替 ───
   function showOnly(viewId) {
-    ['homeView', 'historyView', 'accountView', 'shiftView', 'registerView', 'staffView', 'unregView'].forEach(function(v) {
+    ['homeView', 'historyView', 'accountView', 'shiftView', 'shiftAdminView', 'registerView', 'staffView', 'unregView'].forEach(function(v) {
       $(v).classList.toggle('hidden', v !== viewId);
     });
   }
   function switchTab(name) {
     state.tab = name;
-    var map = { home: 'homeView', history: 'historyView', account: 'accountView', shift: 'shiftView', register: 'registerView', staff: 'staffView' };
+    var map = { home: 'homeView', history: 'historyView', account: 'accountView', shift: 'shiftView', shiftadmin: 'shiftAdminView', register: 'registerView', staff: 'staffView' };
     showOnly(map[name]);
     var btns = document.querySelectorAll('#bottomNav button');
     for (var i = 0; i < btns.length; i++) {
@@ -681,6 +727,7 @@ var App = (function() {
     else if (name === 'register') loadRegister();
     else if (name === 'staff') loadStaff();
     else if (name === 'shift') { var sd = $('shiftDone'); if (sd) sd.innerHTML = ''; loadShifts(); }
+    else if (name === 'shiftadmin') loadShiftAdmin();
   }
 
   // ─── ホーム: 本日の担当 ───
@@ -1795,6 +1842,123 @@ var App = (function() {
     });
   }
 
+  // ─── シフト管理（管理者・スタッフのシフトを代理登録） ───
+  function loadShiftAdmin() {
+    var sel = $('saStaff');
+    if (sel.options.length <= 1) {   // スタッフ候補（在籍・管理者のみ handleCases で返る）
+      (state.staffList || []).forEach(function(s) {
+        var o = document.createElement('option');
+        o.value = s.staffId; o.textContent = s.name + '（' + s.staffId + '）';
+        sel.appendChild(o);
+      });
+    }
+    sel.onchange = onSaStaffChange;
+    if (state.saForm) { renderSaCal(); }   // 既に選択済みなら再描画
+  }
+
+  function onSaStaffChange() {
+    var staffId = $('saStaff').value;
+    if (!staffId) {
+      state.saForm = null;
+      $('saCalCard').classList.add('hidden');
+      $('saBaseInfo').classList.add('hidden');
+      return;
+    }
+    var t = todayIso().split('-');
+    state.saForm = { staffId: staffId, name: '', base: '', configured: false,
+                     viewY: Number(t[0]), viewM: Number(t[1]) - 1, selected: {}, today: todayIso(), dirty: false };
+    saLoadMonth();
+  }
+
+  function saLoadMonth() {
+    var f = state.saForm;
+    if (!f) return;
+    var reqStaff = f.staffId, reqY = f.viewY, reqM = f.viewM;   // 応答レース対策の照合キー
+    $('saCalCard').classList.remove('hidden');
+    $('saSum').textContent = '読み込み中…';
+    $('saGrid').innerHTML = '';
+    $('saResult').innerHTML = '';
+    api({ action: 'adminStaffShifts', staffId: f.staffId, year: f.viewY, month: f.viewM + 1 }).then(function(res) {
+      var cur = state.saForm;
+      if (!cur || cur.staffId !== reqStaff || cur.viewY !== reqY || cur.viewM !== reqM) return;   // 別スタッフ/別月に切替済み→古い応答は破棄
+      f = cur;
+      if (!res.ok) { $('saSum').textContent = res.message || res.code; return; }
+      f.name = res.staffName || ''; f.base = res.base || ''; f.configured = !!res.baseConfigured;
+      f.selected = {}; f.dirty = false;
+      (res.dates || []).forEach(function(d) { f.selected[d] = true; });
+      var bi = $('saBaseInfo');
+      bi.classList.remove('hidden');
+      bi.innerHTML = f.configured
+        ? '拠点: <b>' + esc(f.base || '（既定）') + '</b>'
+        : '<span style="color:var(--c-err)">⚠ ' + esc(f.name) + ' さんの拠点が未設定です。配達員マスタの「主エリア」を設定してください（このままでは保存できません）。</span>';
+      renderSaCal();
+    }).catch(function(e) { $('saSum').textContent = '接続できません: ' + e.message; });
+  }
+
+  function saMonth(delta) {
+    var f = state.saForm;
+    if (!f) return;
+    if (f.dirty && !confirm('保存していない変更があります。破棄して月を移動しますか？')) return;
+    var idx = f.viewY * 12 + f.viewM + delta;
+    f.viewY = Math.floor(idx / 12); f.viewM = idx % 12;
+    saLoadMonth();
+  }
+
+  function renderSaCal() {
+    var f = state.saForm;
+    if (!f) return;
+    var y = f.viewY, m = f.viewM;   // m: 0-based
+    $('saMonthLabel').textContent = y + '年 ' + (m + 1) + '月';
+    var tp = f.today.split('-');
+    var minIdx = Number(tp[0]) * 12 + (Number(tp[1]) - 1);
+    $('saPrev').disabled = (y * 12 + m <= minIdx);   // 過去月には戻さない
+    var startDow = new Date(y, m, 1).getDay();       // 0=日
+    var daysInMonth = new Date(y, m + 1, 0).getDate();
+    var html = '', total = 0;
+    for (var i = 0; i < startDow; i++) html += '<div class="sa-day empty"></div>';
+    for (var d = 1; d <= daysInMonth; d++) {
+      var iso = y + '-' + ('0' + (m + 1)).slice(-2) + '-' + ('0' + d).slice(-2);
+      var cls = 'sa-day';
+      if (iso === f.today) cls += ' today';
+      if (iso < f.today) { html += '<div class="' + cls + ' dis">' + d + '</div>'; continue; }   // 過去日は不可
+      if (f.selected[iso]) { cls += ' sel'; total++; }
+      html += '<div class="' + cls + '" onclick="App.toggleSaDay(\'' + iso + '\')">' + d + '</div>';
+    }
+    $('saGrid').innerHTML = html;
+    var sum = $('saSum');
+    sum.textContent = '出勤: ' + total + '日（' + (m + 1) + '月）' + (f.dirty ? ' ・未保存' : '');
+  }
+
+  function toggleSaDay(iso) {
+    var f = state.saForm;
+    if (!f) return;
+    if (f.selected[iso]) delete f.selected[iso]; else f.selected[iso] = true;
+    f.dirty = true;
+    renderSaCal();
+  }
+
+  function saSave() {
+    var f = state.saForm;
+    if (!f || state.submitting) return;
+    if (!f.configured) { alert(f.name + ' さんの拠点が未設定です。配達員マスタの主エリアを設定してください。'); return; }
+    var dates = Object.keys(f.selected).sort();
+    var btn = $('saSave');
+    state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>保存中…';
+    api({ action: 'adminSubmitStaffShifts', staffId: f.staffId, year: f.viewY, month: f.viewM + 1, dates: dates }).then(function(res) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'この月の内容で保存';
+      if (res.ok) {
+        $('saResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + res.message) + '</div>';
+        saLoadMonth();   // サーバの実状態で再描画（部分失敗も反映）
+      } else {
+        $('saResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E_UNKNOWN') + ']') + '</div>';
+      }
+      $('saResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }).catch(function(e) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'この月の内容で保存';
+      $('saResult').innerHTML = '<div class="msg msg-err">' + esc('接続できません: ' + e.message) + '</div>';
+    });
+  }
+
   // ─── アカウント ───
   function renderAccount() {
     var s = state.staff || {};
@@ -1844,7 +2008,8 @@ var App = (function() {
     submitRegister: submitRegister, setBan: setBan,
     submitStaff: submitStaff,
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
-    submitShiftCycle: submitShiftCycle
+    submitShiftCycle: submitShiftCycle,
+    saMonth: saMonth, toggleSaDay: toggleSaDay, saSave: saSave
   };
 })();
 </script>
