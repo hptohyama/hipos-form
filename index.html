@@ -442,8 +442,8 @@
       <label style="margin-top:12px">権限 <span style="color:var(--c-err)">*</span></label>
       <select id="stPerm">
         <option value="配布員">配布員</option>
-        <option value="管理者">管理者（配布報告なし）</option>
-        <option value="管理者（配布報告あり）">管理者（配布報告あり）</option>
+        <option value="管理者">管理者</option>
+        <option value="管理者（配布者）">管理者（配布者）</option>
       </select>
       <details style="margin-top:12px">
         <summary>詳細設定（任意・ふつうは空欄でOK）</summary>
@@ -694,7 +694,7 @@ var App = (function() {
       showOnly('unregView');
       return false;
     }
-    var permLabel = state.isAdmin ? (state.canReport ? '・管理者(報告あり)' : '・管理者') : '';
+    var permLabel = state.isAdmin ? (state.canReport ? '・管理者(配布者)' : '・管理者') : '';
     $('userBar').textContent = state.staff.name + '（' + state.staff.staffId + '）' + permLabel;
     $('authCard').classList.add('hidden');
     $('bottomNav').classList.remove('hidden');
@@ -928,7 +928,10 @@ var App = (function() {
       (c.material ? '<br>配布物: ' + esc(c.material) : '');
     // 案件の町リスト（配布エリアU列）＋町名サジェスト＋配布禁止物件を一括取得してプリフィル
     api({ action: 'caseTowns', caseNo: c.caseNo }).then(function(res) {
-      if (!res.ok) return;
+      if (!res.ok) {
+        $('caseInfo').innerHTML += '<br>⚠️ 町リストの取得に失敗しました（' + esc(res.code || '') + '）— 町名は下の欄に手入力してください';
+        return;
+      }
       state.banList = res.banList || [];      // この案件の配布禁止物件（入力町で絞って表示）
       state.banChoices = {};
       renderBanCheck();
@@ -948,6 +951,8 @@ var App = (function() {
         addTownRow();
         recalc();
         $('caseInfo').innerHTML += '<br>📋 <b>配布エリアを読み込みました（' + pre.length + '町）</b> — 各町の部数を入力してください';
+      } else {
+        $('caseInfo').innerHTML += '<br>📝 この案件は<b>町リスト未登録</b>です（カレンダー予定・配布エリアの町データなし）— 下の欄に町名を手入力してください';
       }
     });
   }
@@ -2189,7 +2194,7 @@ var App = (function() {
       'メール: <b>' + esc(state.email || '') + '</b><br>' +
       'ID: <b>' + esc(s.staffId || '') + '</b><br>' +
       '拠点: <b>' + esc(s.homeArea || '(未設定)') + '</b>' +
-      '<br>権限: <b>' + esc(state.isAdmin ? (state.canReport ? '管理者（配布報告あり）' : '管理者') : '配布員') + '</b>' +
+      '<br>権限: <b>' + esc(state.isAdmin ? (state.canReport ? '管理者（配布者）' : '管理者') : '配布員') + '</b>' +
       '</div>';
   }
 
