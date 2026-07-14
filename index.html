@@ -82,6 +82,20 @@
   .reg-staff { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
   .reg-chk { display: flex; align-items: center; gap: 8px; border: 1px solid var(--c-border); border-radius: 8px; padding: 10px; font-size: 14px; cursor: pointer; }
   .reg-chk input[type=checkbox] { width: 20px; height: 20px; flex: 0 0 20px; padding: 0; margin: 0; }
+  /* 予定登録: 拠点タブ＋タップ選択＋役割トグル */
+  .regtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .regtab { border: 1px solid var(--c-border); background: #fff; border-radius: 999px; padding: 7px 12px; font-size: 13px; cursor: pointer; color: var(--c-text); }
+  .regtab.on { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+  .regtab-n { font-size: 11px; opacity: .8; margin-left: 4px; }
+  .regchips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+  .regchip { border: 1px solid var(--c-border); background: #fff; border-radius: 8px; padding: 11px 8px; font-size: 14px; cursor: pointer; text-align: center; color: var(--c-text); }
+  .regchip.on { background: #e8f0fe; border-color: var(--c-primary); color: var(--c-primary); font-weight: 700; }
+  .regsel-row { display: flex; align-items: center; gap: 6px; border: 1px solid var(--c-border); border-radius: 8px; padding: 7px 8px; margin-top: 6px; flex-wrap: wrap; }
+  .regsel-name { font-size: 14px; font-weight: 600; flex: 1 1 auto; min-width: 70px; }
+  .rolebtns { display: inline-flex; gap: 4px; }
+  .rolebtn { border: 1px solid var(--c-border); background: #fff; border-radius: 6px; padding: 6px 9px; font-size: 12px; cursor: pointer; color: var(--c-sub); }
+  .rolebtn.on { background: var(--c-primary); border-color: var(--c-primary); color: #fff; font-weight: 700; }
+  .regsel-x { border: none; background: #f3f3f3; border-radius: 6px; width: 28px; height: 28px; font-size: 16px; cursor: pointer; color: #666; flex: 0 0 28px; }
   .ban-item { border: 1px solid var(--c-border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
   .ban-item .addr { font-size: 13px; font-weight: 600; line-height: 1.4; }
   .ban-item .note { font-size: 12px; color: var(--c-sub); margin-top: 3px; }
@@ -257,20 +271,21 @@
     <!-- 報告フォーム -->
     <form id="reportForm" onsubmit="App.submit(event)">
       <div class="card">
-        <h2>① 催事（案件）</h2>
+        <h2>① 催事（案件・割当日）</h2>
+        <div class="case-info">あなたに割り当てられた案件だけが出ます。報告する日を選んでください。</div>
         <select id="caseSelect" required></select>
         <div class="case-info" id="caseInfo">催事を選択してください</div>
-        <details id="overrideBox">
-          <summary>エリア・帰属月を手動指定（通常は不要）</summary>
-          <div class="case-info">※ 催事にエリア・帰属月が設定済みの場合は<b>催事側の設定が優先</b>されます。</div>
-          <label>集計エリア</label>
-          <select id="overrideArea"><option value="">（催事から自動）</option></select>
-          <label>帰属月（YYYY.MM）</label>
-          <input id="overrideMonth" placeholder="例 2026.07" pattern="\d{4}\.\d{2}">
-        </details>
       </div>
 
-      <!-- 配布日は「今日やった分」を自動送信（画面には出さない）。過去分など例外は上の「帰属月を手動指定」で対応 -->
+      <!-- 送迎・現場指導の「本日は配布なし」ショートカット（該当役割のときのみ表示） -->
+      <div class="card hidden" id="noDistCard" style="border-color:#f0b400">
+        <h2>役割：<span id="noDistRole"></span></h2>
+        <div class="case-info">配布を手伝った場合は下の「町×部数」を入力して報告してください。<b>配布しなかった</b>場合はこのボタンで完了できます。</div>
+        <button type="button" class="btn-ghost" id="noDistBtn" style="margin-top:8px;border-color:#f0b400;color:#8a6d00" onclick="App.reportNoDistribution()">この日は配布なしで完了</button>
+        <div id="noDistResult"></div>
+      </div>
+
+      <!-- 配布日は選んだ割当日を自動送信（画面には出さない・hidden） -->
       <input type="hidden" id="distStart">
       <input type="hidden" id="distEnd">
 
@@ -388,31 +403,30 @@
     </div>
 
     <div class="card">
-      <h2>② 配布日（全員共通）</h2>
-      <div class="row">
-        <div><label>開始</label><input type="date" id="regStart"></div>
-        <div><label>終了</label><input type="date" id="regEnd"></div>
-      </div>
+      <h2>② 配布日</h2>
+      <div class="case-info">1日ずつ登録します。別の日はもう一度登録してください。</div>
+      <input type="date" id="regDate" style="margin-top:6px">
     </div>
 
     <div class="card">
       <h2>③ 配布エリア（全員共通）</h2>
       <div class="case-info">1行に1町。案件の配布エリアを自動で読み込みます（編集できます）。</div>
       <textarea id="regTowns" rows="6" placeholder="押熊町&#10;東登美ケ丘(1)&#10;東登美ケ丘(2)" style="margin-top:6px"></textarea>
+      <label style="margin-top:12px">選択中のスタッフ（役割）</label>
+      <div id="regSelected"><div class="empty">下の「担当を選ぶ」から追加してください</div></div>
     </div>
 
     <div class="card">
-      <h2>④ 配布担当（複数選択）</h2>
-      <div id="regStaffList" class="reg-staff"><div class="empty">読み込み中…</div></div>
+      <h2>④ 担当を選ぶ</h2>
+      <div class="case-info">拠点タブで切り替えて、担当を<b>タップで追加／解除</b>。追加すると上の「選択中のスタッフ」に出て、役割（配布／送迎／現場指導）を選べます。</div>
+      <div id="regStaffTabs" class="regtabs"></div>
+      <div id="regStaffList" class="regchips"><div class="empty">読み込み中…</div></div>
     </div>
 
-    <details class="card">
-      <summary>🚚 送迎のみの担当・連絡事項（任意）</summary>
-      <label style="margin-top:12px">送迎のみ（配布なし）の担当</label>
-      <div id="regSogeiList" class="reg-staff"></div>
-      <label>連絡事項（全予定のメモに追記されます）</label>
+    <div class="card">
+      <label>連絡事項（任意・全予定のメモに追記されます）</label>
       <textarea id="regNote" rows="3" placeholder="例：新事務所に集合、社用車で移動"></textarea>
-    </details>
+    </div>
 
     <div id="regResult"></div>
     <button type="button" class="btn-primary" id="regSubmit" onclick="App.submitRegister()">この内容でカレンダーに登録</button>
@@ -521,7 +535,8 @@ var App = (function() {
   var state = {
     idToken: null, tokenExp: 0, staffToken: null,
     deviceId: null, reportUuid: null,
-    email: '', cases: [], areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
+    email: '', cases: [], allOpenCases: [], areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
+    regSel: {}, regTab: '', correctingCase: null,   // 予定登録の選択(staffId→役割)/拠点タブ／履歴修正の対象案件
     banList: [], banChoices: {},   // 選択中案件の配布禁止物件と 回避/誤配 の選択（raw→'AVOIDED'|'DISTRIBUTED'）
     correcting: false,             // 履歴からの取消→修正の実行中フラグ（二重押し防止）
     submitting: false, retryCount: 0,
@@ -713,22 +728,26 @@ var App = (function() {
 
   // cases相当（bootstrap上位 or cases応答）を反映
   function applyCases(res) {
-    state.cases = res.cases || [];
+    state.cases = res.cases || [];               // 報告フォーム用＝本人の割当案件（案件×割当日）
+    state.allOpenCases = res.allOpenCases || []; // 予定登録用＝全OPEN案件（管理者のみ）
     state.areas = res.areas || [];
-    state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ）
+    state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ・homeArea同梱）
     state.calendars = res.calendars || [];       // 予定登録の登録先カレンダー（管理者のみ）
     state.gpsMax = Number(res.gpsMax) || 10;
     $('gpsHeading').textContent = '④ GPS軌跡画像（最大' + state.gpsMax + '枚）';
     renderCases();
-    renderAreas();
   }
 
   // カレンダーのリンク（?case=）から来た場合は該当催事を自動選択
   function handlePreset() {
     if (!PRESET_CASE) return;
     var sel = $('caseSelect');
+    var pref = PRESET_CASE + '|';
     for (var i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === PRESET_CASE) { sel.value = PRESET_CASE; onCaseChange(); break; }
+      var v = sel.options[i].value;
+      if (v === PRESET_CASE || v.indexOf(pref) === 0) {   // option値は複合値 caseNo|割当日
+        sel.value = v; state.correctingCase = null; onCaseChange(); break;
+      }
     }
   }
 
@@ -830,9 +849,9 @@ var App = (function() {
       $('todayList').innerHTML = '<div class="empty">本日の割当はありません。<br>下の「催事」から選んで報告できます。</div>';
     } else {
       $('todayList').innerHTML = list.map(function(a) {
-        var badge = a.reported ? '<span class="badge badge-done">報告済</span>' :
-                    a.role === '送迎' ? '<span class="badge" style="background:#e8eaed;color:#5f6368">送迎</span>' :
-                    '<span class="badge badge-todo">未報告</span>';
+        var roleTag = a.role === '送迎' ? '（送迎）' : a.role === '現場指導' ? '（現場指導）' : '';
+        var badge = a.reported ? '<span class="badge badge-done">対応済' + roleTag + '</span>' :
+                    '<span class="badge badge-todo">未報告' + roleTag + '</span>';
         var townLabel = (a.townCount || 0) > 0
           ? (a.townCount + '町')
           : '<span style="color:var(--c-warn)">町リスト未設定（町名は手入力）</span>';
@@ -872,60 +891,85 @@ var App = (function() {
   }
 
   function pickCase(caseNo) {
+    state.correctingCase = null;   // 「本日の担当」から選び直したら修正モード解除
     var sel = $('caseSelect');
+    var pref = caseNo + '|';
     var found = false;
     for (var i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === caseNo) { sel.value = caseNo; found = true; break; }
+      var v = sel.options[i].value;
+      if (v === caseNo || v.indexOf(pref) === 0) { sel.value = v; found = true; break; }   // 案件×割当日の複合値
     }
     if (!found) { alert('この案件は選択リストにありません（受付終了の可能性）'); return; }
     onCaseChange();
     $('caseSelect').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function renderCases() {
-    var sel = $('caseSelect');
-    sel.innerHTML = '<option value="">— 催事を選択 —</option>';
-    var home = state.staff ? state.staff.homeArea : '';
-    var sorted = state.cases.slice().sort(function(a, b) {
-      var ah = a.areaId === home ? 0 : 1, bh = b.areaId === home ? 0 : 1;
-      if (ah !== bh) return ah - bh;
-      return String(b.distStart).localeCompare(String(a.distStart));
-    });
-    sorted.forEach(function(c) {
-      var opt = document.createElement('option');
-      opt.value = c.caseNo;
-      opt.textContent = c.storeClean + '（' + c.areaDisplay + '・' + c.caseNo + '）';
-      sel.appendChild(opt);
-    });
-    sel.onchange = onCaseChange;
+  function formatMd(iso) {
+    var m = String(iso || '').match(/^\d{4}-(\d{2})-(\d{2})/);
+    return m ? (Number(m[1]) + '/' + Number(m[2])) : String(iso || '');
   }
 
-  function renderAreas() {
-    var sel = $('overrideArea');
-    sel.innerHTML = '<option value="">（催事から自動）</option>';
-    state.areas.forEach(function(a) {
+  // 案件×割当日を1行ずつ（サーバが today→missed・日付降順に整列済み）
+  function renderCases() {
+    var sel = $('caseSelect');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">— 選んでください —</option>';
+    (state.cases || []).forEach(function(c) {
       var opt = document.createElement('option');
-      opt.value = a.areaId; opt.textContent = a.display;
+      opt.value = c.caseNo + '|' + (c.assignDate || c.distEnd || '');
+      var when = c.status === 'today' ? '今日' : (formatMd(c.assignDate) + 'の配布');
+      var roleTag = (c.role === '送迎') ? '［送迎］' : (c.role === '現場指導') ? '［現場指導］' : '';
+      var doneTag = c.done ? ' ✓済' : (c.status === 'missed' ? ' ⚠未報告' : '');
+      opt.textContent = c.storeClean + '（' + when + '）' + roleTag + doneTag;
       sel.appendChild(opt);
     });
+    if (current) sel.value = current;
+    sel.onchange = function() { state.correctingCase = null; onCaseChange(); };   // 手動で案件を選んだら修正モード解除
   }
 
   function currentCase() {
-    var no = $('caseSelect').value;
+    if (state.correctingCase) return state.correctingCase;   // 履歴からの修正中は専用オブジェクトを使う（複合値selectに載らない過去日も扱える）
+    var v = $('caseSelect').value;
+    if (!v) return null;
+    var parts = v.split('|'), no = parts[0], d = parts[1] || '';
     for (var i = 0; i < state.cases.length; i++) {
-      if (state.cases[i].caseNo === no) return state.cases[i];
+      var c = state.cases[i];
+      if (c.caseNo === no && String(c.assignDate || c.distEnd || '') === d) return c;
     }
     return null;
   }
 
   function onCaseChange() {
     var c = currentCase();
-    if (!c) { $('caseInfo').textContent = '催事を選択してください'; return; }
-    $('caseInfo').innerHTML =
-      '店舗: <b>' + esc(c.storeClean) + '</b> ／ エリア: <b>' + esc(c.areaDisplay) + '</b>' +
-      ' ／ 帰属月: <b>' + esc(c.month || '(配布日から自動)') + '</b>' +
-      (c.distStart ? '<br>予定期間: ' + esc(c.distStart) + ' 〜 ' + esc(c.distEnd) : '') +
-      (c.material ? '<br>配布物: ' + esc(c.material) : '');
+    var noDist = $('noDistCard');
+    if (!c) { $('caseInfo').textContent = '催事を選択してください'; noDist.classList.add('hidden'); return; }
+    var correcting = !!state.correctingCase;
+    var day = c.assignDate || c.distEnd || '';
+    if (!correcting) { $('distStart').value = day; $('distEnd').value = day; }   // 修正中はprefillが入れた元の配布日を保持
+    var roleTxt = (c.role === '送迎') ? '送迎' : (c.role === '現場指導') ? '現場指導' : '配布';
+    if (correcting) {
+      $('caseInfo').innerHTML = '<b>✏️ 修正モード</b>：' + esc(c.storeClean || c.caseNo) +
+        '（' + esc(c.distStart) + (c.distEnd && c.distEnd !== c.distStart ? '〜' + esc(c.distEnd) : '') +
+        ' の配布）を修正中です。数字を直して「報告を送信」を押してください。';
+      noDist.classList.add('hidden');
+    } else {
+      var when = c.status === 'today' ? '今日（' + esc(day) + '）' : esc(day) + ' の配布（報告忘れ）';
+      $('caseInfo').innerHTML =
+        '店舗: <b>' + esc(c.storeClean) + '</b> ／ エリア: <b>' + esc(c.areaDisplay) + '</b>' +
+        '<br>報告する日: <b>' + when + '</b> ／ 役割: <b>' + roleTxt + '</b>' +
+        (c.done ? '<br><span style="color:var(--c-ok)">✓ この日は対応済みです（再送信すると重複になります）</span>' : '') +
+        (c.material ? '<br>配布物: ' + esc(c.material) : '');
+      // 送迎・現場指導は「本日は配布なし」ショートカットを表示
+      if (c.role === '送迎' || c.role === '現場指導') {
+        $('noDistRole').textContent = roleTxt;
+        $('noDistResult').innerHTML = '';
+        noDist.classList.remove('hidden');
+      } else {
+        noDist.classList.add('hidden');
+      }
+    }
+    // 案件切替の起点で前案件の配布禁止物件を必ずクリア（caseTowns失敗時の他案件への誤適用を防ぐ）
+    state.banList = []; state.banChoices = {}; renderBanCheck();
     // 案件の町リスト（配布エリアU列）＋町名サジェスト＋配布禁止物件を一括取得してプリフィル
     api({ action: 'caseTowns', caseNo: c.caseNo }).then(function(res) {
       if (!res.ok) {
@@ -954,6 +998,8 @@ var App = (function() {
       } else {
         $('caseInfo').innerHTML += '<br>📝 この案件は<b>町リスト未登録</b>です（カレンダー予定・配布エリアの町データなし）— 下の欄に町名を手入力してください';
       }
+    }).catch(function(e) {
+      $('caseInfo').innerHTML += '<br>⚠️ 通信エラー（' + esc(e && e.message || '') + '）— 町名は下の欄に手入力してください';
     });
   }
 
@@ -1099,11 +1145,37 @@ var App = (function() {
         work: { copiesPerHour: numOrNull($('workCph').value),
                 breakH: numOrNull($('workBreakH').value),
                 workH: numOrNull($('workWorkH').value) },
-        note: '',
-        overrides: { areaId: $('overrideArea').value || null, month: $('overrideMonth').value.trim() || null }
+        note: ''
       }
     };
     doSend(payload);
+  }
+
+  // 「本日は配布なし」＝送迎/現場指導が配布なしで完了（部数報告なし）
+  function reportNoDistribution() {
+    if (state.submitting) return;
+    var c = currentCase();
+    if (!c) { alert('催事を選択してください'); return; }
+    var day = c.assignDate || c.distEnd || '';
+    if (!confirm('「' + c.storeClean + '（' + day + '）」を配布なしで完了します。よろしいですか？')) return;
+    var ruuid = uuid();
+    var btn = $('noDistBtn');
+    state.submitting = true; btn.disabled = true;
+    var oldTxt = btn.textContent; btn.innerHTML = '<span class="spin"></span>送信中…';
+    api({ action: 'reportNoDistribution', deviceId: state.deviceId, reportUuid: ruuid,
+          report: { caseNo: c.caseNo, distEnd: day } }).then(function(res) {
+      state.submitting = false; btn.disabled = false; btn.textContent = oldTxt;
+      if (res.ok) {
+        $('noDistResult').innerHTML = '<div class="msg msg-ok">✅ ' + esc(res.message || '配布なしで完了しました') + '</div>';
+        c.done = true;                                  // ローカルに完了マーク
+        var v = $('caseSelect').value; renderCases(); $('caseSelect').value = v;   // 一覧の✓を更新（選択は維持）
+      } else {
+        $('noDistResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || '') + ']') + '</div>';
+      }
+    }).catch(function(e) {
+      state.submitting = false; btn.disabled = false; btn.textContent = oldTxt;
+      $('noDistResult').innerHTML = '<div class="msg msg-err">接続できません: ' + esc(e.message) + '</div>';
+    });
   }
 
   function doSend(payload) {
@@ -1175,6 +1247,13 @@ var App = (function() {
   }
 
   function clearFormAfterSuccess() {
+    var done = currentCase();
+    if (done && !state.correctingCase) done.done = true;   // 送信済みの案件×割当日に✓（修正は専用objなので触らない）
+    state.correctingCase = null;                // 修正モード解除
+    $('caseSelect').value = '';                 // 案件選択をリセット（次の案件を選ぶ）
+    $('caseInfo').textContent = '催事を選択してください';
+    $('noDistCard').classList.add('hidden');
+    renderCases();                              // 一覧の✓済を反映
     $('townRows').innerHTML = '';
     addTownRow(); addTownRow(); addTownRow();
     $('distStart').value = todayIso();   // 配布日は毎回「今日」に戻す（編集で入った過去日を持ち越さない）
@@ -1362,9 +1441,19 @@ var App = (function() {
   function prefillFromDetail(detail) {
     state.reportUuid = null;       // 修正は「新しい報告」として送る
     state.restoringDetail = true;  // 以降のcaseTowns応答による町行の上書きを禁止（レース保護）
-    $('caseSelect').value = detail.caseNo;
-    $('distStart').value = detail.distStart || todayIso();
-    $('distEnd').value = detail.distEnd || todayIso();
+    // 複合値select(caseNo|割当日)に載らない過去日も扱うため、修正は専用オブジェクトで保持（selectに依存しない）
+    state.correctingCase = {
+      caseNo: detail.caseNo,
+      storeClean: detail.storeClean || detail.caseNo,
+      areaDisplay: detail.areaDisplay || '',
+      distStart: detail.distStart || todayIso(),
+      distEnd: detail.distEnd || todayIso(),
+      assignDate: detail.distEnd || todayIso(),
+      role: '', done: false
+    };
+    $('caseSelect').value = '';    // 複合値selectには一致しないので未選択にしておく
+    $('distStart').value = state.correctingCase.distStart;
+    $('distEnd').value = state.correctingCase.distEnd;
     $('townRows').innerHTML = '';
     (detail.lines || []).forEach(function(l) { addTownRow(l.town, l.qty); });
     if (!(detail.lines || []).length) { addTownRow(); addTownRow(); }
@@ -1421,14 +1510,20 @@ var App = (function() {
   }
 
   // ─── 予定登録（管理者） ───
+  var REG_BASES = ['関西', '東戸塚', '稲毛', '五香'];
+  function regBaseOf(s) {
+    var h = String((s && s.homeArea) || '').trim();
+    return REG_BASES.indexOf(h) >= 0 ? h : 'その他';
+  }
+
   function loadRegister() {
-    // 案件ドロップダウン（本人拠点を上に・配布日降順）
+    // 案件ドロップダウン＝全OPEN案件（予定登録用）。本人拠点を上に・配布日降順。
     var sel = $('regCase');
     var current = sel.value;
     sel.innerHTML = '<option value="">— 催事を選択 —</option>';
     var home = state.staff ? state.staff.homeArea : '';
-    state.cases.slice().sort(function(a, b) {
-      var ah = a.areaId === home ? 0 : 1, bh = b.areaId === home ? 0 : 1;
+    (state.allOpenCases || []).slice().sort(function(a, b) {
+      var ah = a.areaDisplay === home ? 0 : 1, bh = b.areaDisplay === home ? 0 : 1;   // 拠点は表示名で比較（areaIdは内部ID）
       if (ah !== bh) return ah - bh;
       return String(b.distStart).localeCompare(String(a.distStart));
     }).forEach(function(c) {
@@ -1454,15 +1549,64 @@ var App = (function() {
       $('regCalWrap').style.display = 'none';
     }
 
+    if (!state.regSel) state.regSel = {};   // staffId → role（配布/送迎/現場指導）
     renderRegStaff();
+    renderRegSelected();
   }
 
+  // 拠点タブ＋その拠点のスタッフをタップ選択（スクロール不要）
   function renderRegStaff() {
-    var html = (state.staffList || []).map(function(s) {
-      return '<label class="reg-chk"><input type="checkbox" value="' + esc(s.staffId) + '"> ' + esc(s.name) + '</label>';
+    var list = state.staffList || [];
+    var byBase = {}; REG_BASES.concat(['その他']).forEach(function(b) { byBase[b] = []; });
+    list.forEach(function(s) { byBase[regBaseOf(s)].push(s); });
+    var tabs = REG_BASES.slice();
+    if (byBase['その他'].length) tabs.push('その他');
+    if (tabs.indexOf(state.regTab) < 0) state.regTab = tabs[0];
+    $('regStaffTabs').innerHTML = tabs.map(function(b) {
+      var sel = state.regSel || {};
+      var nSel = byBase[b].filter(function(s) { return s.staffId in sel; }).length;
+      return '<button type="button" class="regtab' + (b === state.regTab ? ' on' : '') + '" onclick="App.regTab(\'' + esc(b) + '\')">' +
+             esc(b) + '<span class="regtab-n">' + byBase[b].length + (nSel ? '・選' + nSel : '') + '</span></button>';
     }).join('');
-    $('regStaffList').innerHTML = html || '<div class="empty">配達員がいません（配達員マスタを確認してください）</div>';
-    $('regSogeiList').innerHTML = html || '';
+    var mem = byBase[state.regTab] || [];
+    if (!mem.length) { $('regStaffList').innerHTML = '<div class="empty">この拠点のスタッフがいません</div>'; return; }
+    var sel2 = state.regSel || {};
+    $('regStaffList').innerHTML = mem.map(function(s) {
+      var on = s.staffId in sel2;
+      return '<button type="button" class="regchip' + (on ? ' on' : '') + '" onclick="App.regToggle(\'' + esc(s.staffId) + '\')">' +
+             (on ? '✓ ' : '') + esc(s.name) + '</button>';
+    }).join('');
+  }
+
+  // 選択中スタッフ＋役割トグル（配布エリアの下）
+  function renderRegSelected() {
+    var sel = state.regSel || {};
+    var ids = Object.keys(sel);
+    var nameOf = {}; (state.staffList || []).forEach(function(s) { nameOf[s.staffId] = s.name; });
+    if (!ids.length) { $('regSelected').innerHTML = '<div class="empty">下の「担当を選ぶ」から追加してください</div>'; return; }
+    var ROLES = ['配布', '送迎', '現場指導'];
+    $('regSelected').innerHTML = ids.map(function(id) {
+      var role = sel[id] || '配布';
+      var btns = ROLES.map(function(r) {
+        return '<button type="button" class="rolebtn' + (r === role ? ' on' : '') + '" onclick="App.regSetRole(\'' + esc(id) + '\',\'' + r + '\')">' + r + '</button>';
+      }).join('');
+      return '<div class="regsel-row"><span class="regsel-name">' + esc(nameOf[id] || id) + '</span>' +
+             '<span class="rolebtns">' + btns + '</span>' +
+             '<button type="button" class="regsel-x" onclick="App.regRemove(\'' + esc(id) + '\')">×</button></div>';
+    }).join('');
+  }
+
+  function regTab(b) { state.regTab = b; renderRegStaff(); }
+  function regToggle(id) {
+    if (!state.regSel) state.regSel = {};
+    if (id in state.regSel) delete state.regSel[id]; else state.regSel[id] = '配布';
+    renderRegStaff(); renderRegSelected();
+  }
+  function regSetRole(id, role) {
+    if (state.regSel && (id in state.regSel)) { state.regSel[id] = role; renderRegSelected(); }
+  }
+  function regRemove(id) {
+    if (state.regSel) { delete state.regSel[id]; renderRegStaff(); renderRegSelected(); }
   }
 
   function onRegCaseChange() {
@@ -1476,10 +1620,9 @@ var App = (function() {
       }
       $('regCaseInfo').innerHTML =
         '店舗: <b>' + esc(res.storeClean) + '</b> ／ エリア: <b>' + esc(res.areaDisplay || '') + '</b>' +
-        (res.distStart ? '<br>予定期間: ' + esc(res.distStart) + ' 〜 ' + esc(res.distEnd) : '') +
+        (res.distStart ? '<br>案件の配布期間: ' + esc(res.distStart) + ' 〜 ' + esc(res.distEnd) + '（登録は1日ずつ）' : '') +
         (res.material ? '<br>配布物: ' + esc(res.material) : '');
-      if (res.distStart) $('regStart').value = res.distStart;
-      if (res.distEnd) $('regEnd').value = res.distEnd;
+      if (res.distStart) $('regDate').value = res.distStart;   // 案件切替のたび既定=案件の開始日に更新（前案件の日付を持ち越さない）
       var pre = (res.prefill || []).map(function(t) { return t.display; }).filter(Boolean);
       $('regTowns').value = pre.join('\n');
     }).catch(function(e) {
@@ -1487,30 +1630,20 @@ var App = (function() {
     });
   }
 
-  function gatherChecked(containerId) {
-    var out = [];
-    var ins = $(containerId).querySelectorAll('input[type=checkbox]');
-    for (var i = 0; i < ins.length; i++) if (ins[i].checked) out.push(ins[i].value);
-    return out;
-  }
-  function clearChecked(containerId) {
-    var ins = $(containerId).querySelectorAll('input[type=checkbox]');
-    for (var i = 0; i < ins.length; i++) ins[i].checked = false;
-  }
-
   function submitRegister() {
     if (state.submitting) return;
     var caseNo = $('regCase').value;
     if (!caseNo) { alert('催事を選択してください'); return; }
-    var dist = gatherChecked('regStaffList');
-    var sogei = gatherChecked('regSogeiList');
-    if (dist.length === 0 && sogei.length === 0) { alert('担当者を1人以上選んでください'); return; }
+    var distDate = $('regDate').value;
+    if (!distDate) { alert('配布日を選んでください'); return; }
+    var sel = state.regSel || {};
+    var assignments = Object.keys(sel).map(function(id) { return { staffId: id, role: sel[id] || '配布' }; });
+    if (assignments.length === 0) { alert('担当者を1人以上選んでください'); return; }
     var towns = $('regTowns').value.split(/\r?\n/).map(function(t) { return t.trim(); }).filter(Boolean);
 
     var payload = {
-      action: 'registerAssignEvents', caseNo: caseNo,
-      distStart: $('regStart').value, distEnd: $('regEnd').value,
-      towns: towns, staffIds: dist, sogeiStaffIds: sogei,
+      action: 'registerAssignEvents', caseNo: caseNo, distDate: distDate,
+      towns: towns, assignments: assignments,
       note: $('regNote').value,
       srcCalId: ($('regCal') && $('regCalWrap').style.display !== 'none') ? $('regCal').value : ''
     };
@@ -1528,7 +1661,7 @@ var App = (function() {
         body += res.synced ? '\n\n✅ 同期済み — 各配達員のフォームに反映されました'
                            : '\n\n※ 同期は次回の自動実行（1時間おき）で反映されます';
         area.innerHTML = '<div class="msg msg-ok">' + esc(body) + '</div>';
-        clearChecked('regStaffList'); clearChecked('regSogeiList'); $('regNote').value = '';
+        state.regSel = {}; renderRegStaff(); renderRegSelected(); $('regNote').value = ''; $('regDate').value = '';
       } else {
         area.innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E_UNKNOWN') + ']') + '</div>';
       }
@@ -2233,6 +2366,8 @@ var App = (function() {
     toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
     onGpsAddSelect: onGpsAddSelect, logout: logout, copyEmail: copyEmail,
     submitRegister: submitRegister, setBan: setBan,
+    reportNoDistribution: reportNoDistribution,
+    regTab: regTab, regToggle: regToggle, regSetRole: regSetRole, regRemove: regRemove,
     submitStaff: submitStaff,
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
     submitShiftCycle: submitShiftCycle,
