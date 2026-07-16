@@ -122,6 +122,12 @@
   .regbtn-del { border-color: var(--c-err); color: var(--c-err); }
   .regpick { margin-top: 8px; padding: 8px 9px; background: #f5f6f8; border-radius: 8px; }
   .regpick select, .regpick textarea { width: 100%; margin-top: 4px; }
+  .subtabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .subtab { flex: 1; padding: 11px 8px; border: 1px solid var(--c-border); background: #fff; border-radius: 10px; font-weight: 700; color: var(--c-sub); cursor: pointer; }
+  .subtab.on { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+  .reghead { display: flex; align-items: center; justify-content: space-between; }
+  .infobtn { border: none; background: transparent; font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 6px; }
+  .helpbox { background: #f5f6f8; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 13px; line-height: 1.8; }
   /* 履歴 */
   .rep { border: 1px solid var(--c-border); border-radius: 10px; padding: 12px; margin-bottom: 8px; background:#fff; }
   .rep .top { display: flex; justify-content: space-between; align-items: center; }
@@ -393,57 +399,76 @@
 
   <!-- ═══ ④ 予定登録（管理者のみ） ═══ -->
   <div class="view hidden" id="registerView">
-    <div class="card">
-      <h2>配布予定の一括登録（管理者）</h2>
-      <div class="case-info">案件と担当者を選ぶと、源泉カレンダー「Hiポス予定入力」に<b>担当者ごとの予定を自動作成</b>します（TimeTreeへの手入力の置き換え）。作成後、各配達員のフォームに自動で反映されます。</div>
+    <div class="subtabs">
+      <button type="button" class="subtab on" id="regSubNew" onclick="App.regSubTab('new')">新規登録</button>
+      <button type="button" class="subtab" id="regSubManage" onclick="App.regSubTab('manage')">登録済みの変更・取消</button>
     </div>
 
-    <div class="card">
-      <h2>① 案件（催事）</h2>
-      <select id="regCase"><option value="">— 催事を選択 —</option></select>
-      <div class="case-info" id="regCaseInfo">催事を選択してください</div>
-      <div id="regCalWrap" style="display:none">
-        <label>登録先カレンダー（拠点）</label>
-        <select id="regCal"></select>
+    <div id="regNewPane">
+      <div class="card">
+        <h2>配布予定の一括登録（管理者）</h2>
+        <div class="case-info">案件と担当者を選ぶと、源泉カレンダー「Hiポス予定入力」に<b>担当者ごとの予定を自動作成</b>します（TimeTreeへの手入力の置き換え）。作成後、各配達員のフォームに自動で反映されます。</div>
       </div>
+
+      <div class="card">
+        <h2>① 案件（催事）</h2>
+        <select id="regCase"><option value="">— 催事を選択 —</option></select>
+        <div class="case-info" id="regCaseInfo">催事を選択してください</div>
+        <div id="regCalWrap" style="display:none">
+          <label>登録先カレンダー（拠点）</label>
+          <select id="regCal"></select>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>② 配布日</h2>
+        <div class="case-info">1日ずつ登録します。別の日はもう一度登録してください。</div>
+        <input type="date" id="regDate" style="margin-top:6px">
+      </div>
+
+      <div class="card">
+        <h2>③ 配布エリア（全員共通）</h2>
+        <div class="case-info">1行に1町。案件の配布エリアを自動で読み込みます（編集できます）。</div>
+        <textarea id="regTowns" rows="6" placeholder="押熊町&#10;東登美ケ丘(1)&#10;東登美ケ丘(2)" style="margin-top:6px"></textarea>
+        <label style="margin-top:12px">選択中のスタッフ（役割）</label>
+        <div id="regSelected"><div class="empty">下の「担当を選ぶ」から追加してください</div></div>
+      </div>
+
+      <div class="card">
+        <h2>④ 担当を選ぶ</h2>
+        <div class="case-info">拠点タブで切り替えて、担当を<b>タップで追加／解除</b>。追加すると上の「選択中のスタッフ」に出て、役割（配布／送迎／現場指導）を選べます。</div>
+        <div id="regStaffTabs" class="regtabs"></div>
+        <div id="regStaffList" class="regchips"><div class="empty">読み込み中…</div></div>
+      </div>
+
+      <div class="card">
+        <label>連絡事項（任意・全予定のメモに追記されます）</label>
+        <textarea id="regNote" rows="3" placeholder="例：新事務所に集合、社用車で移動"></textarea>
+      </div>
+
+      <div id="regResult"></div>
+      <button type="button" class="btn-primary" id="regSubmit" onclick="App.submitRegister()">この内容でカレンダーに登録</button>
+      <div class="footer-note">登録後、スタッフ用の予定と報告リンクが自動で作成されます。<br>変更・取消は上の「登録済みの変更・取消」から。</div>
     </div>
 
-    <div class="card">
-      <h2>② 配布日</h2>
-      <div class="case-info">1日ずつ登録します。別の日はもう一度登録してください。</div>
-      <input type="date" id="regDate" style="margin-top:6px">
-    </div>
-
-    <div class="card">
-      <h2>③ 配布エリア（全員共通）</h2>
-      <div class="case-info">1行に1町。案件の配布エリアを自動で読み込みます（編集できます）。</div>
-      <textarea id="regTowns" rows="6" placeholder="押熊町&#10;東登美ケ丘(1)&#10;東登美ケ丘(2)" style="margin-top:6px"></textarea>
-      <label style="margin-top:12px">選択中のスタッフ（役割）</label>
-      <div id="regSelected"><div class="empty">下の「担当を選ぶ」から追加してください</div></div>
-    </div>
-
-    <div class="card">
-      <h2>④ 担当を選ぶ</h2>
-      <div class="case-info">拠点タブで切り替えて、担当を<b>タップで追加／解除</b>。追加すると上の「選択中のスタッフ」に出て、役割（配布／送迎／現場指導）を選べます。</div>
-      <div id="regStaffTabs" class="regtabs"></div>
-      <div id="regStaffList" class="regchips"><div class="empty">読み込み中…</div></div>
-    </div>
-
-    <div class="card">
-      <label>連絡事項（任意・全予定のメモに追記されます）</label>
-      <textarea id="regNote" rows="3" placeholder="例：新事務所に集合、社用車で移動"></textarea>
-    </div>
-
-    <div id="regResult"></div>
-    <button type="button" class="btn-primary" id="regSubmit" onclick="App.submitRegister()">この内容でカレンダーに登録</button>
-    <div class="footer-note">登録後、スタッフ用の予定と報告リンクが自動で作成されます</div>
-
-    <div class="card" style="margin-top:18px">
-      <h2>登録済みの予定（取消・役割変更）</h2>
-      <div class="case-info">ツールから登録した予定の一覧です。<b>町・連絡を編集</b>＝予定町や連絡事項をその場で書き換え／<b>差し替え</b>＝担当を別の人に交代（予定町・連絡事項は引き継ぎ）／<b>＋追加</b>＝同じ予定にもう1人／<b>取消</b>＝その担当を外す（各配達員のフォームからも消えます。提出済みの報告・集計は残ります）／<b>役割</b>ボタンで配布・送迎・現場指導を変更。いずれもGoogleカレンダー（源泉・本人の予定）と報告フォームに自動で最新反映されます。<b>日にちを変える</b>ときだけ、取消してから登録し直してください。</div>
-      <div id="regListResult"></div>
-      <div id="regList"><div class="empty">読み込み中…</div></div>
-      <button type="button" class="btn-ghost" id="regListReload" onclick="App.loadRegistrations()" style="margin-top:10px">↻ 一覧を更新</button>
+    <div id="regManagePane" style="display:none">
+      <div class="card">
+        <div class="reghead">
+          <h2>登録済みの予定</h2>
+          <button type="button" class="infobtn" onclick="App.toggleRegHelp()" aria-label="使い方を表示">ℹ️</button>
+        </div>
+        <div id="regManageHelp" class="helpbox" style="display:none">
+          <div><b>町・連絡を編集</b> … 予定町・連絡事項をその場で書き換え</div>
+          <div><b>差し替え</b> … 担当を別の人に交代（予定町・連絡は引き継ぎ）</div>
+          <div><b>＋追加</b> … 同じ予定にもう1人</div>
+          <div><b>取消</b> … その担当を外す（報告・集計は残ります）</div>
+          <div><b>役割</b> … 配布／送迎／現場指導を変更</div>
+          <div style="margin-top:6px;color:var(--c-sub)">すべてGoogleカレンダー・報告フォームに自動反映。日にちを変えるときは取消→登録し直し。</div>
+        </div>
+        <div id="regListResult"></div>
+        <div id="regList"><div class="empty">読み込み中…</div></div>
+        <button type="button" class="btn-ghost" id="regListReload" onclick="App.loadRegistrations()" style="margin-top:10px">↻ 一覧を更新</button>
+      </div>
     </div>
   </div>
 
@@ -1566,7 +1591,21 @@ var App = (function() {
     if (!state.regSel) state.regSel = {};   // staffId → role（配布/送迎/現場指導）
     renderRegStaff();
     renderRegSelected();
-    loadRegistrations();
+    regSubTab('new');   // タブを開くたび「新規登録」側を表示（変更・取消は別サブタブ）
+  }
+
+  // 予定登録の2画面切替（新規登録 / 登録済みの変更・取消）
+  function regSubTab(which) {
+    var isNew = (which !== 'manage');
+    $('regNewPane').style.display = isNew ? '' : 'none';
+    $('regManagePane').style.display = isNew ? 'none' : '';
+    $('regSubNew').classList.toggle('on', isNew);
+    $('regSubManage').classList.toggle('on', !isNew);
+    if (!isNew) { state.regAction = null; loadRegistrations(); }
+  }
+  function toggleRegHelp() {
+    var el = $('regManageHelp');
+    el.style.display = el.style.display === 'none' ? '' : 'none';
   }
 
   // ─── 登録済み予定の取消・役割変更（管理者・§7.106） ───
@@ -2572,6 +2611,7 @@ var App = (function() {
     loadRegistrations: loadRegistrations, changeRegRole: changeRegRole, deleteRegistration: deleteRegistration,
     regStartAction: regStartAction, regCancelAction: regCancelAction, regDoAction: regDoAction,
     regStartEdit: regStartEdit, regDoEdit: regDoEdit,
+    regSubTab: regSubTab, toggleRegHelp: toggleRegHelp,
     regTab: regTab, regToggle: regToggle, regSetRole: regSetRole, regRemove: regRemove,
     submitStaff: submitStaff,
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
