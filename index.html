@@ -116,6 +116,12 @@
   .assign .badge { float: right; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
   .badge-todo { background: var(--c-warn-bg); color: var(--c-warn); }
   .badge-done { background: var(--c-ok-bg); color: var(--c-ok); }
+  .badge-inline { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; font-weight: 700; }
+  .regitem { border: 1px solid var(--c-border); border-radius: 8px; padding: 9px 10px; margin-top: 8px; }
+  .regitem-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+  .regbtn-del { border-color: var(--c-err); color: var(--c-err); }
+  .regpick { margin-top: 8px; padding: 8px 9px; background: #f5f6f8; border-radius: 8px; }
+  .regpick select, .regpick textarea { width: 100%; margin-top: 4px; }
   /* 履歴 */
   .rep { border: 1px solid var(--c-border); border-radius: 10px; padding: 12px; margin-bottom: 8px; background:#fff; }
   .rep .top { display: flex; justify-content: space-between; align-items: center; }
@@ -325,7 +331,7 @@
         <h2 id="gpsHeading">④ GPS軌跡画像（最大10枚）</h2>
         <input type="file" id="gpsFiles" accept="image/*" multiple onchange="App.onGpsSelect(this)">
         <div id="gpsList" style="margin-top:8px"></div>
-        <div class="case-info">GPSアプリの軌跡スクリーンショットを選択してください。<br>報告の送信後に自動で一括アップロードされ、管理者がドライブで確認できます。</div>
+        <div class="case-info">GPSアプリの軌跡スクリーンショットをアップロードしてください。</div>
         <div id="gpsProgress"></div>
       </div>
 
@@ -431,6 +437,14 @@
     <div id="regResult"></div>
     <button type="button" class="btn-primary" id="regSubmit" onclick="App.submitRegister()">この内容でカレンダーに登録</button>
     <div class="footer-note">登録後、スタッフ用の予定と報告リンクが自動で作成されます</div>
+
+    <div class="card" style="margin-top:18px">
+      <h2>登録済みの予定（取消・役割変更）</h2>
+      <div class="case-info">ツールから登録した予定の一覧です。<b>町・連絡を編集</b>＝予定町や連絡事項をその場で書き換え／<b>差し替え</b>＝担当を別の人に交代（予定町・連絡事項は引き継ぎ）／<b>＋追加</b>＝同じ予定にもう1人／<b>取消</b>＝その担当を外す（各配達員のフォームからも消えます。提出済みの報告・集計は残ります）／<b>役割</b>ボタンで配布・送迎・現場指導を変更。いずれもGoogleカレンダー（源泉・本人の予定）と報告フォームに自動で最新反映されます。<b>日にちを変える</b>ときだけ、取消してから登録し直してください。</div>
+      <div id="regListResult"></div>
+      <div id="regList"><div class="empty">読み込み中…</div></div>
+      <button type="button" class="btn-ghost" id="regListReload" onclick="App.loadRegistrations()" style="margin-top:10px">↻ 一覧を更新</button>
+    </div>
   </div>
 
   <!-- ═══ ⑤ スタッフ登録（管理者のみ） ═══ -->
@@ -536,7 +550,7 @@ var App = (function() {
     idToken: null, tokenExp: 0, staffToken: null,
     deviceId: null, reportUuid: null,
     email: '', cases: [], allOpenCases: [], areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
-    regSel: {}, regTab: '', correctingCase: null,   // 予定登録の選択(staffId→役割)/拠点タブ／履歴修正の対象案件
+    regSel: {}, regTab: '', registrations: [], regAction: null, correctingCase: null,   // 予定登録の選択(staffId→役割)/拠点タブ／登録済み一覧／差し替え・追加の対象／履歴修正の対象案件
     banList: [], banChoices: {},   // 選択中案件の配布禁止物件と 回避/誤配 の選択（raw→'AVOIDED'|'DISTRIBUTED'）
     correcting: false,             // 履歴からの取消→修正の実行中フラグ（二重押し防止）
     submitting: false, retryCount: 0,
@@ -1552,6 +1566,194 @@ var App = (function() {
     if (!state.regSel) state.regSel = {};   // staffId → role（配布/送迎/現場指導）
     renderRegStaff();
     renderRegSelected();
+    loadRegistrations();
+  }
+
+  // ─── 登録済み予定の取消・役割変更（管理者・§7.106） ───
+  function loadRegistrations() {
+    $('regList').innerHTML = '<div class="empty">読み込み中…</div>';
+    $('regListResult').innerHTML = '';
+    api({ action: 'listMyRegistrations' }).then(function(res) {
+      if (!res.ok) { $('regList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
+      state.registrations = res.registrations || [];
+      renderRegistrations();
+    }).catch(function(e) {
+      $('regList').innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function renderRegistrations() {
+    var list = state.registrations || [];
+    if (!list.length) { $('regList').innerHTML = '<div class="empty">登録済みの予定はありません</div>'; return; }
+    var ROLES = ['配布', '送迎', '現場指導'];
+    var act = state.regAction;
+    $('regList').innerHTML = list.map(function(r, i) {
+      var names = (r.staff || []).map(function(s) {
+        return esc(s.name) + (s.reported ? ' <span class="badge-inline badge-done">報告済</span>' : '');
+      }).join('、');
+      var roleBtns = ROLES.map(function(role) {
+        var on = (r.roleLabel === role);
+        return '<button type="button" class="rolebtn' + (on ? ' on' : '') + '" onclick="App.changeRegRole(' + i + ',\'' + role + '\')">' + role + '</button>';
+      }).join('');
+      var townsNote = (r.towns && r.towns.length) ? '（' + r.towns.length + '町）' : '';
+      var picker = (act && act.i === i) ? regPickerHtml(i, act.mode) : '';
+      return '<div class="regitem">' +
+               '<div><b>' + esc(r.distDate) + '</b>　' + esc(r.storeClean) +
+                 '<span style="color:var(--c-sub)"> ' + esc(r.caseNo) + townsNote + '</span>' +
+                 (r.base ? ' <span style="font-size:11px;color:var(--c-sub)">[' + esc(r.base) + ']</span>' : '') + '</div>' +
+               '<div style="color:var(--c-sub);font-size:13px;margin-top:2px">担当: ' + names + '</div>' +
+               '<div class="regitem-actions">' +
+                 '<span class="rolebtns">' + roleBtns + '</span>' +
+                 '<button type="button" class="rolebtn" onclick="App.regStartEdit(' + i + ')">町・連絡を編集</button>' +
+                 '<button type="button" class="rolebtn" onclick="App.regStartAction(\'swap\',' + i + ')">差し替え</button>' +
+                 '<button type="button" class="rolebtn" onclick="App.regStartAction(\'add\',' + i + ')">＋追加</button>' +
+                 '<button type="button" class="rolebtn regbtn-del" onclick="App.deleteRegistration(' + i + ')">取消</button>' +
+               '</div>' + picker +
+             '</div>';
+    }).join('');
+  }
+
+  // 対象行の下にインライン表示するパネル（差し替え/追加＝担当ピッカー、編集＝町・連絡の入力）
+  function regPickerHtml(i, mode) {
+    var act = state.regAction || {};
+    if (mode === 'edit') {
+      if (act.loading) return '<div class="regpick"><div class="empty">読み込み中…</div></div>';
+      var townsVal = (act.towns || []).join('\n');
+      return '<div class="regpick"><label>予定町（1行に1町）</label>' +
+             '<textarea id="regEditTowns" rows="5">' + esc(townsVal) + '</textarea>' +
+             '<label style="margin-top:8px">連絡事項（任意）</label>' +
+             '<textarea id="regEditNote" rows="3">' + esc(act.note || '') + '</textarea>' +
+             '<div style="margin-top:6px"><button type="button" class="rolebtn on" onclick="App.regDoEdit(' + i + ')">保存</button> ' +
+             '<button type="button" class="rolebtn" onclick="App.regCancelAction()">やめる</button></div></div>';
+    }
+    var r = state.registrations[i] || {};
+    var cur = {}; (r.staff || []).forEach(function(s) { cur[s.staffId] = 1; });
+    var opts = (state.staffList || []).filter(function(s) { return !cur[s.staffId]; })
+      .slice().sort(function(a, b) {
+        return String(a.homeArea || '').localeCompare(String(b.homeArea || '')) || String(a.name || '').localeCompare(String(b.name || ''));
+      })
+      .map(function(s) { return '<option value="' + esc(s.staffId) + '">' + esc(s.name) + '（' + esc(s.homeArea || '') + '）</option>'; }).join('');
+    if (!opts) {
+      return '<div class="regpick"><div class="empty">選べる担当者がいません</div>' +
+             '<button type="button" class="rolebtn" onclick="App.regCancelAction()">やめる</button></div>';
+    }
+    var label = mode === 'swap' ? 'この予定を誰に差し替えますか？' : 'この予定に誰を追加しますか？';
+    return '<div class="regpick"><label>' + label + '</label>' +
+           '<select id="regPickSel">' + opts + '</select>' +
+           '<div style="margin-top:6px"><button type="button" class="rolebtn on" onclick="App.regDoAction(' + i + ')">実行</button> ' +
+           '<button type="button" class="rolebtn" onclick="App.regCancelAction()">やめる</button></div></div>';
+  }
+
+  function regStartAction(mode, i) { state.regAction = { mode: mode, i: i }; renderRegistrations(); }
+  function regCancelAction() { state.regAction = null; renderRegistrations(); }
+
+  // 町・連絡の編集を開始＝現在値をサーバ（源泉メモ）から取得してエディタに反映
+  function regStartEdit(i) {
+    var r = state.registrations[i]; if (!r) return;
+    state.regAction = { mode: 'edit', i: i, loading: true, towns: [], note: '' };
+    renderRegistrations();
+    api({ action: 'getAssignDetails', srcEventId: r.srcEventId, srcCal: r.srcCal }).then(function(res) {
+      if (!state.regAction || state.regAction.i !== i || state.regAction.mode !== 'edit') return;   // 既に閉じた
+      if (res.ok) { state.regAction.towns = res.towns || []; state.regAction.note = res.note || ''; }
+      else { state.regAction.towns = r.towns || []; state.regAction.note = ''; }
+      state.regAction.loading = false;
+      renderRegistrations();
+    }).catch(function() {
+      if (!state.regAction || state.regAction.i !== i) return;
+      state.regAction.towns = r.towns || []; state.regAction.note = ''; state.regAction.loading = false;
+      renderRegistrations();
+    });
+  }
+
+  function regDoEdit(i) {
+    var act = state.regAction;
+    if (!act || act.i !== i || act.mode !== 'edit') return;
+    var r = state.registrations[i]; if (!r) return;
+    var towns = ($('regEditTowns').value || '').split(/\r?\n/).map(function(t) { return t.trim(); }).filter(Boolean);
+    var note = $('regEditNote').value || '';
+    state.regAction = null; renderRegistrations();
+    $('regListResult').innerHTML = '<div class="msg">保存中…</div>';
+    api({ action: 'editAssignDetails', srcEventId: r.srcEventId, srcCal: r.srcCal, towns: towns, note: note }).then(function(res) {
+      if (res.ok) {
+        $('regListResult').innerHTML = '<div class="msg msg-ok">' + esc(res.message || '更新しました') +
+          (res.synced === false ? '\n（同期は次回自動実行で反映）' : '') + '</div>';
+        loadRegistrations();
+      } else {
+        $('regListResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E') + ']') + '</div>';
+      }
+    }).catch(function(e) {
+      $('regListResult').innerHTML = '<div class="msg msg-err">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function regDoAction(i) {
+    var act = state.regAction;
+    if (!act || act.i !== i) return;
+    var sel = $('regPickSel');
+    if (!sel || !sel.value) { alert('担当者を選んでください'); return; }
+    var r = state.registrations[i]; if (!r) return;
+    var mode = act.mode, staffId = sel.value;
+    state.regAction = null; renderRegistrations();
+    sendReg(mode === 'swap' ? 'replaceAssignStaff' : 'addAssignStaff', r, staffId, false, mode);
+  }
+
+  // 差し替え/追加の送信（報告済みは確認→force再送）
+  function sendReg(action, r, staffId, force, mode) {
+    $('regListResult').innerHTML = '<div class="msg">' + (mode === 'swap' ? '差し替え中…' : '追加中…') + '</div>';
+    api({ action: action, srcEventId: r.srcEventId, srcCal: r.srcCal, newStaffId: staffId, force: !!force }).then(function(res) {
+      if (res.ok) {
+        $('regListResult').innerHTML = '<div class="msg msg-ok">' + esc(res.message || '完了しました') +
+          (res.warning ? '\n⚠ ' + esc(res.warning) : '') + (res.synced === false ? '\n（同期は次回自動実行で反映）' : '') + '</div>';
+        loadRegistrations();
+      } else if (res.code === 'E_REPORTED' && res.needsConfirm) {
+        if (confirm(res.message)) sendReg(action, r, staffId, true, mode);
+        else $('regListResult').innerHTML = '';
+      } else {
+        $('regListResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E') + ']') + '</div>';
+      }
+    }).catch(function(e) {
+      $('regListResult').innerHTML = '<div class="msg msg-err">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function changeRegRole(i, role) {
+    var r = (state.registrations || [])[i];
+    if (!r || r.roleLabel === role) return;   // 変更なしは何もしない
+    $('regListResult').innerHTML = '<div class="msg">役割を変更中…</div>';
+    api({ action: 'changeAssignRole', srcEventId: r.srcEventId, srcCal: r.srcCal, role: role }).then(function(res) {
+      if (res.ok) {
+        $('regListResult').innerHTML = '<div class="msg msg-ok">' + esc(res.message || '変更しました') +
+          (res.synced === false ? '（同期は次回自動実行で反映）' : '') + '</div>';
+        loadRegistrations();
+      } else {
+        $('regListResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E') + ']') + '</div>';
+      }
+    }).catch(function(e) {
+      $('regListResult').innerHTML = '<div class="msg msg-err">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function deleteRegistration(i, force) {
+    var r = (state.registrations || [])[i];
+    if (!r) return;
+    if (!force) {
+      var who = (r.staff || []).map(function(s) { return s.name; }).join('、');
+      if (!confirm('「' + r.distDate + '　' + r.storeClean + '（' + who + '）」の割当を取り消します。よろしいですか？\n（提出済みの報告・集計は残ります）')) return;
+    }
+    $('regListResult').innerHTML = '<div class="msg">取消中…</div>';
+    api({ action: 'deleteAssignEvent', srcEventId: r.srcEventId, srcCal: r.srcCal, force: !!force }).then(function(res) {
+      if (res.ok) {
+        $('regListResult').innerHTML = '<div class="msg msg-ok">' + esc(res.message || '取り消しました') + '</div>';
+        loadRegistrations();
+      } else if (res.code === 'E_REPORTED' && res.needsConfirm) {
+        if (confirm(res.message)) deleteRegistration(i, true);
+        else $('regListResult').innerHTML = '';
+      } else {
+        $('regListResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E') + ']') + '</div>';
+      }
+    }).catch(function(e) {
+      $('regListResult').innerHTML = '<div class="msg msg-err">接続できません: ' + esc(e.message) + '</div>';
+    });
   }
 
   // 拠点タブ＋その拠点のスタッフをタップ選択（スクロール不要）
@@ -2367,6 +2569,9 @@ var App = (function() {
     onGpsAddSelect: onGpsAddSelect, logout: logout, copyEmail: copyEmail,
     submitRegister: submitRegister, setBan: setBan,
     reportNoDistribution: reportNoDistribution,
+    loadRegistrations: loadRegistrations, changeRegRole: changeRegRole, deleteRegistration: deleteRegistration,
+    regStartAction: regStartAction, regCancelAction: regCancelAction, regDoAction: regDoAction,
+    regStartEdit: regStartEdit, regDoEdit: regDoEdit,
     regTab: regTab, regToggle: regToggle, regSetRole: regSetRole, regRemove: regRemove,
     submitStaff: submitStaff,
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
