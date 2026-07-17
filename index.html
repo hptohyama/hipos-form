@@ -95,7 +95,11 @@
   .rolebtns { display: inline-flex; gap: 4px; }
   .rolebtn { border: 1px solid var(--c-border); background: #fff; border-radius: 6px; padding: 6px 9px; font-size: 12px; cursor: pointer; color: var(--c-sub); }
   .rolebtn.on { background: var(--c-primary); border-color: var(--c-primary); color: #fff; font-weight: 700; }
-  .regsel-x { border: none; background: #f3f3f3; border-radius: 6px; width: 28px; height: 28px; font-size: 16px; cursor: pointer; color: #666; flex: 0 0 28px; }
+  .regsel-actions { display: inline-flex; gap: 4px; flex: 0 0 auto; }
+  .regsel-ic { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 34px; height: 34px; min-width: 34px; padding: 0; border: 1px solid var(--c-border); background: #f7f7f7; border-radius: 8px; font-size: 16px; line-height: 1; cursor: pointer; color: #555; }
+  .regsel-ic:disabled { opacity: .3; cursor: default; }
+  .regsel-x { color: #c0392b; font-size: 18px; }
+  .regsel-x:hover { background: #fdecea; }
   .ban-item { border: 1px solid var(--c-border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
   .ban-item .addr { font-size: 13px; font-weight: 600; line-height: 1.4; }
   .ban-item .note { font-size: 12px; color: var(--c-sub); margin-top: 3px; }
@@ -420,7 +424,7 @@
       <div class="card">
         <h2>② 案件番号</h2>
         <div class="case-info">この案件を区別する番号（自由入力）。<b>同じ番号＝同じ案件</b>として集計されます。スタッフには表示されません。</div>
-        <input type="text" id="regCaseNo" placeholder="例：J250701 / 奈良共済7月 など" autocomplete="off" style="margin-top:6px">
+        <input type="text" id="regCaseNo" autocomplete="off" style="margin-top:6px">
       </div>
 
       <div class="card">
@@ -583,7 +587,8 @@ var App = (function() {
     idToken: null, tokenExp: 0, staffToken: null,
     deviceId: null, reportUuid: null,
     email: '', cases: [], allOpenCases: [], areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
-    regSel: {}, regBase: '', registrations: [], regAction: null, correctingCase: null,   // 予定登録の選択(staffId→役割)/①拠点／登録済み一覧／差し替え・追加の対象／履歴修正の対象案件
+    regSel: {}, regOrder: [], regBase: '', registrations: [], regAction: null, correctingCase: null,   // 予定登録の選択(staffId→役割)/表示・登録順/①拠点／登録済み一覧／差し替え・追加の対象／履歴修正の対象案件
+    regShiftStaff: null, regShiftKey: '', regShiftAll: false,   // 担当候補のシフト絞込(当日シフトのあるstaffId配列/取得キー/全員表示フォールバック)
     banList: [], banChoices: {},   // 選択中案件の配布禁止物件と 回避/誤配 の選択（raw→'AVOIDED'|'DISTRIBUTED'）
     correcting: false,             // 履歴からの取消→修正の実行中フラグ（二重押し防止）
     submitting: false, retryCount: 0,
@@ -1574,10 +1579,12 @@ var App = (function() {
     }).join('');
     state.regBase = want;
     sel.onchange = onRegBaseChange;
+    $('regDate').onchange = onRegDateChange;   // 配布日を選ぶとその日のシフト候補を取り直す
 
     if (!state.regSel) state.regSel = {};   // staffId → role（配布/送迎/現場指導）
-    renderRegStaff();
+    if (!state.regOrder) state.regOrder = [];
     renderRegSelected();
+    loadRegShiftStaff();   // 内部で renderRegStaff（拠点＋配布日でシフト候補を取得）
     regSubTab('new');   // タブを開くたび「新規登録」側を表示（変更・取消は別サブタブ）
   }
 
@@ -1585,9 +1592,37 @@ var App = (function() {
   function onRegBaseChange() {
     state.regBase = $('regBase').value;
     state.regSel = {};
-    renderRegStaff();
+    state.regOrder = [];
     renderRegSelected();
+    loadRegShiftStaff();
   }
+  // ③配布日を変更＝その日のシフト候補を取り直す（担当は日ごとに変わるので選択はクリア）
+  function onRegDateChange() {
+    state.regSel = {};
+    state.regOrder = [];
+    renderRegSelected();
+    loadRegShiftStaff();
+  }
+
+  // 選択中の拠点×配布日で「シフトのあるスタッフ」を取得し、担当ピッカーを絞る
+  function loadRegShiftStaff() {
+    var base = state.regBase, date = $('regDate').value;
+    var key = base + '|' + date;
+    state.regShiftKey = key;
+    if (!base || !date) { state.regShiftStaff = null; renderRegStaff(); return; }   // 日付未選択＝案内表示
+    state.regShiftStaff = null;   // 取得中
+    renderRegStaff();
+    api({ action: 'shiftStaffForDate', base: base, distDate: date }).then(function(res) {
+      if (state.regShiftKey !== key) return;   // 条件が変わっていたら破棄（レース保護）
+      state.regShiftStaff = (res && res.ok && res.staffIds) ? res.staffIds : [];
+      renderRegStaff();
+    }).catch(function() {
+      if (state.regShiftKey !== key) return;
+      state.regShiftStaff = [];
+      renderRegStaff();
+    });
+  }
+  function regToggleShiftAll() { state.regShiftAll = !state.regShiftAll; renderRegStaff(); }
 
   // 予定登録の2画面切替（新規登録 / 登録済みの変更・取消）
   function regSubTab(which) {
@@ -1790,50 +1825,102 @@ var App = (function() {
     });
   }
 
-  // ①拠点のスタッフをタップ選択（拠点は上のセレクトで切替）
+  // ①拠点×③配布日で「シフトのあるスタッフ」だけをタップ選択（全員表示トグルで解除可）
   function renderRegStaff() {
     var base = state.regBase || REG_BASES[0];
-    var mem = (state.staffList || []).filter(function(s) { return regBaseOf(s) === base; });
-    if (!mem.length) {
-      $('regStaffList').innerHTML = '<div class="empty">「' + esc(base) + '」の拠点に登録されたスタッフがいません（スタッフ登録の拠点をご確認ください）</div>';
+    var sel = state.regSel || {};
+    var el = $('regStaffList');
+    var chips = function(list) {
+      return list.map(function(s) {
+        var on = s.staffId in sel;
+        return '<button type="button" class="regchip' + (on ? ' on' : '') + '" onclick="App.regToggle(\'' + esc(s.staffId) + '\')">' +
+               (on ? '✓ ' : '') + esc(s.name) + '</button>';
+      }).join('');
+    };
+    var toggleLink = function(showingAll) {
+      return '<div style="margin-top:8px"><a href="javascript:void(0)" onclick="App.regToggleShiftAll()" style="font-size:12px;color:var(--c-sub)">' +
+             (showingAll ? '▸ シフトのある人だけに絞る' : '▸ シフトに関係なく全員から選ぶ') + '</a></div>';
+    };
+    // 全員表示モード（フォールバック）＝拠点の全スタッフ
+    if (state.regShiftAll) {
+      var all = (state.staffList || []).filter(function(s) { return regBaseOf(s) === base; });
+      el.innerHTML = (all.length ? chips(all) : '<div class="empty">「' + esc(base) + '」の拠点にスタッフがいません。</div>') + toggleLink(true);
       return;
     }
-    var sel = state.regSel || {};
-    $('regStaffList').innerHTML = mem.map(function(s) {
-      var on = s.staffId in sel;
-      return '<button type="button" class="regchip' + (on ? ' on' : '') + '" onclick="App.regToggle(\'' + esc(s.staffId) + '\')">' +
-             (on ? '✓ ' : '') + esc(s.name) + '</button>';
-    }).join('');
+    // シフト絞り込みモード
+    var date = $('regDate').value;
+    if (!date) { el.innerHTML = '<div class="empty">③配布日を選ぶと、その日にシフトが入っているスタッフが出ます。</div>' + toggleLink(false); return; }
+    if (state.regShiftStaff === null) { el.innerHTML = '<div class="empty">シフトを確認中…</div>'; return; }
+    var set = {}; state.regShiftStaff.forEach(function(id) { set[id] = 1; });
+    var mem = (state.staffList || []).filter(function(s) { return set[s.staffId]; });
+    if (!mem.length) {
+      el.innerHTML = '<div class="empty">' + esc(date) + ' にシフトが入っている「' + esc(base) + '」のスタッフがいません。<br>スタッフのシフト提出をご確認ください。</div>' + toggleLink(false);
+      return;
+    }
+    el.innerHTML = chips(mem) + toggleLink(false);
   }
 
-  // 選択中スタッフ＋役割トグル（配布エリアの下）
+  // 選択中スタッフの表示順（＝登録順）を state.regSel と同期して返す
+  function regSelectedOrder() {
+    var sel = state.regSel || {};
+    if (!state.regOrder) state.regOrder = [];
+    var order = state.regOrder.filter(function(id) { return id in sel; });      // 既存順（消えた人を除く）
+    Object.keys(sel).forEach(function(id) { if (order.indexOf(id) < 0) order.push(id); });   // 順序漏れは末尾に補完
+    state.regOrder = order;
+    return order;
+  }
+
+  // 選択中スタッフ＋役割トグル＋並び替え(↑↓)＋削除(×)（配布エリアの下）
   function renderRegSelected() {
     var sel = state.regSel || {};
-    var ids = Object.keys(sel);
+    var order = regSelectedOrder();
     var nameOf = {}; (state.staffList || []).forEach(function(s) { nameOf[s.staffId] = s.name; });
-    if (!ids.length) { $('regSelected').innerHTML = '<div class="empty">下の「担当を選ぶ」から追加してください</div>'; return; }
+    if (!order.length) { $('regSelected').innerHTML = '<div class="empty">下の「担当を選ぶ」から追加してください</div>'; return; }
     var ROLES = ['配布', '送迎', '現場指導'];
-    $('regSelected').innerHTML = ids.map(function(id) {
+    $('regSelected').innerHTML = order.map(function(id, idx) {
       var role = sel[id] || '配布';
       var btns = ROLES.map(function(r) {
         return '<button type="button" class="rolebtn' + (r === role ? ' on' : '') + '" onclick="App.regSetRole(\'' + esc(id) + '\',\'' + r + '\')">' + r + '</button>';
       }).join('');
+      var up = '<button type="button" class="regsel-ic" ' + (idx === 0 ? 'disabled' : '') + ' onclick="App.regMove(\'' + esc(id) + '\',-1)" aria-label="上へ">↑</button>';
+      var down = '<button type="button" class="regsel-ic" ' + (idx === order.length - 1 ? 'disabled' : '') + ' onclick="App.regMove(\'' + esc(id) + '\',1)" aria-label="下へ">↓</button>';
+      var del = '<button type="button" class="regsel-ic regsel-x" onclick="App.regRemove(\'' + esc(id) + '\')" aria-label="削除">×</button>';
       return '<div class="regsel-row"><span class="regsel-name">' + esc(nameOf[id] || id) + '</span>' +
              '<span class="rolebtns">' + btns + '</span>' +
-             '<button type="button" class="regsel-x" onclick="App.regRemove(\'' + esc(id) + '\')">×</button></div>';
+             '<span class="regsel-actions">' + up + down + del + '</span></div>';
     }).join('');
   }
 
   function regToggle(id) {
     if (!state.regSel) state.regSel = {};
-    if (id in state.regSel) delete state.regSel[id]; else state.regSel[id] = '配布';
+    if (!state.regOrder) state.regOrder = [];
+    if (id in state.regSel) {
+      delete state.regSel[id];
+      var i = state.regOrder.indexOf(id); if (i >= 0) state.regOrder.splice(i, 1);
+    } else {
+      state.regSel[id] = '配布';
+      state.regOrder.push(id);
+    }
     renderRegStaff(); renderRegSelected();
   }
   function regSetRole(id, role) {
     if (state.regSel && (id in state.regSel)) { state.regSel[id] = role; renderRegSelected(); }
   }
   function regRemove(id) {
-    if (state.regSel) { delete state.regSel[id]; renderRegStaff(); renderRegSelected(); }
+    if (state.regSel) {
+      delete state.regSel[id];
+      if (state.regOrder) { var i = state.regOrder.indexOf(id); if (i >= 0) state.regOrder.splice(i, 1); }
+      renderRegStaff(); renderRegSelected();
+    }
+  }
+  // ↑↓で並び替え（dir=-1:上へ / 1:下へ）
+  function regMove(id, dir) {
+    var ord = regSelectedOrder();
+    var i = ord.indexOf(id), j = i + dir;
+    if (i < 0 || j < 0 || j >= ord.length) return;
+    var t = ord[i]; ord[i] = ord[j]; ord[j] = t;
+    state.regOrder = ord;
+    renderRegSelected();
   }
 
   function submitRegister() {
@@ -1847,7 +1934,7 @@ var App = (function() {
     var label = $('regLabel').value.replace(/\s+$/, '');
     if (!label.trim()) { alert('案件名など（自由記載）を入力してください'); return; }
     var sel = state.regSel || {};
-    var assignments = Object.keys(sel).map(function(id) { return { staffId: id, role: sel[id] || '配布' }; });
+    var assignments = regSelectedOrder().map(function(id) { return { staffId: id, role: sel[id] || '配布' }; });
     if (assignments.length === 0) { alert('担当者を1人以上選んでください'); return; }
     var towns = $('regTowns').value.split(/\r?\n/).map(function(t) { return t.trim(); }).filter(Boolean);
 
@@ -1872,7 +1959,8 @@ var App = (function() {
                            : '\n\n※ 同期は次回の自動実行（1時間おき）で反映されます';
         area.innerHTML = '<div class="msg msg-ok">' + esc(body) + '</div>';
         // 案件番号・案件名・配布エリア・拠点は残す（同じ案件の別の日をすぐ登録できる）。担当・連絡・日付だけクリア。
-        state.regSel = {}; renderRegStaff(); renderRegSelected(); $('regNote').value = ''; $('regDate').value = '';
+        state.regSel = {}; state.regOrder = []; $('regNote').value = ''; $('regDate').value = '';
+        state.regShiftStaff = null; renderRegStaff(); renderRegSelected();   // 日付クリア＝担当は「配布日を選ぶと…」表示に戻す
       } else {
         area.innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E_UNKNOWN') + ']') + '</div>';
       }
@@ -2582,7 +2670,7 @@ var App = (function() {
     regStartAction: regStartAction, regCancelAction: regCancelAction, regDoAction: regDoAction,
     regStartEdit: regStartEdit, regDoEdit: regDoEdit,
     regSubTab: regSubTab, toggleRegHelp: toggleRegHelp,
-    regToggle: regToggle, regSetRole: regSetRole, regRemove: regRemove,
+    regToggle: regToggle, regSetRole: regSetRole, regRemove: regRemove, regMove: regMove, regToggleShiftAll: regToggleShiftAll,
     submitStaff: submitStaff,
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
     submitShiftCycle: submitShiftCycle,
