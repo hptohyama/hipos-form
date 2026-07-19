@@ -94,7 +94,9 @@
   .regsel-row { display: flex; align-items: center; gap: 6px; border: 1px solid var(--c-border); border-radius: 8px; padding: 7px 8px; margin-top: 6px; flex-wrap: wrap; }
   .regsel-grip { display: inline-flex; align-items: center; justify-content: center; width: 24px; min-width: 24px; align-self: stretch; color: #9aa0a6; font-size: 18px; cursor: grab; touch-action: none; user-select: none; }
   .regsel-grip:active { cursor: grabbing; }
-  .regsel-row.dragging { opacity: .6; background: #f1f3f4; border-color: var(--c-primary); }
+  .regsel-row.dragging { opacity: .45; background: #eef2f7; border: 1px dashed var(--c-primary); }
+  .regsel-clone { position: fixed; z-index: 1000; margin: 0; pointer-events: none; background: #fff;
+                  border: 1px solid var(--c-primary); box-shadow: 0 10px 24px rgba(0,0,0,.22); transform: scale(1.03); }
   .regsel-name { font-size: 14px; font-weight: 600; flex: 1 1 auto; min-width: 70px; }
   .rolebtns { display: inline-flex; gap: 4px; }
   .rolebtn { border: 1px solid var(--c-border); background: #fff; border-radius: 6px; padding: 6px 9px; font-size: 12px; cursor: pointer; color: var(--c-sub); }
@@ -1895,11 +1897,13 @@ var App = (function() {
     attachRegDrag();
   }
 
-  // 「つまみ」ドラッグで並び替え（マウス・タッチ両対応＝pointer events）。並べた順が登録順＝《配布メンバー》の順。
+  // 「つまみ」ドラッグで並び替え（マウス・タッチ両対応＝pointer events）。
+  // 掴んだカードは浮いてカーソルに追従（クローン）＝直感的。元の行は薄い「差込先」プレースホルダとして残り、
+  // 他の行が隙間を空けて動く。並べた順が登録順＝ミラー《配布メンバー》の順。
   function attachRegDrag() {
     var container = $('regSelected');
     if (!container) return;
-    var dragging = null;
+    var dragging = null, clone = null, offsetY = 0, startX = 0;
     var afterEl = function(y) {
       var els = Array.prototype.slice.call(container.querySelectorAll('.regsel-row:not(.dragging)'));
       var closest = null, closestOffset = -Infinity;
@@ -1910,24 +1914,42 @@ var App = (function() {
       });
       return closest;
     };
+    var cleanup = function() {
+      if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+      clone = null;
+      if (dragging) dragging.classList.remove('dragging');
+      dragging = null;
+    };
     Array.prototype.slice.call(container.querySelectorAll('.regsel-grip')).forEach(function(grip) {
       var row = grip.parentNode;
       grip.addEventListener('pointerdown', function(e) {
         e.preventDefault();
-        dragging = row; row.classList.add('dragging');
+        dragging = row;
+        var box = row.getBoundingClientRect();
+        offsetY = e.clientY - box.top;
+        startX = box.left;
+        // カーソルに追従する浮いたカード（クローン）
+        clone = row.cloneNode(true);
+        clone.className += ' regsel-clone';
+        clone.style.width = box.width + 'px';
+        clone.style.left = startX + 'px';
+        clone.style.top = box.top + 'px';
+        document.body.appendChild(clone);
+        row.classList.add('dragging');   // 元行＝差込先プレースホルダ（薄い破線）
         try { grip.setPointerCapture(e.pointerId); } catch (x) {}
       });
       grip.addEventListener('pointermove', function(e) {
         if (!dragging) return;
         e.preventDefault();
+        if (clone) { clone.style.top = (e.clientY - offsetY) + 'px'; clone.style.left = startX + 'px'; }
         var after = afterEl(e.clientY);
         if (after == null) container.appendChild(dragging);
         else container.insertBefore(dragging, after);
       });
       var end = function(e) {
         if (!dragging) return;
-        dragging.classList.remove('dragging'); dragging = null;
         try { grip.releasePointerCapture(e.pointerId); } catch (x) {}
+        cleanup();
         state.regOrder = Array.prototype.slice.call(container.querySelectorAll('.regsel-row'))
           .map(function(r) { return r.getAttribute('data-id'); });
         renderRegSelected();   // 並び順を確定して再描画（ハンドラ再付与）
