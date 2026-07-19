@@ -889,6 +889,12 @@ var App = (function() {
     }).catch(function() {
       $('todayList').innerHTML = '<div class="empty">読み込みに失敗しました</div>';
     });
+    // 報告フォームの案件（本日＋報告忘れ）も最新化＝登録直後などで state.cases が古いまま
+    // 「本日の報告対象はありません」と出るのを防ぐ（applyCases が renderReportCases を呼ぶ）。
+    api({ action: 'cases' }).then(function(res) {
+      if (state.tab !== tabAtRequest) return;
+      if (res && res.ok) applyCases(res);
+    }).catch(function() { /* 失敗時はログイン時の内容のまま */ });
   }
 
   // myToday応答（またはbootstrap同梱の同形データ）からホームを描画
