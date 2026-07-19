@@ -1712,14 +1712,13 @@ var App = (function() {
     }).join('');
     var cur = {}; (ed.members || []).forEach(function(m) { cur[m.staffId] = 1; });
     var opts = (state.staffList || []).filter(function(s) { return !cur[s.staffId]; })
-      .slice().sort(function(a, b) {
-        return String(a.homeArea || '').localeCompare(String(b.homeArea || '')) || String(a.name || '').localeCompare(String(b.name || ''));
-      })
-      .map(function(s) { return '<option value="' + esc(s.staffId) + '">' + esc(s.name) + '（' + esc(s.homeArea || '') + '）</option>'; }).join('');
+      .filter(function(s) { return ed.area ? (String(s.homeArea || '') === ed.area) : true; })   // その案件の拠点の担当だけ
+      .slice().sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || '')); })
+      .map(function(s) { return '<option value="' + esc(s.staffId) + '">' + esc(s.name) + '</option>'; }).join('');
     var addRow = opts
-      ? '<div style="display:flex;gap:6px;margin-top:6px"><select id="regEditAddSel" style="flex:1">' + opts + '</select>' +
-        '<button type="button" class="rolebtn" onclick="App.regEditAddMember()">＋追加</button></div>'
-      : '<div style="color:var(--c-sub);font-size:12px;margin-top:6px">追加できる担当者がいません</div>';
+      ? '<select id="regEditAddSel" style="width:100%;margin-top:6px"><option value="">＜担当者を選んで追加＞</option>' + opts + '</select>' +
+        '<button type="button" class="rolebtn" style="width:100%;margin-top:6px" onclick="App.regEditAddMember()">＋追加</button>'
+      : '<div style="color:var(--c-sub);font-size:12px;margin-top:6px">' + (ed.area ? 'この拠点（' + esc(ed.area) + '）に追加できる担当者がいません' : '追加できる担当者がいません') + '</div>';
     return '<div class="regpick">' +
            '<label>案件名など（1行目が店名・複数行OK）</label>' +
            '<textarea id="regEditLabel" rows="2">' + esc(ed.label || '') + '</textarea>' +
@@ -1747,7 +1746,8 @@ var App = (function() {
   // 編集を開始＝現在の内容（ラベル/町/連絡/担当＋役割）をサーバから取得してフォームに反映
   function regStartEdit(i) {
     var r = state.registrations[i]; if (!r) return;
-    state.regEdit = { i: i, srcEventId: r.srcEventId, srcCal: r.srcCal, loading: true, label: '', townsText: '', note: '', members: [] };
+    // area=案件の拠点（担当追加を同じ拠点に絞る）。無ければカレンダーペアのbase。
+    state.regEdit = { i: i, srcEventId: r.srcEventId, srcCal: r.srcCal, area: r.area || r.base || '', loading: true, label: '', townsText: '', note: '', members: [] };
     $('regListResult').innerHTML = '';
     renderRegistrations();
     api({ action: 'getAssignDetails', srcEventId: r.srcEventId, srcCal: r.srcCal }).then(function(res) {
@@ -1791,7 +1791,8 @@ var App = (function() {
   function regEditAddMember() {
     regEditSyncFields();
     var ed = state.regEdit; if (!ed) return;
-    var sel = $('regEditAddSel'); if (!sel || !sel.value) return;
+    var sel = $('regEditAddSel');
+    if (!sel || !sel.value) { alert('追加する担当者をプルダウンから選んでください'); return; }
     var sid = sel.value;
     if ((ed.members || []).some(function(m) { return m.staffId === sid; })) return;
     var st = (state.staffList || []).filter(function(s) { return s.staffId === sid; })[0];
