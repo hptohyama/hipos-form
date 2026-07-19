@@ -41,6 +41,8 @@
   header .sub { font-size: 12px; opacity: .85; margin-top: 2px; }
   main { max-width: 560px; margin: 0 auto; padding: 12px 12px 88px; }
   .card { background: #fff; border: 1px solid var(--c-border); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+  .missed-card { border: 2px solid #f0b400; background: #fffbe9; cursor: pointer; }
+  .missed-card:active { background: #fff3c9; }
   .card h2 { margin: 0 0 10px; font-size: 14px; color: var(--c-sub); font-weight: 600; }
   label { display: block; font-size: 13px; color: var(--c-sub); margin: 10px 0 4px; }
   input, select, textarea, button {
@@ -292,11 +294,12 @@
 
     <!-- 報告フォーム -->
     <form id="reportForm" onsubmit="App.submit(event)">
+      <!-- 報告忘れ（過去の未報告）＝注意カード。タップでその日の報告に切替。報告完了で消える（複数溜まれば全部出る） -->
+      <div id="missedCards"></div>
+
       <div class="card">
-        <h2>① 催事（案件・割当日）</h2>
-        <div class="case-info">あなたに割り当てられた案件だけが出ます。報告する日を選んでください。</div>
-        <select id="caseSelect" required></select>
-        <div class="case-info" id="caseInfo">催事を選択してください</div>
+        <h2>① 本日の案件</h2>
+        <div class="case-info" id="caseInfo">読み込み中…</div>
       </div>
 
       <!-- 送迎・現場指導の「本日は配布なし」ショートカット（該当役割のときのみ表示） -->
@@ -316,11 +319,8 @@
         <div id="townRows"></div>
         <button type="button" class="btn-ghost" onclick="App.addTownRow()">＋ 行を追加</button>
         <datalist id="townList"></datalist>
-        <label>合計部数（自分で数えた値を入力）</label>
-        <input type="number" id="totalReported" min="0" step="1" required inputmode="numeric"
-               placeholder="自動転記されません。必ず自分の合計を入力">
         <div class="total-bar" id="totalBar">
-          <span>入力行の自動合計</span><strong id="autoTotal">0</strong>
+          <span>合計部数（自動）</span><strong id="autoTotal">0</strong>
         </div>
       </div>
 
@@ -332,15 +332,15 @@
 
       <div class="card">
         <h2>③ 勤務実績</h2>
-        <div class="case-info">自動で入ります（休憩1時間・勤務8時間が初期値／部数毎時＝合計部数÷勤務時間）。違う場合はその場で直せます。</div>
-        <div class="row">
-          <div><label>部数毎時（部/1h・自動）</label>
-            <input type="number" id="workCph" min="0" step="1" inputmode="numeric"></div>
-          <div><label>休憩時間（h）</label>
-            <input type="number" id="workBreakH" min="0" step="0.5" inputmode="decimal"></div>
-        </div>
+        <div class="case-info">ほぼ自動です。実働が違う日は<b>勤務時間</b>だけ直してください（部数毎時は自動で計算し直します）。</div>
         <label>勤務時間（h）</label>
         <input type="number" id="workWorkH" min="0" step="0.5" inputmode="decimal">
+        <div class="total-bar" style="margin-top:10px">
+          <span>部数毎時（部/1h・自動）</span><strong id="workCphView">0</strong>
+        </div>
+        <div class="case-info" style="margin-top:6px">休憩時間：1時間（自動）</div>
+        <input type="hidden" id="workCph">
+        <input type="hidden" id="workBreakH">
       </div>
 
       <div class="card">
@@ -591,13 +591,13 @@ var App = (function() {
   var state = {
     idToken: null, tokenExp: 0, staffToken: null,
     deviceId: null, reportUuid: null,
-    email: '', cases: [], allOpenCases: [], areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
+    email: '', cases: [], reportCase: null, allOpenCases: [], areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
     regSel: {}, regOrder: [], regBase: '', registrations: [], regAction: null, correctingCase: null,   // 予定登録の選択(staffId→役割)/表示・登録順/①拠点／登録済み一覧／差し替え・追加の対象／履歴修正の対象案件
     regShiftStaff: null, regShiftKey: '', regShiftAll: false,   // 担当候補のシフト絞込(当日シフトのあるstaffId配列/取得キー/全員表示フォールバック)
     banList: [], banChoices: {},   // 選択中案件の配布禁止物件と 回避/誤配 の選択（raw→'AVOIDED'|'DISTRIBUTED'）
     correcting: false,             // 履歴からの取消→修正の実行中フラグ（二重押し防止）
     submitting: false, retryCount: 0,
-    gpsFiles: [], gpsMax: 10, gpsUploading: false,
+    gpsFiles: [], gpsMax: 50, gpsUploading: false,
     gpsAddTarget: null,   // 履歴からGPS追加する対象 reportUuid
     restoringDetail: false, // 修正プリフィル中フラグ（caseTowns応答の誤上書き防止）
     shiftData: null,        // myShiftCycles の応答（サイクル2枠＋提出状態）
@@ -790,22 +790,16 @@ var App = (function() {
     state.areas = res.areas || [];
     state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ・homeArea同梱）
     state.calendars = res.calendars || [];       // 予定登録の登録先カレンダー（管理者のみ）
-    state.gpsMax = Number(res.gpsMax) || 10;
+    state.gpsMax = Number(res.gpsMax) || 50;
     $('gpsHeading').textContent = '④ GPS軌跡画像（最大' + state.gpsMax + '枚）';
-    renderCases();
+    renderReportCases();
   }
 
-  // カレンダーのリンク（?case=）から来た場合は該当催事を自動選択
+  // カレンダーのリンク（?case=）から来た場合は該当案件を自動選択
   function handlePreset() {
     if (!PRESET_CASE) return;
-    var sel = $('caseSelect');
-    var pref = PRESET_CASE + '|';
-    for (var i = 0; i < sel.options.length; i++) {
-      var v = sel.options[i].value;
-      if (v === PRESET_CASE || v.indexOf(pref) === 0) {   // option値は複合値 caseNo|割当日
-        sel.value = v; state.correctingCase = null; onCaseChange(); break;
-      }
-    }
+    var c = (state.cases || []).filter(function(x) { return x.caseNo === PRESET_CASE; })[0];
+    if (c) { state.correctingCase = null; state.reportCase = c; renderReportCases(); }
   }
 
   // 初期表示タブ: 報告する人=ホーム／報告しない管理者=予定登録
@@ -947,18 +941,22 @@ var App = (function() {
       : '<div class="case-info">本日の予定町に配布禁止物件はありません。</div>';
   }
 
-  function pickCase(caseNo) {
-    state.correctingCase = null;   // 「本日の担当」から選び直したら修正モード解除
-    var sel = $('caseSelect');
-    var pref = caseNo + '|';
-    var found = false;
-    for (var i = 0; i < sel.options.length; i++) {
-      var v = sel.options[i].value;
-      if (v === caseNo || v.indexOf(pref) === 0) { sel.value = v; found = true; break; }   // 案件×割当日の複合値
+  // 案件の切替（ホームの本日カード or 報告忘れカードのタップ）。dayは割当日（省略時は当日分を選ぶ）。
+  function pickCase(caseNo, day) {
+    state.correctingCase = null;
+    var list = state.cases || [];
+    var c = null;
+    if (day) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].caseNo === caseNo && String(list[i].assignDate || list[i].distEnd || '') === String(day)) { c = list[i]; break; }
+      }
     }
-    if (!found) { alert('この案件は選択リストにありません（受付終了の可能性）'); return; }
-    onCaseChange();
-    $('caseSelect').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!c) { for (var j = 0; j < list.length; j++) { if (list[j].caseNo === caseNo && list[j].status === 'today') { c = list[j]; break; } } }
+    if (!c) { for (var k = 0; k < list.length; k++) { if (list[k].caseNo === caseNo) { c = list[k]; break; } } }
+    if (!c) { alert('この案件は報告対象にありません（受付終了の可能性）'); return; }
+    state.reportCase = c;
+    renderReportCases();
+    $('caseInfo').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function formatMd(iso) {
@@ -966,40 +964,38 @@ var App = (function() {
     return m ? (Number(m[1]) + '/' + Number(m[2])) : String(iso || '');
   }
 
-  // 案件×割当日を1行ずつ（サーバが today→missed・日付降順に整列済み）
-  function renderCases() {
-    var sel = $('caseSelect');
-    var current = sel.value;
-    sel.innerHTML = '<option value="">— 選んでください —</option>';
-    (state.cases || []).forEach(function(c) {
-      var opt = document.createElement('option');
-      opt.value = c.caseNo + '|' + (c.assignDate || c.distEnd || '');
-      var when = c.status === 'today' ? '今日' : (formatMd(c.assignDate) + 'の配布');
-      var roleTag = (c.role === '送迎') ? '［送迎］' : (c.role === '現場指導') ? '［現場指導］' : '';
-      var doneTag = c.done ? ' ✓済' : (c.status === 'missed' ? ' ⚠未報告' : '');
-      opt.textContent = c.storeClean + '（' + when + '）' + roleTag + doneTag;
-      sel.appendChild(opt);
-    });
-    if (current) sel.value = current;
-    sel.onchange = function() { state.correctingCase = null; onCaseChange(); };   // 手動で案件を選んだら修正モード解除
+  // 報告フォームの案件表示：報告忘れカード（過去の未報告）＋本日の案件を自動選択。
+  function renderReportCases() {
+    var list = state.cases || [];
+    // 報告忘れ（過去・未報告）＝注意カード
+    var missed = list.filter(function(c) { return c.status === 'missed' && !c.done; });
+    var mc = $('missedCards');
+    if (mc) {
+      mc.innerHTML = missed.map(function(c) {
+        var roleTag = (c.role === '送迎') ? '［送迎］' : (c.role === '現場指導') ? '［現場指導］' : '';
+        var active = (state.reportCase === c) ? ' ✏️入力中' : '';
+        return '<div class="card missed-card" onclick="App.pickCase(\'' + esc(c.caseNo) + '\',\'' + esc(c.assignDate || c.distEnd || '') + '\')">' +
+          '<b>⚠ 報告忘れ</b>' + active + '　' + esc(c.storeClean) + roleTag +
+          '<br><span style="color:var(--c-sub)">' + esc(formatMd(c.assignDate || c.distEnd)) + ' の配布　—　タップして入力をお願いします</span></div>';
+      }).join('');
+    }
+    // アクティブ案件：明示選択が有効ならそれ／無ければ当日の未報告→当日
+    if (!state.reportCase || list.indexOf(state.reportCase) < 0) {
+      var todayList = list.filter(function(c) { return c.status === 'today'; });
+      state.reportCase = todayList.filter(function(c) { return !c.done; })[0] || todayList[0] || null;
+    }
+    onCaseChange();
   }
 
   function currentCase() {
-    if (state.correctingCase) return state.correctingCase;   // 履歴からの修正中は専用オブジェクトを使う（複合値selectに載らない過去日も扱える）
-    var v = $('caseSelect').value;
-    if (!v) return null;
-    var parts = v.split('|'), no = parts[0], d = parts[1] || '';
-    for (var i = 0; i < state.cases.length; i++) {
-      var c = state.cases[i];
-      if (c.caseNo === no && String(c.assignDate || c.distEnd || '') === d) return c;
-    }
-    return null;
+    if (state.correctingCase) return state.correctingCase;   // 履歴からの修正中は専用オブジェクト
+    return state.reportCase || null;
   }
 
   function onCaseChange() {
     var c = currentCase();
     var noDist = $('noDistCard');
-    if (!c) { $('caseInfo').textContent = '催事を選択してください'; noDist.classList.add('hidden'); return; }
+    if (!c) { $('caseInfo').innerHTML = '<span style="color:var(--c-sub)">本日の報告対象はありません。<br>（管理者が予定を登録すると、その日の案件がここに自動表示されます）</span>'; noDist.classList.add('hidden'); return; }
     var correcting = !!state.correctingCase;
     var day = c.assignDate || c.distEnd || '';
     if (!correcting) { $('distStart').value = day; $('distEnd').value = day; }   // 修正中はprefillが入れた元の配布日を保持
@@ -1097,12 +1093,13 @@ var App = (function() {
     return false;
   }
 
+  // 合計部数＝入力行の部数の自動合計（手入力は廃止）
+  function autoSum() {
+    return readLines().reduce(function(s, l) { return s + (Number(l.qty) || 0); }, 0);
+  }
   function recalc() {
-    var sum = readLines().reduce(function(s, l) { return s + (Number(l.qty) || 0); }, 0);
-    $('autoTotal').textContent = sum;
-    var reported = $('totalReported').value;
+    $('autoTotal').textContent = autoSum();
     var bar = $('totalBar');
-    bar.classList.remove('match', 'mismatch');
     var warn = $('emptyTownWarn');
     if (hasEmptyTownWithQty()) {
       if (!warn) {
@@ -1112,19 +1109,20 @@ var App = (function() {
     } else if (warn) {
       warn.remove();
     }
-    if (reported !== '') bar.classList.add(Number(reported) === sum ? 'match' : 'mismatch');
     renderBanCheck();   // 入力町が変わると該当する配布禁止物件も変わる
     updateCph();        // 合計部数が変わると部数毎時（=合計÷勤務時間）を再計算
   }
 
-  // 部数毎時 = 合計部数 ÷ 勤務時間（実働）。合計・勤務時間が変わるたび自動計算（本人が上書きも可）。
+  // 部数毎時 = 合計部数（自動） ÷ 勤務時間。合計・勤務時間が変わるたび自動計算（表示は読み取り専用）。
   function updateCph() {
-    var total = Number($('totalReported').value);
+    var total = autoSum();
     var wh = Number($('workWorkH').value);
-    $('workCph').value = (total > 0 && wh > 0) ? Math.round(total / wh) : '';
+    var cph = (total > 0 && wh > 0) ? Math.round(total / wh) : '';
+    $('workCph').value = cph;
+    if ($('workCphView')) $('workCphView').textContent = cph || 0;
   }
 
-  // 勤務実績の初期値（休憩1h・勤務8h）を入れる。部数毎時は合計÷勤務時間で自動。相違は本人が直せる。
+  // 勤務実績の初期値（休憩1h・勤務8h）を入れる。部数毎時は自動。勤務時間のみ本人が直せる。
   function resetWorkFields() {
     $('workBreakH').value = 1;
     $('workWorkH').value = 8;
@@ -1196,7 +1194,7 @@ var App = (function() {
       avoidances: avoidances,
       report: {
         caseNo: c.caseNo, distStart: $('distStart').value, distEnd: $('distEnd').value,
-        lines: lines, totalReported: Number($('totalReported').value),
+        lines: lines, totalReported: autoSum(),
         material: '',
         // 勤務実績（任意・M4.5でUI復活。空欄は null = 未入力として保存され 0 と区別される）
         work: { copiesPerHour: numOrNull($('workCph').value),
@@ -1225,7 +1223,8 @@ var App = (function() {
       if (res.ok) {
         $('noDistResult').innerHTML = '<div class="msg msg-ok">✅ ' + esc(res.message || '配布なしで完了しました') + '</div>';
         c.done = true;                                  // ローカルに完了マーク
-        var v = $('caseSelect').value; renderCases(); $('caseSelect').value = v;   // 一覧の✓を更新（選択は維持）
+        if (c.status === 'missed') state.reportCase = null;   // 報告忘れを完了＝カードを消す→次の対象へ
+        renderReportCases();                            // 報告忘れカード・案件表示を更新
       } else {
         $('noDistResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || '') + ']') + '</div>';
       }
@@ -1305,17 +1304,15 @@ var App = (function() {
 
   function clearFormAfterSuccess() {
     var done = currentCase();
-    if (done && !state.correctingCase) done.done = true;   // 送信済みの案件×割当日に✓（修正は専用objなので触らない）
+    if (done && !state.correctingCase) done.done = true;   // 送信済みの案件に✓（修正は専用objなので触らない）
+    var wasMissed = !!(done && done.status === 'missed');
     state.correctingCase = null;                // 修正モード解除
-    $('caseSelect').value = '';                 // 案件選択をリセット（次の案件を選ぶ）
-    $('caseInfo').textContent = '催事を選択してください';
+    if (wasMissed) state.reportCase = null;     // 報告忘れを完了＝カードが消え、次の対象（今日 or 次の報告忘れ）へ
     $('noDistCard').classList.add('hidden');
-    renderCases();                              // 一覧の✓済を反映
     $('townRows').innerHTML = '';
     addTownRow(); addTownRow(); addTownRow();
-    $('distStart').value = todayIso();   // 配布日は毎回「今日」に戻す（編集で入った過去日を持ち越さない）
+    $('distStart').value = todayIso();
     $('distEnd').value = todayIso();
-    $('totalReported').value = '';
     state.banChoices = {};
     renderBanCheck();
     resetWorkFields();   // 送信後は勤務実績を初期値（休憩1h・勤務8h）に戻す
@@ -1323,6 +1320,7 @@ var App = (function() {
     $('gpsFiles').value = '';
     renderGpsList();
     recalc();
+    renderReportCases();   // 報告忘れカード・案件表示・町プリフィルを更新（済みは消える）
   }
 
   // ─── GPS軌跡画像（報告フォーム用） ───
@@ -1508,14 +1506,12 @@ var App = (function() {
       assignDate: detail.distEnd || todayIso(),
       role: '', done: false
     };
-    $('caseSelect').value = '';    // 複合値selectには一致しないので未選択にしておく
     $('distStart').value = state.correctingCase.distStart;
     $('distEnd').value = state.correctingCase.distEnd;
     $('townRows').innerHTML = '';
     (detail.lines || []).forEach(function(l) { addTownRow(l.town, l.qty); });
     if (!(detail.lines || []).length) { addTownRow(); addTownRow(); }
-    $('totalReported').value = detail.totalReported != null ? detail.totalReported : '';
-    onCaseChange();   // caseInfo・サジェスト更新（restoringDetail中はプリフィルは走らない）
+    onCaseChange();   // caseInfo・サジェスト更新（restoringDetail中はプリフィルは走らない）。合計は町行から自動算出。
     recalc();
     // caseTowns応答が返るまで少し待ってからフラグ解除（誤上書き防止）
     setTimeout(function() { state.restoringDetail = false; }, 4000);
@@ -2738,7 +2734,6 @@ var App = (function() {
     $('distStart').value = todayIso();
     $('distEnd').value = todayIso();
     addTownRow(); addTownRow(); addTownRow();
-    $('totalReported').oninput = recalc;
     $('workWorkH').oninput = updateCph;        // 勤務時間を直すと部数毎時も再計算
     resetWorkFields();                          // 勤務実績の初期値（休憩1h・勤務8h）
     setInterval(refreshShiftDisplays, 60000);  // JST判定を1分ごとに再評価（8日0時・19時跨ぎで表示が自動切替）
