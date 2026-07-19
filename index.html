@@ -138,6 +138,8 @@
   .reg-member-name { font-size: 13px; font-weight: 700; margin-bottom: 5px; }
   .reg-member-ops { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .reg-role-label { font-size: 11px; color: var(--c-sub); align-self: center; margin-right: 1px; }
+  .reghead-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .base-badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 11px; border-radius: 12px; color: #fff; white-space: nowrap; flex-shrink: 0; }
   .subtabs { display: flex; gap: 6px; margin-bottom: 12px; }
   .subtab { flex: 1; padding: 11px 8px; border: 1px solid var(--c-border); background: #fff; border-radius: 10px; font-weight: 700; color: var(--c-sub); cursor: pointer; }
   .subtab.on { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
@@ -1579,6 +1581,8 @@ var App = (function() {
 
   // ─── 予定登録（管理者） ───
   var REG_BASES = ['関西', '東戸塚', '稲毛', '五香'];
+  // 拠点バッジの色（登録済みの変更・取消カードで拠点を一目で分かるように）
+  var BASE_COLORS = { '関西': '#e8590c', '東戸塚': '#1c7ed6', '稲毛': '#2f9e44', '五香': '#9c36b5' };
   function regBaseOf(s) {
     var h = String((s && s.homeArea) || '').trim();
     return REG_BASES.indexOf(h) >= 0 ? h : 'その他';
@@ -1678,10 +1682,15 @@ var App = (function() {
         return esc(s.name) + roleSuffix(s) + (s.reported ? ' <span class="badge-inline badge-done">報告済</span>' : '');
       }).join('、');
       var editForm = (ed && ed.i === i) ? regEditFormHtml(i) : '';
+      var baseLabel = r.base || r.area || '拠点未設定';
+      var baseColor = BASE_COLORS[baseLabel] || '#868e96';
+      var badge = '<span class="base-badge" style="background:' + baseColor + '">' + esc(baseLabel) + '</span>';
       return '<div class="regitem">' +
-               '<div><b>' + esc(r.distDate) + '</b>　' + esc(r.storeClean) +
-                 '<span style="color:var(--c-sub)"> ' + esc(r.caseNo) + townsNote + '</span>' +
-                 (r.base ? ' <span style="font-size:11px;color:var(--c-sub)">[' + esc(r.base) + ']</span>' : '') + '</div>' +
+               '<div class="reghead-row">' +
+                 '<div><b>' + esc(r.distDate) + '</b>　' + esc(r.storeClean) +
+                   '<span style="color:var(--c-sub)"> ' + esc(r.caseNo) + townsNote + '</span></div>' +
+                 badge +
+               '</div>' +
                '<div style="color:var(--c-sub);font-size:13px;margin-top:4px">担当: ' + (names || '—') + '</div>' +
                '<div class="regitem-actions">' +
                  '<button type="button" class="rolebtn" onclick="App.regStartEdit(' + i + ')">編集</button>' +
