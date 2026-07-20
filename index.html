@@ -11,7 +11,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Hiポス配布報告</title>
 <!--
-  Hiポス配布報告フォーム（配達員セルフサービス・3メニュー: 報告 / 履歴 / アカウント）
+  Hiポス配布報告フォーム（ポスティングスタッフセルフサービス・3メニュー: 報告 / 履歴 / アカウント）
 
   【設置手順】
   1. 下の CONFIG の API_URL と OAUTH_CLIENT_ID を書き換える
@@ -266,38 +266,49 @@
     </div>
   </div>
 
-  <!-- ═══ 未登録者：自分のアカウント登録（セルフ・ひもづけ） ═══ -->
+  <!-- ═══ 未登録者：スタッフ登録の申請（本人）／承認待ち ═══ -->
   <div class="view hidden" id="unregView">
-    <div class="card">
-      <h2>アカウント登録</h2>
-      <div class="msg msg-ok" style="margin-bottom:10px">Googleログインができました。<br>初回だけ、<b>ご自身のお名前と拠点</b>を選んで登録してください。</div>
+
+    <!-- (A) 登録フォーム（申請） -->
+    <div class="card" id="regFormCard">
+      <h2>スタッフ登録</h2>
+      <div class="msg msg-ok" style="margin-bottom:10px">Googleログインができました。<br><b>お名前と拠点</b>を選んで、登録を申請してください。<br>管理者が承認すると、そのままご利用いただけます。</div>
       <div class="case-info" id="claimEmailLine" style="margin-bottom:12px"></div>
 
-      <div id="claimForm">
-        <label>お名前（一覧から選ぶ）</label>
-        <select id="claimName" onchange="App.onClaimName()">
-          <option value="">― 選んでください ―</option>
-        </select>
+      <label>お名前</label>
+      <select id="claimName" onchange="App.onClaimName()">
+        <option value="">― 選んでください ―</option>
+      </select>
 
-        <label style="margin-top:10px">拠点（あなたが働く拠点）</label>
-        <select id="claimHome">
-          <option value="">― 選んでください ―</option>
-        </select>
-
-        <button class="btn-primary" id="claimSubmit" style="margin-top:12px" onclick="App.claimSubmit()">この内容で登録</button>
+      <!-- 一覧に無い（新しく入った）場合の氏名手入力（姓・名を分けて＝間に半角スペースで統一） -->
+      <div id="newNameWrap" class="hidden" style="margin-top:8px">
+        <label>お名前（姓・名を分けて入力）</label>
+        <div style="display:flex;gap:8px">
+          <input id="claimSei" placeholder="姓（例：山田）" style="flex:1" autocomplete="off">
+          <input id="claimMei" placeholder="名（例：太郎）" style="flex:1" autocomplete="off">
+        </div>
       </div>
+
+      <label style="margin-top:10px">拠点（あなたが働く拠点）</label>
+      <select id="claimHome">
+        <option value="">― 選んでください ―</option>
+      </select>
+
+      <button class="btn-primary" id="claimSubmit" style="margin-top:14px" onclick="App.claimSubmit()">登録を申請する</button>
       <div id="claimResult" style="margin-top:10px"></div>
-
-      <!-- 一覧に自分の名前が無い場合（新人など） -->
-      <details style="margin-top:16px">
-        <summary style="cursor:pointer">一覧に自分の名前が無い場合はこちら</summary>
-        <div class="case-info" style="margin-top:8px">新しく入った方などで一覧に無い場合は、下のメールアドレスを管理者に伝えて登録を依頼してください。</div>
-        <input id="unregEmail" readonly style="margin-top:6px">
-        <button class="btn-ghost" style="margin-top:8px" onclick="App.copyEmail()">📋 メールアドレスをコピー</button>
-      </details>
-
       <button class="btn-ghost" style="margin-top:12px" onclick="location.reload()">再読み込み</button>
     </div>
+
+    <!-- (B) 承認待ち -->
+    <div class="card hidden" id="pendingCard">
+      <h2>承認待ちです</h2>
+      <div class="msg msg-warn" id="pendingMsg" style="margin-bottom:10px"></div>
+      <div class="case-info">管理者が承認すると、この画面を再読み込みするだけでご利用いただけます。</div>
+      <button class="btn-primary" style="margin-top:12px" onclick="location.reload()">再読み込み</button>
+    </div>
+
+    <!-- 予備: メール取得できない等の連絡用（隠しフィールド） -->
+    <input id="unregEmail" readonly class="hidden">
   </div>
 
   <!-- ═══ ① 報告（ホーム） ═══ -->
@@ -445,7 +456,7 @@
     <div id="regNewPane">
       <div class="card">
         <h2>配布予定の一括登録（管理者）</h2>
-        <div class="case-info">拠点・案件番号・案件名などを入力し担当者を選ぶと、<b>担当者ごとの配布予定を自動で作成</b>します。作成後、各配達員のフォームに自動で反映されます。<br>※<b>案件番号</b>は管理者だけが使う内部の番号です（スタッフのカレンダー・報告フォームには出ません）。</div>
+        <div class="case-info">拠点・案件番号・案件名などを入力し担当者を選ぶと、<b>担当者ごとの配布予定を自動で作成</b>します。作成後、各ポスティングスタッフのフォームに自動で反映されます。<br>※<b>案件番号</b>は管理者だけが使う内部の番号です（スタッフのカレンダー・報告フォームには出ません）。</div>
       </div>
 
       <div class="card">
@@ -514,45 +525,22 @@
     </div>
   </div>
 
-  <!-- ═══ ⑤ スタッフ登録（管理者のみ） ═══ -->
+  <!-- ═══ ⑤ スタッフ管理（管理者のみ）＝登録申請の承認/却下＋一覧 ═══ -->
   <div class="view hidden" id="staffView">
-    <div class="card">
-      <h2>スタッフ登録（管理者）</h2>
-      <div class="case-info">新しいアルバイトスタッフを登録します。<b>氏名</b>と<b>会社で使うGoogleアカウント（Gmail）</b>を入れて登録すると、そのスタッフはGoogleサインインで報告できるようになります。</div>
-    </div>
 
-    <div class="card">
-      <label>氏名 <span style="color:var(--c-err)">*</span></label>
-      <input type="text" id="stName" placeholder="例：山田 太郎" autocomplete="off">
-      <label style="margin-top:12px">Googleアカウント（Gmail） <span style="color:var(--c-err)">*</span></label>
-      <input type="email" id="stEmail" placeholder="例：yamada@gmail.com" autocomplete="off">
-      <label style="margin-top:12px">拠点 <span style="color:var(--c-err)">*</span></label>
-      <select id="stHome">
-        <option value="">— 拠点を選択 —</option>
-        <option value="関西">関西</option>
-        <option value="東戸塚">東戸塚</option>
-        <option value="稲毛">稲毛</option>
-        <option value="五香">五香</option>
-      </select>
-      <label style="margin-top:12px">権限 <span style="color:var(--c-err)">*</span></label>
-      <select id="stPerm">
-        <option value="配布員">配布員</option>
-        <option value="管理者">管理者</option>
-        <option value="管理者（配布者）">管理者（配布者）</option>
-      </select>
-      <details style="margin-top:12px">
-        <summary>詳細設定（任意・ふつうは空欄でOK）</summary>
-        <label style="margin-top:10px">集計タブの表記名<br><span class="footer-note">空欄なら氏名を使います。集計表の列見出しと表記が違うときだけ入力。</span></label>
-        <input type="text" id="stTabName" placeholder="集計表の列見出しと同じ表記" autocomplete="off">
-      </details>
-      <div id="stResult"></div>
-      <button type="button" class="btn-primary" id="stSubmit" style="margin-top:14px" onclick="App.submitStaff()">このスタッフを登録</button>
-      <div class="footer-note">※ 集計に反映するには、集計タブ側にそのスタッフの列（表記名）が別途必要です。</div>
+    <!-- 承認待ちの登録申請（本人セルフ登録の承認/却下） -->
+    <div class="card" id="pendingRegCard" style="border-color:#f0b400">
+      <h2>🔔 承認待ちの登録申請</h2>
+      <div class="case-info">スタッフ本人がGoogleログインで申請した内容です。中身と<b>権限</b>を確認して<b>承認</b>すると使えるようになります。氏名が既存スタッフと同じ場合は<b>既存に紐づけ</b>を選ぶと集計が引き継がれます。<br>※新しいスタッフの登録は、本人がログインして申請する方式です（管理者が手で追加する必要はありません）。</div>
+      <div id="pendingRegResult"></div>
+      <div id="pendingRegList"><div class="empty">読み込み中…</div></div>
+      <button type="button" class="btn-ghost" onclick="App.loadPendingRegs()" style="margin-top:10px">↻ 更新</button>
     </div>
 
     <div class="card">
       <h2>登録済みスタッフ</h2>
       <div id="stRoster"><div class="empty">読み込み中…</div></div>
+      <button type="button" class="btn-ghost" onclick="App.loadStaff()" style="margin-top:10px">↻ 更新</button>
     </div>
   </div>
 
@@ -590,7 +578,7 @@
   <button type="button" data-tab="account" onclick="App.switchTab('account')"><span class="ic">👤</span>アカウント</button>
   <button type="button" data-tab="shift" id="navShift" onclick="App.switchTab('shift')"><span class="ic">📅</span>シフト<span class="navdot hidden" id="navShiftDot"></span></button>
   <button type="button" data-tab="register" id="navRegister" onclick="App.switchTab('register')" style="display:none"><span class="ic">🗓️</span>予定登録</button>
-  <button type="button" data-tab="staff" id="navStaff" onclick="App.switchTab('staff')" style="display:none"><span class="ic">👥</span>スタッフ登録</button>
+  <button type="button" data-tab="staff" id="navStaff" onclick="App.switchTab('staff')" style="display:none"><span class="ic">👥</span>スタッフ管理</button>
   <button type="button" data-tab="shiftadmin" id="navShiftAdmin" onclick="App.switchTab('shiftadmin')" style="display:none"><span class="ic">🗂️</span>シフト管理</button>
 </nav>
 
@@ -753,64 +741,84 @@ var App = (function() {
     } else { window.prompt('コピーしてください', v); }
   }
 
-  // ─── 未登録者のセルフ登録（自分の行にメールをひもづけ） ───
-  // 候補＝在籍かつメール未登録の行。本人が氏名＋拠点を選び claimStaff で自分の行に後付けする。
-  function renderClaimForm(res) {
+  // ─── 未登録者のスタッフ登録（申請→管理者承認） ───
+  // 候補＝在籍かつメール未登録の氏名。既存の人はそこから選び、新しい人は「一覧に無い」で手入力。
+  // 送信＝申請中に記録（handleSubmitRegistration）→ 管理者が承認するとマスタに反映され使える。
+  function renderRegForm(res) {
+    $('regFormCard').classList.remove('hidden');
+    $('pendingCard').classList.add('hidden');
     state.claimCandidates = (res && res.claimCandidates) || [];
     var bases = (res && res.bases) || ['関西', '東戸塚', '稲毛', '五香'];
     $('claimEmailLine').innerHTML = 'あなたのGoogleアカウント: <b>' + esc(state.email || '') + '</b>';
-    // 氏名プルダウン（未登録の在籍スタッフのみ・拠点つき表示）
+    // 氏名プルダウン（未登録の在籍スタッフ）＋末尾に「一覧に無い（新しく入った）」
     var nameOpts = ['<option value="">― 選んでください ―</option>'];
     state.claimCandidates.forEach(function(c) {
       var label = c.name + (c.homeArea ? '（' + c.homeArea + '）' : '');
       nameOpts.push('<option value="' + esc(c.staffId) + '" data-home="' + esc(c.homeArea || '') + '">' + esc(label) + '</option>');
     });
+    nameOpts.push('<option value="__NEW__">＋ 一覧に無い（新しく入った方）</option>');
     $('claimName').innerHTML = nameOpts.join('');
     // 拠点プルダウン
     $('claimHome').innerHTML = ['<option value="">― 選んでください ―</option>'].concat(
       bases.map(function(b) { return '<option value="' + esc(b) + '">' + esc(b) + '</option>'; })
     ).join('');
     $('claimName').disabled = false; $('claimHome').disabled = false;
-    var btn = $('claimSubmit'); btn.disabled = false; btn.textContent = 'この内容で登録';
-    if (!state.claimCandidates.length) {
-      // 候補ゼロ＝全員登録済み or マスタ未整備 → 名前で選ぶ導線は使えない旨を案内
-      $('claimForm').classList.add('hidden');
-      $('claimResult').innerHTML = '<div class="msg msg-warn">登録できる候補が見つかりませんでした。下の「一覧に自分の名前が無い場合」から管理者にご連絡ください。</div>';
-    } else {
-      $('claimForm').classList.remove('hidden');
-      $('claimResult').innerHTML = '';
-    }
+    $('claimSei').value = ''; $('claimMei').value = '';
+    $('newNameWrap').classList.add('hidden');
+    var btn = $('claimSubmit'); btn.disabled = false; btn.textContent = '登録を申請する';
+    $('claimResult').innerHTML = '';
   }
 
-  // 氏名を選んだら、その行に設定済みの拠点を自動で入れる（未設定なら空のまま本人が選ぶ）
+  // 承認待ち画面
+  function renderPending(pr) {
+    $('regFormCard').classList.add('hidden');
+    $('pendingCard').classList.remove('hidden');
+    $('pendingMsg').innerHTML = esc(pr.name || '') + ' さんで登録申請を受け付けています。<br>管理者の承認をお待ちください。';
+  }
+
+  // 氏名を選んだら: 既存はその拠点を自動入力／「一覧に無い」は手入力欄を出す
   function onClaimName() {
     var sel = $('claimName');
     var opt = sel.options[sel.selectedIndex];
+    var val = sel.value;
+    if (val === '__NEW__') {
+      $('newNameWrap').classList.remove('hidden');
+      try { $('claimSei').focus(); } catch (e) {}
+      return;
+    }
+    $('newNameWrap').classList.add('hidden');
     var home = opt ? (opt.getAttribute('data-home') || '') : '';
     if (home) $('claimHome').value = home;
   }
 
   function claimSubmit() {
     if (state.submitting) return;
-    var staffId = $('claimName').value;
+    var sel = $('claimName').value;
     var homeArea = $('claimHome').value;
-    if (!staffId) { alert('お名前を選んでください'); return; }
+    var payload = { action: 'submitRegistration', homeArea: homeArea };
+    if (sel === '__NEW__') {
+      var sei = $('claimSei').value.trim(), mei = $('claimMei').value.trim();
+      if (!sei || !mei) { alert('姓と名の両方を入力してください'); return; }
+      payload.name = sei + ' ' + mei;   // 姓と名の間は半角スペースで統一
+    } else if (sel) {
+      payload.targetStaffId = sel;
+    } else {
+      alert('お名前を選ぶか、「一覧に無い」を選んで入力してください'); return;
+    }
     if (!homeArea) { alert('拠点を選んでください（関西／東戸塚／稲毛／五香）'); return; }
     var btn = $('claimSubmit');
-    state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>登録中…';
-    api({ action: 'claimStaff', staffId: staffId, homeArea: homeArea }).then(function(res) {
+    state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>申請中…';
+    api(payload).then(function(res) {
       state.submitting = false;
       if (res.ok) {
-        $('claimName').disabled = true; $('claimHome').disabled = true;
-        btn.disabled = true; btn.textContent = '登録済み';
-        $('claimResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + res.message) + '</div>' +
-          '<button class="btn-primary" style="margin-top:10px" onclick="location.reload()">アプリを開く</button>';
+        renderPending({ name: (payload.name || ($('claimName').options[$('claimName').selectedIndex] || {}).text || '') });
+        $('pendingMsg').innerHTML = '<b>✅ ' + esc(res.message) + '</b>';
       } else {
-        btn.disabled = false; btn.textContent = 'この内容で登録';
+        btn.disabled = false; btn.textContent = '登録を申請する';
         $('claimResult').innerHTML = '<div class="msg msg-warn">' + esc(res.message || res.code) + '</div>';
       }
     }).catch(function(e) {
-      state.submitting = false; btn.disabled = false; btn.textContent = 'この内容で登録';
+      state.submitting = false; btn.disabled = false; btn.textContent = '登録を申請する';
       $('claimResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
     });
   }
@@ -857,7 +865,11 @@ var App = (function() {
       $('bottomNav').classList.add('hidden');   // 先に出した枠を畳む（未登録は案内画面のみ）
       $('unregEmail').value = state.email || '(メール取得できず)';
       $('userBar').textContent = (state.email || '') + '（未登録）';
-      renderClaimForm(res);                       // セルフ登録フォーム（氏名候補＋拠点）を用意
+      if (res.pendingRequest) {
+        renderPending(res.pendingRequest);        // 申請済み→承認待ち画面
+      } else {
+        renderRegForm(res);                        // 未申請→登録フォーム（氏名候補＋拠点）
+      }
       showOnly('unregView');
       return false;
     }
@@ -2170,7 +2182,7 @@ var App = (function() {
         if (res.updated && res.updated.length) body += '\n更新: ' + res.updated.join('、');
         if (res.skipped && res.skipped.length) body += '\n変更なし（既存）: ' + res.skipped.join('、');
         if (res.errors && res.errors.length) body += '\n⚠ 失敗: ' + res.errors.join('、');
-        body += res.synced ? '\n\n✅ 同期済み — 各配達員のフォームに反映されました'
+        body += res.synced ? '\n\n✅ 同期済み — 各ポスティングスタッフのフォームに反映されました'
                            : '\n\n※ 同期は次回の自動実行（1時間おき）で反映されます';
         area.innerHTML = '<div class="msg msg-ok">' + esc(body) + '</div>';
         // 登録完了＝入力データを全消去（案件番号・案件名・配布エリア・連絡・配布日・担当）。次の案件を白紙から入力。拠点は選択状態を維持。
@@ -2190,6 +2202,7 @@ var App = (function() {
 
   // ─── スタッフ登録（管理者） ───
   function loadStaff() {
+    loadPendingRegs();   // 承認待ちの申請も同時に読む
     $('stRoster').innerHTML = '<div class="empty">読み込み中…</div>';
     api({ action: 'listStaff' }).then(function(res) {
       if (!res.ok) { $('stRoster').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
@@ -2197,6 +2210,93 @@ var App = (function() {
     }).catch(function(e) {
       $('stRoster').innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
     });
+  }
+
+  // ─── 登録申請の承認/却下（管理者） ───
+  function loadPendingRegs() {
+    $('pendingRegList').innerHTML = '<div class="empty">読み込み中…</div>';
+    $('pendingRegResult').innerHTML = '';
+    api({ action: 'listPendingRegistrations' }).then(function(res) {
+      if (!res.ok) { $('pendingRegList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
+      state.regUnclaimed = res.unclaimed || [];
+      renderPendingRegs(res.pending || []);
+    }).catch(function(e) {
+      $('pendingRegList').innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function renderPendingRegs(list) {
+    if (!list.length) { $('pendingRegList').innerHTML = '<div class="empty">承認待ちの申請はありません</div>'; return; }
+    var unclaimed = state.regUnclaimed || [];
+    $('pendingRegList').innerHTML = list.map(function(r) {
+      // 紐づけ先セレクト（既定=申請の指定→同名候補→新規）
+      var def = r.target || (r.nameMatches && r.nameMatches.length ? r.nameMatches[0].staffId : '__NEW__');
+      var opts = ['<option value="__NEW__"' + (def === '__NEW__' ? ' selected' : '') + '>新規スタッフとして追加</option>'];
+      unclaimed.forEach(function(s) {
+        opts.push('<option value="' + esc(s.staffId) + '"' + (def === s.staffId ? ' selected' : '') +
+          '>既存に紐づけ: ' + esc(s.name) + (s.homeArea ? '（' + esc(s.homeArea) + '）' : '') + '</option>');
+      });
+      var matchHint = (!r.target && r.nameMatches && r.nameMatches.length)
+        ? '<div class="footer-note" style="color:var(--c-warn)">⚠ 同じ氏名の既存スタッフがいます。紐づけを検討してください（集計が引き継がれます）。</div>' : '';
+      var permOpts = ['配布員', '管理者', '管理者（配布者）'].map(function(p) {
+        return '<option value="' + esc(p) + '">' + esc(p) + '</option>';
+      }).join('');
+      return '<div class="assign" style="display:block;margin-bottom:8px">' +
+        '<div class="store">' + esc(r.name) + ' <span class="badge-inline badge-todo">' + esc(r.homeArea || '拠点未設定') + '</span></div>' +
+        '<div class="meta">' + esc(r.email) + ' ／ 申請 ' + esc(String(r.reqAt || '').replace('T', ' ').slice(0, 16)) + '</div>' +
+        matchHint +
+        '<label style="margin-top:8px">この申請の扱い</label>' +
+        '<select id="pr_' + esc(r.reqId) + '">' + opts.join('') + '</select>' +
+        '<label style="margin-top:8px">権限<span class="footer-note">（新規追加のときに適用。既存に紐づけの場合はそのままの権限）</span></label>' +
+        '<select id="prPerm_' + esc(r.reqId) + '">' + permOpts + '</select>' +
+        '<div style="display:flex;gap:8px;margin-top:10px">' +
+          '<button type="button" class="btn-primary" style="flex:1" onclick="App.approveReg(\'' + esc(r.reqId) + '\')">承認</button>' +
+          '<button type="button" class="btn-ghost" style="flex:1" onclick="App.rejectReg(\'' + esc(r.reqId) + '\')">却下</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function approveReg(reqId) {
+    if (state.submitting) return;
+    var sel = $('pr_' + reqId);
+    var v = sel ? sel.value : '__NEW__';
+    var permSel = $('prPerm_' + reqId);
+    var payload = { action: 'approveRegistration', reqId: reqId };
+    if (v && v !== '__NEW__') payload.targetStaffId = v;
+    if (permSel && permSel.value) payload.perm = permSel.value;
+    state.submitting = true;
+    $('pendingRegResult').innerHTML = '<div class="msg">処理中…</div>';
+    api(payload).then(function(res) {
+      state.submitting = false;
+      $('pendingRegResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') + '">' + esc(res.message || res.code) + '</div>';
+      loadPendingRegs();
+      if (res.ok) loadStaffRosterOnly();   // ロスターだけ更新（申請一覧の二重読みを避ける）
+    }).catch(function(e) {
+      state.submitting = false;
+      $('pendingRegResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function rejectReg(reqId) {
+    if (state.submitting) return;
+    if (!confirm('この申請を却下しますか？')) return;
+    state.submitting = true;
+    $('pendingRegResult').innerHTML = '<div class="msg">処理中…</div>';
+    api({ action: 'rejectRegistration', reqId: reqId }).then(function(res) {
+      state.submitting = false;
+      $('pendingRegResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') + '">' + esc(res.message || res.code) + '</div>';
+      loadPendingRegs();
+    }).catch(function(e) {
+      state.submitting = false;
+      $('pendingRegResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  // ロスターだけ再読込（承認直後の反映用・申請一覧は別途 loadPendingRegs で更新）
+  function loadStaffRosterOnly() {
+    api({ action: 'listStaff' }).then(function(res) {
+      if (res.ok) renderRoster(res.staff || []);
+    }).catch(function() {});
   }
 
   function renderRoster(list) {
@@ -2210,37 +2310,8 @@ var App = (function() {
       }).join('');
   }
 
-  function submitStaff() {
-    if (state.submitting) return;
-    var name = $('stName').value.trim();
-    var email = $('stEmail').value.trim();
-    var homeArea = $('stHome').value;
-    var perm = $('stPerm').value;
-    if (!name) { alert('氏名を入力してください'); return; }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { alert('Gmailの形式が正しくありません'); return; }
-    if (!homeArea) { alert('拠点を選んでください（関西／東戸塚／稲毛／五香）'); return; }
-    var payload = {
-      action: 'registerStaff', name: name, email: email,
-      tabName: $('stTabName').value.trim(), homeArea: homeArea, perm: perm
-    };
-    var btn = $('stSubmit');
-    state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>登録中…';
-    api(payload).then(function(res) {
-      state.submitting = false; btn.disabled = false; btn.textContent = 'このスタッフを登録';
-      if (res.ok) {
-        $('stResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + res.message) + '</div>';
-        $('stName').value = ''; $('stEmail').value = ''; $('stTabName').value = ''; $('stHome').value = ''; $('stPerm').value = '配布員';
-        if (res.staff) state.staffList.push({ staffId: res.staff.staffId, name: res.staff.name });  // 予定登録の候補にも反映
-        loadStaff();
-      } else {
-        $('stResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E_UNKNOWN') + ']') + '</div>';
-      }
-      $('stResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }).catch(function(e) {
-      state.submitting = false; btn.disabled = false; btn.textContent = 'このスタッフを登録';
-      $('stResult').innerHTML = '<div class="msg msg-err">' + esc('接続できません: ' + e.message) + '</div>';
-    });
-  }
+  // （管理者の手動スタッフ登録フォームは撤去。登録は本人申請→承認フローに一本化した。
+  //   権限の付与は承認画面の「権限」で行う。稀に手で足したい場合は配達員マスタを直接編集。）
 
   // ─── シフト提出（サイクル制①前半/②後半） ───
   function fmtMd(iso) { var p = iso.split('-'); return Number(p[1]) + '/' + Number(p[2]); }
@@ -2881,6 +2952,7 @@ var App = (function() {
     toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
     onGpsAddSelect: onGpsAddSelect, logout: logout, copyEmail: copyEmail,
     claimSubmit: claimSubmit, onClaimName: onClaimName,
+    loadPendingRegs: loadPendingRegs, approveReg: approveReg, rejectReg: rejectReg,
     submitRegister: submitRegister, setBan: setBan,
     reportNoDistribution: reportNoDistribution,
     loadRegistrations: loadRegistrations, deleteRegistration: deleteRegistration,
@@ -2888,7 +2960,7 @@ var App = (function() {
     regEditSetRole: regEditSetRole, regEditRemoveMember: regEditRemoveMember, regEditAddMember: regEditAddMember,
     regSubTab: regSubTab, toggleRegHelp: toggleRegHelp,
     regToggle: regToggle, regSetRole: regSetRole, regRemove: regRemove, regToggleShiftAll: regToggleShiftAll,
-    submitStaff: submitStaff,
+    loadStaff: loadStaff,
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
     submitShiftCycle: submitShiftCycle,
     saMonth: saMonth, toggleSaDay: toggleSaDay, saSave: saSave
