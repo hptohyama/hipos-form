@@ -750,13 +750,13 @@ var App = (function() {
     state.claimCandidates = (res && res.claimCandidates) || [];
     var bases = (res && res.bases) || ['関西', '東戸塚', '稲毛', '五香'];
     $('claimEmailLine').innerHTML = 'あなたのGoogleアカウント: <b>' + esc(state.email || '') + '</b>';
-    // 氏名プルダウン（未登録の在籍スタッフ）＋末尾に「一覧に無い（新しく入った）」
-    var nameOpts = ['<option value="">― 選んでください ―</option>'];
+    // 氏名プルダウン: 先頭に「一覧に無い（新しく入った）」→ その後に未登録の在籍スタッフ
+    var nameOpts = ['<option value="">― 選んでください ―</option>',
+                    '<option value="__NEW__">＋ 一覧に無い（新しく入った方）</option>'];
     state.claimCandidates.forEach(function(c) {
       var label = c.name + (c.homeArea ? '（' + c.homeArea + '）' : '');
       nameOpts.push('<option value="' + esc(c.staffId) + '" data-home="' + esc(c.homeArea || '') + '">' + esc(label) + '</option>');
     });
-    nameOpts.push('<option value="__NEW__">＋ 一覧に無い（新しく入った方）</option>');
     $('claimName').innerHTML = nameOpts.join('');
     // 拠点プルダウン
     $('claimHome').innerHTML = ['<option value="">― 選んでください ―</option>'].concat(
@@ -2227,26 +2227,19 @@ var App = (function() {
 
   function renderPendingRegs(list) {
     if (!list.length) { $('pendingRegList').innerHTML = '<div class="empty">承認待ちの申請はありません</div>'; return; }
-    var unclaimed = state.regUnclaimed || [];
     $('pendingRegList').innerHTML = list.map(function(r) {
-      // 紐づけ先セレクト（既定=申請の指定→同名候補→新規）
-      var def = r.target || (r.nameMatches && r.nameMatches.length ? r.nameMatches[0].staffId : '__NEW__');
-      var opts = ['<option value="__NEW__"' + (def === '__NEW__' ? ' selected' : '') + '>新規スタッフとして追加</option>'];
-      unclaimed.forEach(function(s) {
-        opts.push('<option value="' + esc(s.staffId) + '"' + (def === s.staffId ? ' selected' : '') +
-          '>既存に紐づけ: ' + esc(s.name) + (s.homeArea ? '（' + esc(s.homeArea) + '）' : '') + '</option>');
-      });
+      // 申請の「扱い」は本人が申請時に決めている（既存を選ぶ or 新規）。ここでは表示のみ（管理者は承認/却下だけ）。
+      var kind = r.target ? '既存スタッフに紐づけて登録（集計を引き継ぎ）' : '新規スタッフとして登録';
       var matchHint = (!r.target && r.nameMatches && r.nameMatches.length)
-        ? '<div class="footer-note" style="color:var(--c-warn)">⚠ 同じ氏名の既存スタッフがいます。紐づけを検討してください（集計が引き継がれます）。</div>' : '';
+        ? '<div class="footer-note" style="color:var(--c-warn)">⚠ 同じ氏名の既存スタッフがいます。心当たりがあれば却下し、本人に一覧から選び直してもらうと集計を引き継げます。</div>' : '';
       var permOpts = ['配布員', '管理者', '管理者（配布者）'].map(function(p) {
         return '<option value="' + esc(p) + '">' + esc(p) + '</option>';
       }).join('');
       return '<div class="assign" style="display:block;margin-bottom:8px">' +
         '<div class="store">' + esc(r.name) + ' <span class="badge-inline badge-todo">' + esc(r.homeArea || '拠点未設定') + '</span></div>' +
         '<div class="meta">' + esc(r.email) + ' ／ 申請 ' + esc(String(r.reqAt || '').replace('T', ' ').slice(0, 16)) + '</div>' +
+        '<div class="footer-note" style="margin-top:6px">扱い: <b>' + esc(kind) + '</b></div>' +
         matchHint +
-        '<label style="margin-top:8px">この申請の扱い</label>' +
-        '<select id="pr_' + esc(r.reqId) + '">' + opts.join('') + '</select>' +
         '<label style="margin-top:8px">権限<span class="footer-note">（新規追加のときに適用。既存に紐づけの場合はそのままの権限）</span></label>' +
         '<select id="prPerm_' + esc(r.reqId) + '">' + permOpts + '</select>' +
         '<div style="display:flex;gap:8px;margin-top:10px">' +
@@ -2258,11 +2251,9 @@ var App = (function() {
 
   function approveReg(reqId) {
     if (state.submitting) return;
-    var sel = $('pr_' + reqId);
-    var v = sel ? sel.value : '__NEW__';
+    // 扱い（新規/既存）は申請時に確定済み。管理者は承認するだけ（サーバは申請の target を使う）。権限だけ指定可。
     var permSel = $('prPerm_' + reqId);
     var payload = { action: 'approveRegistration', reqId: reqId };
-    if (v && v !== '__NEW__') payload.targetStaffId = v;
     if (permSel && permSel.value) payload.perm = permSel.value;
     state.submitting = true;
     $('pendingRegResult').innerHTML = '<div class="msg">処理中…</div>';
