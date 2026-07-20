@@ -539,6 +539,8 @@
 
     <div class="card">
       <h2>登録済みスタッフ</h2>
+      <div class="case-info">権限を付け間違えたときは、各スタッフの<b>権限</b>を選び直して［変更］で直せます。</div>
+      <div id="stPermResult"></div>
       <div id="stRoster"><div class="empty">読み込み中…</div></div>
       <button type="button" class="btn-ghost" onclick="App.loadStaff()" style="margin-top:10px">↻ 更新</button>
     </div>
@@ -2291,14 +2293,46 @@ var App = (function() {
   }
 
   function renderRoster(list) {
+    state.roster = list || [];
     if (!list.length) { $('stRoster').innerHTML = '<div class="empty">まだ登録がありません</div>'; return; }
+    var perms = ['配布員', '管理者', '管理者（配布者）'];
     $('stRoster').innerHTML = '<div class="case-info">在籍 ' + list.length + '名</div>' +
       list.map(function(s) {
-        return '<div class="assign"><div class="store">' + esc(s.name) + '</div>' +
+        var cur = s.perm || '配布員';
+        var opts = perms.map(function(p) {
+          return '<option value="' + esc(p) + '"' + (cur === p ? ' selected' : '') + '>' + esc(p) + '</option>';
+        }).join('');
+        return '<div class="assign" style="display:block"><div class="store">' + esc(s.name) + '</div>' +
           '<div class="meta">' + esc(s.staffId) + ' ／ ' + esc(s.email || '(メール未登録)') +
-          (s.homeArea ? ' ／ ' + esc(s.homeArea) : ' ／ <span style="color:var(--c-warn)">拠点未設定</span>') +
-          (s.perm ? ' ／ ' + esc(s.perm) : '') + '</div></div>';
+          (s.homeArea ? ' ／ ' + esc(s.homeArea) : ' ／ <span style="color:var(--c-warn)">拠点未設定</span>') + '</div>' +
+          '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">' +
+            '<span class="footer-note" style="white-space:nowrap">権限</span>' +
+            '<select id="rp_' + esc(s.staffId) + '" style="flex:1">' + opts + '</select>' +
+            '<button type="button" class="btn-ghost" style="width:auto;padding:8px 16px" onclick="App.changeStaffPerm(\'' + esc(s.staffId) + '\')">変更</button>' +
+          '</div></div>';
       }).join('');
+  }
+
+  // ロスターからスタッフの権限だけを変更する（管理者・付け間違いの修正用）
+  function changeStaffPerm(staffId) {
+    if (state.submitting) return;
+    var sel = $('rp_' + staffId);
+    if (!sel) return;
+    var perm = sel.value;
+    var st = (state.roster || []).filter(function(s) { return s.staffId === staffId; })[0];
+    var nm = st ? st.name : staffId;
+    if ((st && (st.perm || '配布員') === perm)) { alert(nm + ' さんの権限は既に「' + perm + '」です'); return; }
+    if (!confirm(nm + ' さんの権限を「' + perm + '」に変更しますか？')) return;
+    state.submitting = true;
+    $('stPermResult').innerHTML = '<div class="msg">変更中…</div>';
+    api({ action: 'updateStaffPerm', staffId: staffId, perm: perm }).then(function(res) {
+      state.submitting = false;
+      $('stPermResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') + '">' + esc(res.message || res.code) + '</div>';
+      if (res.ok) loadStaffRosterOnly();
+    }).catch(function(e) {
+      state.submitting = false;
+      $('stPermResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
+    });
   }
 
   // （管理者の手動スタッフ登録フォームは撤去。登録は本人申請→承認フローに一本化した。
@@ -2944,6 +2978,7 @@ var App = (function() {
     onGpsAddSelect: onGpsAddSelect, logout: logout, copyEmail: copyEmail,
     claimSubmit: claimSubmit, onClaimName: onClaimName,
     loadPendingRegs: loadPendingRegs, approveReg: approveReg, rejectReg: rejectReg,
+    changeStaffPerm: changeStaffPerm,
     submitRegister: submitRegister, setBan: setBan,
     reportNoDistribution: reportNoDistribution,
     loadRegistrations: loadRegistrations, deleteRegistration: deleteRegistration,
