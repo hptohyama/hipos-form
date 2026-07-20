@@ -531,7 +531,7 @@
     <!-- 承認待ちの登録申請（本人セルフ登録の承認/却下） -->
     <div class="card" id="pendingRegCard" style="border-color:#f0b400">
       <h2>🔔 承認待ちの登録申請</h2>
-      <div class="case-info">スタッフ本人がGoogleログインで申請した内容です。中身と<b>権限</b>を確認して<b>承認</b>すると使えるようになります。氏名が既存スタッフと同じ場合は<b>既存に紐づけ</b>を選ぶと集計が引き継がれます。<br>※新しいスタッフの登録は、本人がログインして申請する方式です（管理者が手で追加する必要はありません）。</div>
+      <div class="case-info">スタッフ本人がGoogleログインで申請した内容です。中身と<b>権限</b>を確認して<b>承認</b>すると使えるようになります。<br>※新しいスタッフの登録は、本人がログインして申請する方式です（管理者が手で追加する必要はありません）。</div>
       <div id="pendingRegResult"></div>
       <div id="pendingRegList"><div class="empty">読み込み中…</div></div>
       <button type="button" class="btn-ghost" onclick="App.loadPendingRegs()" style="margin-top:10px">↻ 更新</button>
@@ -2237,13 +2237,18 @@ var App = (function() {
       var permOpts = ['配布員', '管理者', '管理者（配布者）'].map(function(p) {
         return '<option value="' + esc(p) + '">' + esc(p) + '</option>';
       }).join('');
+      // 権限は「新規追加」のときだけ適用（既存に紐づける場合は元の権限を維持）。
+      // 既存紐づけでは選択欄を出さず、その旨だけ表示して誤解を防ぐ。
+      var permBlock = r.target
+        ? '<div class="footer-note" style="margin-top:8px">権限: 既存スタッフの現在の設定を維持します</div>'
+        : '<label style="margin-top:8px">権限<span class="footer-note">（新規スタッフに適用）</span></label>' +
+          '<select id="prPerm_' + esc(r.reqId) + '">' + permOpts + '</select>';
       return '<div class="assign" style="display:block;margin-bottom:8px">' +
         '<div class="store">' + esc(r.name) + ' <span class="badge-inline badge-todo">' + esc(r.homeArea || '拠点未設定') + '</span></div>' +
         '<div class="meta">' + esc(r.email) + ' ／ 申請 ' + esc(String(r.reqAt || '').replace('T', ' ').slice(0, 16)) + '</div>' +
         '<div class="footer-note" style="margin-top:6px">扱い: <b>' + esc(kind) + '</b></div>' +
         matchHint +
-        '<label style="margin-top:8px">権限<span class="footer-note">（新規追加のときに適用。既存に紐づけの場合はそのままの権限）</span></label>' +
-        '<select id="prPerm_' + esc(r.reqId) + '">' + permOpts + '</select>' +
+        permBlock +
         '<div style="display:flex;gap:8px;margin-top:10px">' +
           '<button type="button" class="btn-primary" style="flex:1" onclick="App.approveReg(\'' + esc(r.reqId) + '\')">承認</button>' +
           '<button type="button" class="btn-ghost" style="flex:1" onclick="App.rejectReg(\'' + esc(r.reqId) + '\')">却下</button>' +
@@ -2302,13 +2307,22 @@ var App = (function() {
         var opts = perms.map(function(p) {
           return '<option value="' + esc(p) + '"' + (cur === p ? ' selected' : '') + '>' + esc(p) + '</option>';
         }).join('');
-        return '<div class="assign" style="display:block"><div class="store">' + esc(s.name) + '</div>' +
-          '<div class="meta">' + esc(s.staffId) + ' ／ ' + esc(s.email || '(メール未登録)') +
-          (s.homeArea ? ' ／ ' + esc(s.homeArea) : ' ／ <span style="color:var(--c-warn)">拠点未設定</span>') + '</div>' +
+        // 旧ラベル等、標準3種に無い権限が入っている行は、その実値を先頭に足して選択（誤って配布員へ降格しないように）
+        if (perms.indexOf(cur) < 0) {
+          opts = '<option value="' + esc(cur) + '" selected>' + esc(cur) + '（現状）</option>' + opts;
+        }
+        // 拠点バッジ（登録済みの変更・取消カードと同じ色・テキスト）
+        var baseLabel = REG_BASES.indexOf(s.homeArea) >= 0 ? s.homeArea : '拠点未設定';
+        var baseColor = BASE_COLORS[baseLabel] || '#868e96';
+        var badge = '<span class="base-badge" style="background:' + baseColor + '">' + esc(baseLabel) + '</span>';
+        return '<div class="assign" style="display:block">' +
+          '<div class="store" style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+            '<span>' + esc(s.name) + '</span>' + badge + '</div>' +
+          '<div class="meta">' + esc(s.staffId) + ' ／ ' + esc(s.email || '(メール未登録)') + '</div>' +
           '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">' +
             '<span class="footer-note" style="white-space:nowrap">権限</span>' +
-            '<select id="rp_' + esc(s.staffId) + '" style="flex:1">' + opts + '</select>' +
-            '<button type="button" class="btn-ghost" style="width:auto;padding:8px 16px" onclick="App.changeStaffPerm(\'' + esc(s.staffId) + '\')">変更</button>' +
+            '<select id="rp_' + esc(s.staffId) + '" style="width:auto;max-width:60%">' + opts + '</select>' +
+            '<button type="button" class="btn-ghost" style="width:auto;padding:8px 16px;white-space:nowrap" onclick="App.changeStaffPerm(\'' + esc(s.staffId) + '\')">変更</button>' +
           '</div></div>';
       }).join('');
   }
