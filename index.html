@@ -269,6 +269,17 @@
   <!-- ═══ 未登録者：スタッフ登録の申請（本人）／承認待ち ═══ -->
   <div class="view hidden" id="unregView">
 
+    <!-- (0) アクセスコード（合言葉）ゲート＝設定時のみ。通ると登録フォームが出る -->
+    <div class="card hidden" id="accessCard">
+      <h2>アクセスコードの入力</h2>
+      <div class="msg msg-ok" style="margin-bottom:10px">Googleログインができました。<br>登録を進めるには、会社から伝えられた<b>アクセスコード（合言葉）</b>を入力してください。</div>
+      <label>アクセスコード</label>
+      <input id="accessCode" type="text" placeholder="会社から伝えられたコード" autocomplete="off">
+      <button class="btn-primary" id="accessSubmit" style="margin-top:12px" onclick="App.unlockAccess()">次へ</button>
+      <div id="accessResult" style="margin-top:10px"></div>
+      <button class="btn-ghost" style="margin-top:12px" onclick="location.reload()">再読み込み</button>
+    </div>
+
     <!-- (A) 登録フォーム（申請） -->
     <div class="card" id="regFormCard">
       <h2>スタッフ登録</h2>
@@ -589,7 +600,7 @@
 // CONFIG — 設置時にここを書き換える
 // ════════════════════════════════════════════════════
 var CONFIG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbyRdNFAOyr6z1lmZNn0edwTfiMdsBEZrC4f3kfdgIU75eFGBNPjVm832lKSXVoHUwMXag/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbx-oCBJqrmFtx4Cca8GaJ06e0FGEngjO_Lou3G0azkS2JQytjKlLa_uyz__lQ0KAHR_9g/exec',
   OAUTH_CLIENT_ID: '654669981739-o1iosejqh7dmvumciaannkn84rv6jdhs.apps.googleusercontent.com'
 };
 
@@ -747,6 +758,7 @@ var App = (function() {
   // 候補＝在籍かつメール未登録の氏名。既存の人はそこから選び、新しい人は「一覧に無い」で手入力。
   // 送信＝申請中に記録（handleSubmitRegistration）→ 管理者が承認するとマスタに反映され使える。
   function renderRegForm(res) {
+    $('accessCard').classList.add('hidden');
     $('regFormCard').classList.remove('hidden');
     $('pendingCard').classList.add('hidden');
     state.claimCandidates = (res && res.claimCandidates) || [];
@@ -773,9 +785,41 @@ var App = (function() {
 
   // 承認待ち画面
   function renderPending(pr) {
+    $('accessCard').classList.add('hidden');
     $('regFormCard').classList.add('hidden');
     $('pendingCard').classList.remove('hidden');
     $('pendingMsg').innerHTML = esc(pr.name || '') + ' さんで登録申請を受け付けています。<br>管理者の承認をお待ちください。';
+  }
+
+  // アクセスコード（合言葉）ゲート＝設定時のみ。名簿・登録フォームはコードを通るまで出さない。
+  function renderAccessGate() {
+    $('accessCard').classList.remove('hidden');
+    $('regFormCard').classList.add('hidden');
+    $('pendingCard').classList.add('hidden');
+    $('accessCode').value = ''; $('accessResult').innerHTML = '';
+    var btn = $('accessSubmit'); btn.disabled = false; btn.textContent = '次へ';
+    try { $('accessCode').focus(); } catch (e) {}
+  }
+
+  // コードを検証 → 正しければ登録フォームを表示（候補はサーバから取得）
+  function unlockAccess() {
+    if (state.submitting) return;
+    var code = $('accessCode').value.trim();
+    if (!code) { alert('アクセスコードを入力してください'); return; }
+    var btn = $('accessSubmit');
+    state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>確認中…';
+    api({ action: 'unlockRegistration', accessCode: code }).then(function(res) {
+      state.submitting = false; btn.disabled = false; btn.textContent = '次へ';
+      if (res.ok) {
+        state.accessCode = code;    // 申請時にも同じコードを添える（多重防御）
+        renderRegForm(res);          // res に claimCandidates ＋ bases
+      } else {
+        $('accessResult').innerHTML = '<div class="msg msg-warn">' + esc(res.message || res.code) + '</div>';
+      }
+    }).catch(function(e) {
+      state.submitting = false; btn.disabled = false; btn.textContent = '次へ';
+      $('accessResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
+    });
   }
 
   // 氏名を選んだら: 既存はその拠点を自動入力／「一覧に無い」は手入力欄を出す
@@ -798,6 +842,7 @@ var App = (function() {
     var sel = $('claimName').value;
     var homeArea = $('claimHome').value;
     var payload = { action: 'submitRegistration', homeArea: homeArea };
+    if (state.accessCode) payload.accessCode = state.accessCode;   // 入口で通した合言葉を添える
     if (sel === '__NEW__') {
       var sei = $('claimSei').value.trim(), mei = $('claimMei').value.trim();
       if (!sei || !mei) { alert('姓と名の両方を入力してください'); return; }
@@ -869,6 +914,8 @@ var App = (function() {
       $('userBar').textContent = (state.email || '') + '（未登録）';
       if (res.pendingRequest) {
         renderPending(res.pendingRequest);        // 申請済み→承認待ち画面
+      } else if (res.needsAccessCode) {
+        renderAccessGate();                        // アクセスコード設定時→まず合言葉入力（名簿は出さない）
       } else {
         renderRegForm(res);                        // 未申請→登録フォーム（氏名候補＋拠点）
       }
@@ -2990,7 +3037,7 @@ var App = (function() {
     switchTab: switchTab, pickCase: pickCase,
     toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
     onGpsAddSelect: onGpsAddSelect, logout: logout, copyEmail: copyEmail,
-    claimSubmit: claimSubmit, onClaimName: onClaimName,
+    claimSubmit: claimSubmit, onClaimName: onClaimName, unlockAccess: unlockAccess,
     loadPendingRegs: loadPendingRegs, approveReg: approveReg, rejectReg: rejectReg,
     changeStaffPerm: changeStaffPerm,
     submitRegister: submitRegister, setBan: setBan,
