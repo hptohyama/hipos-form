@@ -266,16 +266,37 @@
     </div>
   </div>
 
-  <!-- ═══ 未登録者の案内（配達員マスタに未登録） ═══ -->
+  <!-- ═══ 未登録者：自分のアカウント登録（セルフ・ひもづけ） ═══ -->
   <div class="view hidden" id="unregView">
     <div class="card">
-      <h2>配達員登録がありません</h2>
-      <div class="msg msg-warn">このGoogleアカウントは、まだ配達員として登録されていません。<br>下のメールアドレスを管理者に伝えて、登録を依頼してください。</div>
-      <label>あなたのメールアドレス</label>
-      <input id="unregEmail" readonly>
-      <button class="btn-primary" style="margin-top:8px" onclick="App.copyEmail()">📋 メールアドレスをコピー</button>
-      <div class="case-info" style="margin-top:10px">登録後、この画面を再読み込みすると報告できるようになります。</div>
-      <button class="btn-ghost" style="margin-top:8px" onclick="location.reload()">再読み込み</button>
+      <h2>アカウント登録</h2>
+      <div class="msg msg-ok" style="margin-bottom:10px">Googleログインができました。<br>初回だけ、<b>ご自身のお名前と拠点</b>を選んで登録してください。</div>
+      <div class="case-info" id="claimEmailLine" style="margin-bottom:12px"></div>
+
+      <div id="claimForm">
+        <label>お名前（一覧から選ぶ）</label>
+        <select id="claimName" onchange="App.onClaimName()">
+          <option value="">― 選んでください ―</option>
+        </select>
+
+        <label style="margin-top:10px">拠点（あなたが働く拠点）</label>
+        <select id="claimHome">
+          <option value="">― 選んでください ―</option>
+        </select>
+
+        <button class="btn-primary" id="claimSubmit" style="margin-top:12px" onclick="App.claimSubmit()">この内容で登録</button>
+      </div>
+      <div id="claimResult" style="margin-top:10px"></div>
+
+      <!-- 一覧に自分の名前が無い場合（新人など） -->
+      <details style="margin-top:16px">
+        <summary style="cursor:pointer">一覧に自分の名前が無い場合はこちら</summary>
+        <div class="case-info" style="margin-top:8px">新しく入った方などで一覧に無い場合は、下のメールアドレスを管理者に伝えて登録を依頼してください。</div>
+        <input id="unregEmail" readonly style="margin-top:6px">
+        <button class="btn-ghost" style="margin-top:8px" onclick="App.copyEmail()">📋 メールアドレスをコピー</button>
+      </details>
+
+      <button class="btn-ghost" style="margin-top:12px" onclick="location.reload()">再読み込み</button>
     </div>
   </div>
 
@@ -732,6 +753,68 @@ var App = (function() {
     } else { window.prompt('コピーしてください', v); }
   }
 
+  // ─── 未登録者のセルフ登録（自分の行にメールをひもづけ） ───
+  // 候補＝在籍かつメール未登録の行。本人が氏名＋拠点を選び claimStaff で自分の行に後付けする。
+  function renderClaimForm(res) {
+    state.claimCandidates = (res && res.claimCandidates) || [];
+    var bases = (res && res.bases) || ['関西', '東戸塚', '稲毛', '五香'];
+    $('claimEmailLine').innerHTML = 'あなたのGoogleアカウント: <b>' + esc(state.email || '') + '</b>';
+    // 氏名プルダウン（未登録の在籍スタッフのみ・拠点つき表示）
+    var nameOpts = ['<option value="">― 選んでください ―</option>'];
+    state.claimCandidates.forEach(function(c) {
+      var label = c.name + (c.homeArea ? '（' + c.homeArea + '）' : '');
+      nameOpts.push('<option value="' + esc(c.staffId) + '" data-home="' + esc(c.homeArea || '') + '">' + esc(label) + '</option>');
+    });
+    $('claimName').innerHTML = nameOpts.join('');
+    // 拠点プルダウン
+    $('claimHome').innerHTML = ['<option value="">― 選んでください ―</option>'].concat(
+      bases.map(function(b) { return '<option value="' + esc(b) + '">' + esc(b) + '</option>'; })
+    ).join('');
+    $('claimName').disabled = false; $('claimHome').disabled = false;
+    var btn = $('claimSubmit'); btn.disabled = false; btn.textContent = 'この内容で登録';
+    if (!state.claimCandidates.length) {
+      // 候補ゼロ＝全員登録済み or マスタ未整備 → 名前で選ぶ導線は使えない旨を案内
+      $('claimForm').classList.add('hidden');
+      $('claimResult').innerHTML = '<div class="msg msg-warn">登録できる候補が見つかりませんでした。下の「一覧に自分の名前が無い場合」から管理者にご連絡ください。</div>';
+    } else {
+      $('claimForm').classList.remove('hidden');
+      $('claimResult').innerHTML = '';
+    }
+  }
+
+  // 氏名を選んだら、その行に設定済みの拠点を自動で入れる（未設定なら空のまま本人が選ぶ）
+  function onClaimName() {
+    var sel = $('claimName');
+    var opt = sel.options[sel.selectedIndex];
+    var home = opt ? (opt.getAttribute('data-home') || '') : '';
+    if (home) $('claimHome').value = home;
+  }
+
+  function claimSubmit() {
+    if (state.submitting) return;
+    var staffId = $('claimName').value;
+    var homeArea = $('claimHome').value;
+    if (!staffId) { alert('お名前を選んでください'); return; }
+    if (!homeArea) { alert('拠点を選んでください（関西／東戸塚／稲毛／五香）'); return; }
+    var btn = $('claimSubmit');
+    state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>登録中…';
+    api({ action: 'claimStaff', staffId: staffId, homeArea: homeArea }).then(function(res) {
+      state.submitting = false;
+      if (res.ok) {
+        $('claimName').disabled = true; $('claimHome').disabled = true;
+        btn.disabled = true; btn.textContent = '登録済み';
+        $('claimResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + res.message) + '</div>' +
+          '<button class="btn-primary" style="margin-top:10px" onclick="location.reload()">アプリを開く</button>';
+      } else {
+        btn.disabled = false; btn.textContent = 'この内容で登録';
+        $('claimResult').innerHTML = '<div class="msg msg-warn">' + esc(res.message || res.code) + '</div>';
+      }
+    }).catch(function(e) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'この内容で登録';
+      $('claimResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
   // ─── 認証後の初期分岐 ───
   // ログイン直後、サーバ応答を待つ前に「アプリの枠」を先に出す（体感速度の改善）。
   // 中身（本日の担当・サマリ）は bootstrap 応答が来てから流し込む。認証失敗時は showAuthError が枠を畳む。
@@ -774,6 +857,7 @@ var App = (function() {
       $('bottomNav').classList.add('hidden');   // 先に出した枠を畳む（未登録は案内画面のみ）
       $('unregEmail').value = state.email || '(メール取得できず)';
       $('userBar').textContent = (state.email || '') + '（未登録）';
+      renderClaimForm(res);                       // セルフ登録フォーム（氏名候補＋拠点）を用意
       showOnly('unregView');
       return false;
     }
@@ -2796,6 +2880,7 @@ var App = (function() {
     switchTab: switchTab, pickCase: pickCase,
     toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
     onGpsAddSelect: onGpsAddSelect, logout: logout, copyEmail: copyEmail,
+    claimSubmit: claimSubmit, onClaimName: onClaimName,
     submitRegister: submitRegister, setBan: setBan,
     reportNoDistribution: reportNoDistribution,
     loadRegistrations: loadRegistrations, deleteRegistration: deleteRegistration,
