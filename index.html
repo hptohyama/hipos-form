@@ -410,14 +410,15 @@
     <p class="signin-note">配布報告には本人確認が必要です。会社に登録済みのGoogleアカウントでサインインしてください。</p>
     <div id="gsiButton"></div>
     <div id="gsiPending" class="signin-note hidden" style="text-align:center;margin-top:8px">Googleログインを準備中です…</div>
-    <div style="text-align:center;margin-top:16px">
-      <a href="#" id="tokenToggle" style="font-size:13px;color:var(--c-sub);cursor:pointer" onclick="App.showTokenLogin();return false;">ログインできない場合はこちら</a>
-    </div>
+    <!-- ★2026-07-27 断捨離: 「個別トークン」ログインを撤去（誰にも発行しておらず、押しても必ず
+         失敗する導線だった）。Googleログインが読み込めない場合は、原因が分かる案内だけを出す。 -->
     <div id="gsiFail" class="hidden">
-      <label style="margin-top:14px">個別トークン</label>
-      <input type="password" id="staffToken" autocomplete="off" placeholder="管理者から配布されたトークン">
-      <button class="btn-primary" style="margin-top:8px" onclick="App.tokenSignIn()">トークンで開始</button>
-      <div class="footer-note">Googleログインができない場合の予備手段です。管理者から配布された個別トークンを入力してください。</div>
+      <div class="footer-note" style="margin-top:14px;text-align:left">
+        <b>Googleログインを表示できませんでした。</b><br>
+        ①通信状況を確認して、画面を読み込み直してください（更新ボタン）。<br>
+        ②社内Wi-Fiや機内モードなど、通信が制限されていないかご確認ください。<br>
+        ③それでも表示されない場合は管理者までご連絡ください。
+      </div>
     </div>
   </div>
 
@@ -835,7 +836,7 @@ PRESET_CASE = PRESET_CASE.replace(/[^A-Za-z0-9]/g, '');
 
 var App = (function() {
   var state = {
-    idToken: null, tokenExp: 0, staffToken: null,
+    idToken: null, tokenExp: 0,
     deviceId: null, reportUuid: null,
     email: '', cases: [], reportCase: null, allOpenCases: [], areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
     regSel: {}, regOrder: [], regBase: '', registrations: [], regEdit: null, correctingCase: null,   // 予定登録の選択(staffId→役割)/表示・登録順/①拠点／登録済み一覧／編集フォームの状態／履歴修正の対象案件
@@ -902,7 +903,6 @@ var App = (function() {
   function api(payload) {
     payload.apiVersion = 1;
     if (state.idToken) payload.idToken = state.idToken;
-    else if (state.staffToken) payload.staffToken = state.staffToken;
     return fetch(CONFIG.API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -948,13 +948,10 @@ var App = (function() {
       google.accounts.id.renderButton($('gsiButton'), { theme: 'filled_blue', size: 'large', width: 280, text: 'signin_with' });
     } catch (e) { showGsiFail(); }
   }
-  function showGsiFail() { showTokenLogin(); }   // Googleが使えない時は個別トークン欄を開く
-
-  function showTokenLogin() {
+  // Googleログインが読み込めなかったときの案内を出す（代替の個別トークンは撤去済み）
+  function showGsiFail() {
     $('gsiFail').classList.remove('hidden');
-    var tl = $('tokenToggle'); if (tl) tl.classList.add('hidden');
     var gp = $('gsiPending'); if (gp) gp.classList.add('hidden');
-    try { $('staffToken').focus(); } catch (e) {}
   }
 
   function onSignIn(credential) {
@@ -969,15 +966,6 @@ var App = (function() {
     afterAuth();
   }
 
-  function tokenSignIn() {
-    var t = $('staffToken').value.trim();
-    if (!t) { alert('トークンを入力してください'); return; }
-    state.staffToken = t;
-    lsSet('hipos_staff_token', t);
-    $('userBar').textContent = '個別トークンで利用中';
-    afterAuth();
-  }
-
   function tryRestoreSession() {
     var t = lsGet('hipos_id_token');
     if (t) {
@@ -986,8 +974,8 @@ var App = (function() {
         if (claims.exp * 1000 > Date.now() + 60000) { onSignIn(t); return true; }
       } catch (e) { /* fallthrough */ }
     }
-    var st = lsGet('hipos_staff_token');
-    if (st) { state.staffToken = st; afterAuth(); return true; }   // 復元時はトークンを入力欄に出さない
+    // 旧「個別トークン」の残骸が端末に残っていても復元しない（撤去済み・2026-07-27）。掃除だけしておく。
+    if (lsGet('hipos_staff_token')) lsDel('hipos_staff_token');
     return false;
   }
 
@@ -3954,7 +3942,7 @@ var App = (function() {
   document.addEventListener('DOMContentLoaded', init);
 
   return {
-    submit: submit, addTownRow: addTownRow, tokenSignIn: tokenSignIn, showTokenLogin: showTokenLogin,
+    submit: submit, addTownRow: addTownRow,
     onGpsSelect: onGpsSelect, removeGpsFile: removeGpsFile, retryGps: retryGps,
     switchTab: switchTab, pickCase: pickCase,
     toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
