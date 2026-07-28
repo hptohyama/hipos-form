@@ -837,7 +837,7 @@ PRESET_CASE = PRESET_CASE.replace(/[^A-Za-z0-9]/g, '');
 var App = (function() {
   var state = {
     idToken: null, tokenExp: 0,
-    deviceId: null, reportUuid: null,
+    deviceId: null, reportUuid: null, reportUuidKey: '',   // 送信IDと、その送信IDが属する案件×配布日（取り違え防止）
     email: '', cases: [], reportCase: null, allOpenCases: [], areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
     regSel: {}, regOrder: [], regBase: '', registrations: [], regEdit: null, correctingCase: null,   // 予定登録の選択(staffId→役割)/表示・登録順/①拠点／登録済み一覧／編集フォームの状態／履歴修正の対象案件
     banListChoices: [], regBanSel: {}, regBanTouched: false,   // 配布禁止リストの選択肢(bootstrap・[{name,storeKw}])／新規登録での選択(name→true)／手動調整フラグ(trueなら自動おすすめしない)
@@ -2002,7 +2002,17 @@ var App = (function() {
     var qtyWarn = checkQtySanity(lines);
     if (qtyWarn && !confirm(qtyWarn + '\n\nこの内容で送信しますか？')) return;
     // 配布禁止物件の回避確認は報告送信ゲートから撤去（Phase2/3）。回避は「配布禁止」タブで行う。
-    if (!state.reportUuid) state.reportUuid = uuid();
+    // ★送信IDは「案件×配布日」に紐づける（総点検 2026-07-28）。
+    //   電波が切れて送信が失敗すると、再送できるよう state.reportUuid を残す（これは正しい）。
+    //   だが案件を切り替えても残るため、サーバが「その送信IDは処理済み」と判定して
+    //   前の案件の結果をそのまま返し、画面には「✅ 反映しました（再送）」と出る。
+    //   実際には**今の案件は1件も送られていない**のに送信済みに見え、入力も消える。
+    //   案件（または配布日）が変わったら必ず新しい送信IDにする。
+    var ckey = caseKeyOf(c);
+    if (!state.reportUuid || state.reportUuidKey !== ckey) {
+      state.reportUuid = uuid();
+      state.reportUuidKey = ckey;
+    }
     state.retryCount = 0;
 
     var payload = {
@@ -2761,7 +2771,8 @@ var App = (function() {
         state.regEdit.householdsText = (res.households || []).join('\n');
         state.regEdit.banSel = {}; (res.banLists || []).forEach(function(n) { state.regEdit.banSel[n] = true; });
         state.regEdit.note = res.note || '';
-        state.regEdit.members = (res.members || []).map(function(m) { return { staffId: m.staffId, name: m.name, role: m.role || '' }; });
+        // missing＝名簿に無い staff_id（古い予定に旧IDが残っている）。赤字表示＋保存ブロックに使う。
+        state.regEdit.members = (res.members || []).map(function(m) { return { staffId: m.staffId, name: m.name, role: m.role || '', missing: !!m.missing }; });
       } else {   // フォールバック: 一覧の情報から（詳細が読めていない＝世帯数/禁止リストは不明）
         state.regEdit.detailFailed = true;   // このまま保存すると世帯数・禁止リストを空で上書きしてしまうので保存はブロック
         state.regEdit.townsText = (r.towns || []).join('\n');
