@@ -43,7 +43,12 @@
     --c-warn: #b06000; --c-warn-bg: #fff8e1;
     --c-merge: #00838f; --c-merge-bg: #e0f7fa;
     --c-border: #dadce0; --c-text: #202124; --c-sub: #5f6368;
+    /* 入力例（プレースホルダー）＝実際に入力した文字とはっきり見分けられるよう薄く */
+    --c-placeholder: #b3b8be;
   }
+  ::placeholder { color: var(--c-placeholder); opacity: 1; }          /* Firefox の既定 opacity を打ち消す */
+  ::-webkit-input-placeholder { color: var(--c-placeholder); }
+  :-ms-input-placeholder { color: var(--c-placeholder); }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
          background: #f8f9fa; color: var(--c-text); font-size: 16px; }
@@ -94,6 +99,21 @@
   .msg-err { background: var(--c-err-bg); color: var(--c-err); }
   .msg-warn { background: var(--c-warn-bg); color: var(--c-warn); }
   .msg-merge { background: var(--c-merge-bg); color: var(--c-merge); }
+  /* エラーの記号（E_XXX）は本文の邪魔をしない小さな添え字にする（現場で読むのは日本語の本文だけ） */
+  .errcode { display: block; margin-top: 8px; font-size: 11px; font-weight: 400;
+             color: #a2a6ac; letter-spacing: .02em; }
+  /* 町の行を消したときの「元に戻す」（5秒だけ出る） */
+  .townundo { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 10px 12px;
+              border-radius: 8px; background: #f1f3f4; font-size: 13px; color: var(--c-sub); }
+  .townundo span { flex: 1; min-width: 0; }
+  .townundo button { width: auto; flex: 0 0 auto; padding: 8px 14px; font-size: 13px;
+                     background: #fff; border: 1px solid var(--c-primary); color: var(--c-primary); }
+  /* GPS未添付の案内（添付必須） */
+  .gpsneed { margin-top: 8px; padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.6;
+             background: var(--c-warn-bg); color: var(--c-warn); font-weight: 600; }
+  /* 修正の再送＝前回の画像を引き継ぐ（添付し直し不要） */
+  .gpsok { margin-top: 8px; margin-bottom: 8px; padding: 10px 12px; border-radius: 8px; font-size: 13px;
+           line-height: 1.6; background: var(--c-ok-bg); color: var(--c-ok); font-weight: 600; }
   .summary { display: flex; gap: 8px; margin-top: 10px; }
   .summary .box { flex: 1; background: #f1f3f4; border-radius: 8px; padding: 10px; text-align: center; }
   .summary .num { font-size: 22px; font-weight: 700; color: var(--c-primary); }
@@ -522,6 +542,7 @@
         <h2>② 町×部数</h2>
         <div id="hhRef" class="hhref hidden"></div>
         <div id="townRows"></div>
+        <div id="townUndo" class="townundo hidden"></div>
         <button type="button" class="btn-ghost" onclick="App.addTownRow()">＋ 行を追加</button>
         <datalist id="townList"></datalist>
         <div class="total-bar" id="totalBar">
@@ -543,10 +564,10 @@
       </div>
 
       <div class="card">
-        <h2 id="gpsHeading">④ GPS軌跡画像（最大10枚）</h2>
+        <h2 id="gpsHeading">④ GPS軌跡画像（必須）</h2>
         <input type="file" id="gpsFiles" accept="image/*" multiple onchange="App.onGpsSelect(this)">
         <div id="gpsList" style="margin-top:8px"></div>
-        <div class="case-info">GPSアプリの軌跡スクリーンショットをアップロードしてください。</div>
+        <div class="case-info">GPSアプリの軌跡スクリーンショットを<b>1枚以上</b>添付してください。添付が無いと送信できません。<br>※「✏️数字を修正」で送り直すときは、<b>前回の画像がそのまま引き継がれます</b>（追加もできます）。</div>
         <div id="gpsProgress"></div>
       </div>
 
@@ -884,6 +905,18 @@ var App = (function() {
     });
   }
 
+  /**
+   * エラー表示のHTML（U-1）。本文は日本語だけを大きく、記号（E_XXX）は小さな添え字にする。
+   * 屋外で読むのは本文だけ。記号は管理者へ連絡するときのために残す。
+   */
+  function errHtml(res, fallback, cls) {
+    var msg = String((res && res.message) || fallback || 'エラーが発生しました');
+    var code = (res && res.code) || '';
+    if (!/^[⚠✅❌🚨]/.test(msg)) msg = '⚠ ' + msg;
+    return '<div class="msg ' + (cls || 'msg-err') + '">' + esc(msg) +
+           (code ? '<span class="errcode">' + esc(code) + '</span>' : '') + '</div>';
+  }
+
   /** onclick 等のHTML属性内JS文字列リテラルへ安全に埋め込む（'…' で囲んだ形を返す） */
   function jsStr(s) {
     return "'" + String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/[&<>"]/g, function(m) {
@@ -1198,7 +1231,7 @@ var App = (function() {
     state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ・homeArea同梱）
     state.calendars = res.calendars || [];       // 予定登録の登録先カレンダー（管理者のみ）
     state.gpsMax = Number(res.gpsMax) || 50;
-    $('gpsHeading').textContent = '④ GPS軌跡画像（最大' + state.gpsMax + '枚）';
+    $('gpsHeading').textContent = '④ GPS軌跡画像（必須・最大' + state.gpsMax + '枚）';
     renderReportCases();
   }
 
@@ -1803,6 +1836,7 @@ var App = (function() {
     var c = currentCase();
     var noDist = $('noDistCard');
     renderSendTarget(c);
+    renderGpsList();   // 修正モードの「前回◯枚 添付済み」を出す／抜けたら消す（案件切替のたびに評価）
     if (!c) { $('caseInfo').innerHTML = '<span style="color:var(--c-sub)">本日の報告対象はありません。<br>（管理者が予定を登録すると、その日の案件がここに自動表示されます）</span>'; noDist.classList.add('hidden'); return; }
     var correcting = !!state.correctingCase;
     var day = c.assignDate || c.distEnd || '';
@@ -1852,7 +1886,7 @@ var App = (function() {
       if (readLines().length > 0) return;
       var pre = res.prefill || [];
       if (pre.length > 0) {
-        $('townRows').innerHTML = '';
+        hideTownUndo(); $('townRows').innerHTML = '';
         pre.forEach(function(t) { addTownRow(t.display, null); });
         addTownRow();
         recalc();
@@ -1866,17 +1900,55 @@ var App = (function() {
   }
 
   // ─── 町×部数の行UI ───
-  function addTownRow(town, qty) {
+  function addTownRow(town, qty, atIndex) {
     var div = document.createElement('div');
     div.className = 'town-row';
     div.innerHTML =
       '<input class="town" list="townList" placeholder="町名" value="' + esc(town || '') + '">' +
       '<input class="qty" type="number" min="0" step="1" inputmode="numeric" placeholder="部数" value="' + (qty != null ? qty : '') + '">' +
       '<button type="button" tabindex="-1">×</button>';
-    div.querySelector('button').onclick = function() { div.remove(); recalc(); };
+    div.querySelector('button').onclick = function() { removeTownRow(div); };
     div.querySelector('.qty').oninput = recalc;
     div.querySelector('.town').oninput = recalc;   // 町名の入力/消去でも合計・警告を再評価
-    $('townRows').appendChild(div);
+    var rows = $('townRows');
+    var at = (atIndex != null) ? rows.children[atIndex] : null;
+    if (at) rows.insertBefore(div, at); else rows.appendChild(div);
+    return div;
+  }
+
+  // ═══ 行の削除は「元に戻す」を5秒だけ出す（U-3） ═══
+  // 15町ぶん入力したあとの誤タップで1行消えると、何を消したのか思い出せないまま送ってしまう。
+  // 確認ダイアログは毎回出ると邪魔なので、消してから戻せる形にする。
+  var _townUndo = null, _townUndoTimer = null;
+  function removeTownRow(div) {
+    var rows = $('townRows');
+    var idx = Array.prototype.indexOf.call(rows.children, div);
+    var town = div.querySelector('.town').value;
+    var qty = div.querySelector('.qty').value;
+    div.remove();
+    recalc();
+    _townUndo = { index: idx, town: town, qty: qty };
+    var box = $('townUndo');
+    if (!box) return;
+    var label = String(town || '').trim() || '（町名なし）';
+    box.innerHTML = '<span>「' + esc(label) + (String(qty).trim() ? ' ' + esc(qty) + '部' : '') + '」の行を削除しました</span>' +
+                    '<button type="button" onclick="App.undoTownRow()">元に戻す</button>';
+    box.classList.remove('hidden');
+    if (_townUndoTimer) clearTimeout(_townUndoTimer);
+    _townUndoTimer = setTimeout(hideTownUndo, 5000);
+  }
+  function hideTownUndo() {
+    if (_townUndoTimer) { clearTimeout(_townUndoTimer); _townUndoTimer = null; }
+    _townUndo = null;
+    var box = $('townUndo');
+    if (box) { box.innerHTML = ''; box.classList.add('hidden'); }
+  }
+  function undoTownRow() {
+    var u = _townUndo;
+    if (!u) return;
+    hideTownUndo();
+    addTownRow(u.town, u.qty === '' ? null : u.qty, u.index);
+    recalc();
   }
 
   function readLines() {
@@ -1938,7 +2010,7 @@ var App = (function() {
     if (!d.lines || !d.lines.length) return false;
     if (readLines().length > 0) return false;             // 既に入力があるなら触らない
     if (Date.now() - (d.at || 0) > 7 * 86400000) { clearDraft(); return false; }   // 1週間で失効
-    $('townRows').innerHTML = '';
+    hideTownUndo(); $('townRows').innerHTML = '';
     d.lines.forEach(function(l) { addTownRow(l.town, l.qty); });
     addTownRow();
     if (d.workStart && $('workStart')) $('workStart').value = d.workStart;
@@ -2001,6 +2073,14 @@ var App = (function() {
     //   世帯数（取得済み）と実務上の上限で「明らかにおかしい値」だけを止める。
     var qtyWarn = checkQtySanity(lines);
     if (qtyWarn && !confirm(qtyWarn + '\n\nこの内容で送信しますか？')) return;
+    // ★GPS軌跡画像の添付を必須にする（U-2・社長判断 2026-07-28）。
+    //   「④ GPS軌跡画像」まで指が届かず未添付のまま送られると、あとから本人に頼み直すことになる。
+    //   ただし「✏️数字を修正」の再送は、前回の報告に付いていた画像をサーバが引き継ぐので免除する。
+    if (state.gpsFiles.length === 0 && !gpsCarryFrom()) {
+      alert('GPS軌跡画像の添付が必要です。\n\n「④ GPS軌跡画像」から、GPSアプリの軌跡スクリーンショットを1枚以上選んでください。');
+      var gp = $('gpsHeading'); if (gp) gp.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     // 配布禁止物件の回避確認は報告送信ゲートから撤去（Phase2/3）。回避は「配布禁止」タブで行う。
     // ★送信IDは「案件×配布日」に紐づける（総点検 2026-07-28）。
     //   電波が切れて送信が失敗すると、再送できるよう state.reportUuid を残す（これは正しい）。
@@ -2028,6 +2108,9 @@ var App = (function() {
         note: ''
       }
     };
+    // 修正の再送＝前回の報告のGPS画像を引き継ぐ（サーバが同じ担当・案件・配布日だけ許可する）
+    var carryFrom = gpsCarryFrom();
+    if (carryFrom) payload.carryGpsFrom = carryFrom;
     doSend(payload);
   }
 
@@ -2051,7 +2134,7 @@ var App = (function() {
         if (c.status === 'missed') state.reportCase = null;   // 報告忘れを完了＝カードを消す→次の対象へ
         renderReportCases();                            // 報告忘れカード・案件表示を更新
       } else {
-        $('noDistResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || '') + ']') + '</div>';
+        $('noDistResult').innerHTML = errHtml(res, 'エラー');
       }
     }).catch(function(e) {
       state.submitting = false; btn.disabled = false; btn.textContent = oldTxt;
@@ -2110,6 +2193,7 @@ var App = (function() {
       body = '✅ 反映しました' + (res.idempotentReplay ? '（再送 — 二重加算はありません）' : '') +
         '\n店舗: ' + (a.storeClean || '') + ' ／ タブ: ' + (a.tabName || '') +
         '\n期間: ' + (a.period || '') + ' ／ 合計 ' + (a.calcTotal != null ? a.calcTotal : '') + '部（' + (a.cells != null ? a.cells : '?') + 'セル）';
+      if (res.gpsCarried > 0) body += '\n📷 前回のGPS画像 ' + res.gpsCarried + '枚を引き継ぎました';
       if (a.addedTowns && a.addedTowns.length) body += '\n新規町: ' + a.addedTowns.join('、');
       if (a.skippedZero && a.skippedZero.length) body += '\n0部スキップ: ' + a.skippedZero.join('、');
       (res.warnings || []).forEach(function(w) { body += '\n⚠ ' + w; });
@@ -2122,8 +2206,7 @@ var App = (function() {
       }
       area.innerHTML = html;
     } else {
-      body = '⚠ ' + (res.message || 'エラーが発生しました') + '\n[' + (res.code || 'E_UNKNOWN') + ']';
-      area.innerHTML = '<div class="msg msg-err">' + esc(body) + '</div>';
+      area.innerHTML = errHtml(res, 'エラーが発生しました');
     }
     area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -2135,7 +2218,7 @@ var App = (function() {
     state.correctingCase = null;                // 修正モード解除
     if (wasMissed) state.reportCase = null;     // 報告忘れを完了＝カードが消え、次の対象（今日 or 次の報告忘れ）へ
     $('noDistCard').classList.add('hidden');
-    $('townRows').innerHTML = '';
+    hideTownUndo(); $('townRows').innerHTML = '';
     addTownRow(); addTownRow(); addTownRow();
     $('distStart').value = todayIso();
     $('distEnd').value = todayIso();
@@ -2164,15 +2247,36 @@ var App = (function() {
 
   function removeGpsFile(idx) { state.gpsFiles.splice(idx, 1); renderGpsList(); }
 
+  /** 修正の再送で引き継ぐ元報告のUUID（前回の画像が1枚以上あるときだけ）。無ければ '' */
+  function gpsCarryFrom() {
+    var c = state.correctingCase;
+    return (c && c.gpsFromCount > 0 && c.gpsFrom) ? c.gpsFrom : '';
+  }
+
   function renderGpsList() {
     var box = $('gpsList');
-    if (state.gpsFiles.length === 0) { box.innerHTML = ''; return; }
+    var carry = gpsCarryFrom();
+    // 修正の再送＝前回の画像をそのまま引き継ぐので、選び直しは不要（追加だけできる）
+    var carried = carry
+      ? '<div class="gpsok">✅ 前回の報告に ' + state.correctingCase.gpsFromCount +
+        '枚 添付済みです（そのまま引き継がれます）<br><span style="font-weight:400">追加したいときだけ下から選んでください。</span></div>'
+      : '';
+    // 未添付＝送信できない状態なので、その場で分かるように出す（U-2）
+    if (state.gpsFiles.length === 0) {
+      box.innerHTML = carried || '<div class="gpsneed">📷 まだ添付されていません（1枚以上が必要です）</div>';
+      return;
+    }
+    box.innerHTML = carried + gpsFileListHtml();
+  }
+
+  /** これから送る（新しく選んだ）画像の一覧HTML */
+  function gpsFileListHtml() {
     var html = state.gpsFiles.map(function(f, i) {
       var kb = Math.round(f.size / 1024);
       return '<div class="town-row"><input class="town" value="📷 ' + esc(f.name) + '（' + kb + 'KB）" readonly>' +
              '<button type="button" onclick="App.removeGpsFile(' + i + ')">×</button></div>';
     }).join('');
-    box.innerHTML = html + '<div class="case-info">選択中: ' + state.gpsFiles.length + '/' + state.gpsMax + '枚</div>';
+    return html + '<div class="case-info">選択中: ' + state.gpsFiles.length + '/' + state.gpsMax + '枚</div>';
   }
 
   function shrinkImage(file) {
@@ -2328,11 +2432,15 @@ var App = (function() {
       distStart: detail.distStart || todayIso(),
       distEnd: detail.distEnd || todayIso(),
       assignDate: detail.distEnd || todayIso(),
-      role: '', done: false
+      role: '', done: false,
+      // ★前回の報告に付いていたGPS画像を新しい報告へ引き継ぐ（2026-07-28 社長要望）。
+      //   同じ写真を選び直さなくてよい。追加したいときだけ選ぶ。
+      gpsFrom: detail.reportUuid || '',
+      gpsFromCount: Number(detail.gpsCount) || 0
     };
     $('distStart').value = state.correctingCase.distStart;
     $('distEnd').value = state.correctingCase.distEnd;
-    $('townRows').innerHTML = '';
+    hideTownUndo(); $('townRows').innerHTML = '';
     (detail.lines || []).forEach(function(l) { addTownRow(l.town, l.qty); });
     if (!(detail.lines || []).length) { addTownRow(); addTownRow(); }
     onCaseChange();   // caseInfo・サジェスト更新（restoringDetail中はプリフィルは走らない）。合計は町行から自動算出。
@@ -2583,8 +2691,14 @@ var App = (function() {
 
   // ── 絞込み（拠点＋検索・すべてfrontend内で完結／期間フィルタは撤去） ──
   function regFilterInit() {
-    if (!state.regFilter) state.regFilter = { base: '', q: '' };
+    // recent=true が既定（U-5）。登録済みの予定は取り消すまで残り続けるため、
+    // 何もしないと数か月ぶんが全部並んで目的の予定を探せなくなる。
+    if (!state.regFilter) state.regFilter = { base: '', q: '', recent: true };
+    if (state.regFilter.recent === undefined) state.regFilter.recent = true;
   }
+  /** 既定の表示範囲＝今日以降＋過去7日（この日付以上の配布日だけ出す） */
+  function regRecentFrom() { return isoAddDays(todayIso(), -7); }
+  function regToggleRecent() { regFilterInit(); state.regFilter.recent = !state.regFilter.recent; renderRegistrations(); }
   function regBaseLabel(r) { return (r.base || r.area || '拠点未設定'); }
   function regBaseColor(b) { return BASE_COLORS[b] || BASE_COLORS[String(b).split('/')[0]] || '#868e96'; }
   function regNrm(s) { return String(s == null ? '' : s).normalize('NFKC').toLowerCase().replace(/\s+/g, ''); }
@@ -2604,8 +2718,12 @@ var App = (function() {
     if (!all.length) { $('regList').innerHTML = '<div class="empty">登録済みの予定はありません</div>'; return; }
     var f = state.regFilter;
 
-    // 検索で絞った母集団（拠点ピルの件数はここから数える）
-    var byQ = all.map(function(r, i) { return { r: r, i: i }; }).filter(function(x) { return regMatchQ(x.r, f.q); });
+    // 検索＋表示範囲で絞った母集団（拠点ピルの件数はここから数える＝画面の数字が食い違わない）
+    var recentOn = f.recent !== false;
+    var recentFrom = regRecentFrom();
+    var byQ = all.map(function(r, i) { return { r: r, i: i }; })
+      .filter(function(x) { return regMatchQ(x.r, f.q); })
+      .filter(function(x) { return !recentOn || String(x.r.distDate || '') >= recentFrom; });
 
     // 拠点ピル（並び順＝関西→東戸塚→稲毛→五香→その他／件数付き。稲毛と五香は別拠点）
     var order = ['関西', '東戸塚', '稲毛', '五香'], counts = {};
@@ -2632,11 +2750,17 @@ var App = (function() {
       return da > db ? -1 : 1;
     });
 
-    var filtered = (f.q || f.base);
+    var filtered = (f.q || f.base || recentOn);
+    var rangeBtn = recentOn
+      ? '　<button type="button" class="reglink" onclick="App.regToggleRecent()">過去の予定もすべて表示</button>'
+      : '　<button type="button" class="reglink" onclick="App.regToggleRecent()">直近だけに戻す</button>';
     $('regCountLine').innerHTML = items.length + '件を表示' +
-      (filtered ? '（全' + all.length + '件中）　<button type="button" class="reglink" onclick="App.regClearFilters()">条件をクリア</button>' : '');
+      (recentOn ? '（今日以降＋過去7日）' : '') +
+      (filtered ? '（全' + all.length + '件中）' : '') + rangeBtn +
+      ((f.q || f.base) ? '　<button type="button" class="reglink" onclick="App.regClearFilters()">条件をクリア</button>' : '');
     if (!items.length) {
-      $('regList').innerHTML = '<div class="empty">条件に合う予定がありません　<button type="button" class="reglink" onclick="App.regClearFilters()">条件をクリア</button></div>';
+      $('regList').innerHTML = '<div class="empty">条件に合う予定がありません' + rangeBtn +
+        ((f.q || f.base) ? '　<button type="button" class="reglink" onclick="App.regClearFilters()">条件をクリア</button>' : '') + '</div>';
       return;
     }
 
@@ -2669,7 +2793,7 @@ var App = (function() {
   function regSetBase(b) { regFilterInit(); state.regFilter.base = (state.regFilter.base === b ? '' : b); renderRegistrations(); }
   function regOnSearch() { regFilterInit(); state.regFilter.q = ($('regSearch') || {}).value || ''; renderRegistrations(); }
   function regClearFilters() {
-    state.regFilter = { base: '', q: '' };
+    state.regFilter = { base: '', q: '', recent: true };   // 表示範囲も既定（直近）へ戻す
     var s = $('regSearch'); if (s) s.value = '';
     renderRegistrations();
   }
@@ -2855,7 +2979,7 @@ var App = (function() {
         if (confirm(res.message)) regDoSave(i, true);
         else $('regListResult').innerHTML = '';
       } else {
-        $('regListResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E') + ']') + '</div>';
+        $('regListResult').innerHTML = errHtml(res, 'エラー');
       }
     }).catch(function(e) {
       $('regListResult').innerHTML = '<div class="msg msg-err">接続できません: ' + esc(e.message) + '</div>';
@@ -2868,7 +2992,11 @@ var App = (function() {
     if (!r) return;
     if (!force) {
       var who = (r.staff || []).map(function(s) { return s.name; }).join('、');
-      if (!confirm('「' + r.distDate + '　' + r.storeClean + '」の予定を取り消します（担当 ' + who + ' 全員）。よろしいですか？\n（提出済みの報告・集計は残ります）')) return;
+      // ★取消の副作用を明記する（U-4）。割当が消えると、その日の報告を本人が
+      //   「✏️数字を修正」で直せなくなる（管理者取消が必要になる）。
+      if (!confirm('「' + r.distDate + '　' + r.storeClean + '」の予定を取り消します（担当 ' + who + ' 全員）。よろしいですか？\n\n' +
+                   '・提出済みの報告・集計はそのまま残ります\n' +
+                   '・※この日の報告を本人が直せなくなります（数字の修正は管理者にご依頼ください）')) return;
     }
     $('regListResult').innerHTML = '<div class="msg">取消中…</div>';
     api({ action: 'deleteAssignEvent', srcEventId: r.srcEventId, srcCal: r.srcCal, force: !!force }).then(function(res) {
@@ -2876,10 +3004,10 @@ var App = (function() {
         $('regListResult').innerHTML = '<div class="msg msg-ok">' + esc(res.message || '取り消しました') + '</div>';
         loadRegistrations();
       } else if (res.code === 'E_REPORTED' && res.needsConfirm) {
-        if (confirm(res.message)) deleteRegistration(i, true);
+        if (confirm(res.message + '\n\n※この日の報告を本人が直せなくなります（数字の修正は管理者にご依頼ください）')) deleteRegistration(i, true);
         else $('regListResult').innerHTML = '';
       } else {
-        $('regListResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E') + ']') + '</div>';
+        $('regListResult').innerHTML = errHtml(res, 'エラー');
       }
     }).catch(function(e) {
       $('regListResult').innerHTML = '<div class="msg msg-err">接続できません: ' + esc(e.message) + '</div>';
@@ -3099,6 +3227,12 @@ var App = (function() {
       base: base, caseNo: caseNo, label: label, distDate: distDate,
       towns: towns, assignments: assignments, note: $('regNote').value,
       banLists: selectedBanLists(), households: z.households,
+      // ★⑦配布禁止リストを管理者が手で触ったか（総点検 2026-07-31）。
+      //   同じ案件番号で2回目（複数日の2日目・増員）を登録するとき、この画面は⑦を
+      //   自動おすすめへ戻している。それをそのまま保存すると、1回目に手で選んだリストが消え、
+      //   スタッフ画面には「配布禁止物件はありません」と出てしまう（＝禁止物件へ投函）。
+      //   触っていないときはサーバ側で既存の設定を温存させる。
+      banTouched: !!state.regBanTouched,
       force: !!force
     };
 
@@ -3130,7 +3264,7 @@ var App = (function() {
         if (confirm(res.message)) { submitRegister(true); return; }
         area.innerHTML = '<div class="msg msg-warn">登録を中止しました。案件番号をご確認ください。</div>';
       } else {
-        area.innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E_UNKNOWN') + ']') + '</div>';
+        area.innerHTML = errHtml(res, 'エラー');
       }
       area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }).catch(function(e) {
@@ -3774,7 +3908,7 @@ var App = (function() {
         loadShifts();
         window.scrollTo(0, 0);
       } else {
-        $('shiftFormResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E_UNKNOWN') + ']') + '</div>';
+        $('shiftFormResult').innerHTML = errHtml(res, 'エラー');
       }
     }).catch(function(e) {
       state.submitting = false; btn.disabled = false; btn.textContent = 'この内容で提出';
@@ -3903,7 +4037,7 @@ var App = (function() {
         $('saResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + res.message) + '</div>';
         saLoadMonth();   // サーバの実状態で再描画（部分失敗も反映）
       } else {
-        $('saResult').innerHTML = '<div class="msg msg-err">' + esc((res.message || 'エラー') + ' [' + (res.code || 'E_UNKNOWN') + ']') + '</div>';
+        $('saResult').innerHTML = errHtml(res, 'エラー');
       }
       $('saResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }).catch(function(e) {
@@ -3932,6 +4066,7 @@ var App = (function() {
     $('distStart').value = todayIso();
     $('distEnd').value = todayIso();
     addTownRow(); addTownRow(); addTownRow();
+    renderGpsList();                            // 「GPS未添付」の案内を最初から出す（U-2・添付必須）
     $('workWorkH').oninput = updateCph;        // 勤務時間を直すと部数毎時も再計算
     resetWorkFields();                          // 勤務実績の初期値（休憩1h・勤務8h）
     setInterval(refreshShiftDisplays, 60000);  // JST判定を1分ごとに再評価（8日0時・19時跨ぎで表示が自動切替）
@@ -3953,7 +4088,7 @@ var App = (function() {
   document.addEventListener('DOMContentLoaded', init);
 
   return {
-    submit: submit, addTownRow: addTownRow,
+    submit: submit, addTownRow: addTownRow, undoTownRow: undoTownRow,
     onGpsSelect: onGpsSelect, removeGpsFile: removeGpsFile, retryGps: retryGps,
     switchTab: switchTab, pickCase: pickCase,
     toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
@@ -3970,7 +4105,7 @@ var App = (function() {
     regEditSetRole: regEditSetRole, regEditRemoveMember: regEditRemoveMember, regEditAddMember: regEditAddMember,
     regEditToggleBan: regEditToggleBan,
     regSubTab: regSubTab, toggleRegHelp: toggleRegHelp,
-    regSetBase: regSetBase, regOnSearch: regOnSearch, regClearFilters: regClearFilters,
+    regSetBase: regSetBase, regOnSearch: regOnSearch, regClearFilters: regClearFilters, regToggleRecent: regToggleRecent,
     regToggle: regToggle, regSetRole: regSetRole, regRemove: regRemove, regToggleShiftAll: regToggleShiftAll,
     loadStaff: loadStaff,
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
