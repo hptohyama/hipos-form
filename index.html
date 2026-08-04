@@ -1869,7 +1869,9 @@ var App = (function() {
     //   プリフィルは「入力済みの行があれば上書きしない」ので、先に戻せば消されない。
     restoreDraft(c);
     // 案件の町リスト（配布エリアU列）＋町名サジェストを取得してプリフィル
-    api({ action: 'caseTowns', caseNo: c.caseNo }).then(function(res) {
+    // ★報告する日を渡す。町は日ごとに違うので、サーバはこの日ちょうどの割当の町だけを返す
+    //   （2026-08-04 社長指摘。報告忘れ＝過去日を入力するときに別の日の町が出るのを防ぐ）
+    api({ action: 'caseTowns', caseNo: c.caseNo, reportDate: c.dEnd || c.distEnd || '' }).then(function(res) {
       if (!res.ok) {
         $('caseInfo').innerHTML += '<br>⚠️ 町リストの取得に失敗しました（' + esc(res.code || '') + '）— 町名は下の欄に手入力してください';
         return;
@@ -1963,6 +1965,26 @@ var App = (function() {
     return lines;
   }
 
+  /**
+   * 下書き保存用の行読み取り。**空欄は「空のまま」返す**（readLines は送信用で空=0）。
+   *
+   * ★なぜ分けるか（2026-08-04 社長指摘）
+   *   下書きは1文字入力するたびに保存される。readLines は空欄を 0 として返すので、
+   *   1つ数字を入れた瞬間に**まだ触っていない行まで「0」として保存**され、
+   *   タブを切り替えて戻ると、その 0 が実際に入力された値として復元されていた。
+   *   「0 が最初から入っていて入力しにくい」の正体はこれ。空欄は空欄のまま持ち回る。
+   */
+  function readLinesRaw() {
+    var lines = [];
+    var rows = $('townRows').querySelectorAll('.town-row');
+    for (var i = 0; i < rows.length; i++) {
+      var town = rows[i].querySelector('.town').value.trim();
+      if (!town) continue;
+      lines.push({ town: town, qty: rows[i].querySelector('.qty').value });   // 文字列のまま（''もある）
+    }
+    return lines;
+  }
+
   /** 町名が空のまま部数だけ入っている行があるか（その行は無効＝合計に入らないため警告する） */
   function hasEmptyTownWithQty() {
     var rows = $('townRows').querySelectorAll('.town-row');
@@ -1988,7 +2010,8 @@ var App = (function() {
       var c = currentCase(); if (!c || state.correctingCase) return;   // 修正モードは対象外
       var d = {
         key: caseKeyOf(c),
-        lines: readLines(),
+        v: 2,                  // 2 = 空欄を空のまま保存する版（1以前は空欄を0で保存していた）
+        lines: readLinesRaw(),
         distStart: ($('distStart') || {}).value || '',
         distEnd: ($('distEnd') || {}).value || '',
         workStart: ($('workStart') || {}).value || '',
@@ -2011,7 +2034,15 @@ var App = (function() {
     if (readLines().length > 0) return false;             // 既に入力があるなら触らない
     if (Date.now() - (d.at || 0) > 7 * 86400000) { clearDraft(); return false; }   // 1週間で失効
     hideTownUndo(); $('townRows').innerHTML = '';
-    d.lines.forEach(function(l) { addTownRow(l.town, l.qty); });
+    // 空欄は空欄のまま戻す（0を入れない）。v が無い古い下書きは「空欄を0で保存していた」版なので、
+    // 0 は「触っていない行」とみなして空に戻す（自分で0と入れた行が空に戻る程度の実害はある）。
+    var old = (d.v || 1) < 2;
+    d.lines.forEach(function(l) {
+      var q = l.qty;
+      if (q === '' || q == null) q = null;
+      else if (old && Number(q) === 0) q = null;
+      addTownRow(l.town, q);
+    });
     addTownRow();
     if (d.workStart && $('workStart')) $('workStart').value = d.workStart;
     if (d.workEnd && $('workEnd')) $('workEnd').value = d.workEnd;
