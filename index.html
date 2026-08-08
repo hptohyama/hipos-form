@@ -3358,16 +3358,35 @@ var App = (function() {
     }).join('');
   }
 
-  function approveReg(reqId) {
+  function approveReg(reqId, opts) {
     if (state.submitting) return;
     // 扱い（新規/既存）は申請時に確定済み。管理者は承認するだけ（サーバは申請の target を使う）。権限だけ指定可。
     var permSel = $('prPerm_' + reqId);
     var payload = { action: 'approveRegistration', reqId: reqId };
     if (permSel && permSel.value) payload.perm = permSel.value;
+    // ★同名の確認に答えたとき（2026-08-08・宿題I）
+    if (opts && opts.targetStaffId) payload.targetStaffId = opts.targetStaffId;   // 既存へ紐づける
+    if (opts && opts.forceNew) payload.forceNew = true;                            // 別人として新規で作る
     state.submitting = true;
     $('pendingRegResult').innerHTML = '<div class="msg">処理中…</div>';
     api(payload).then(function(res) {
       state.submitting = false;
+      // ★★同じ名前の人が既に登録済み＝そのまま新規で作ると履歴が分断される。管理者に選ばせる。
+      if (res && res.code === 'E_SAME_NAME_EXISTS' && res.needsConfirm) {
+        var cands = res.candidates || [];
+        var html = '<div class="msg msg-warn" style="white-space:pre-wrap">' + esc(res.message) + '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">' +
+          cands.map(function(c) {
+            return '<button type="button" class="btn-primary" onclick="App.approveReg(\'' + esc(reqId) +
+                   '\',{targetStaffId:\'' + esc(c.staffId) + '\'})">' +
+                   'この人に紐づける（' + esc(c.staffId) + '　' + esc(c.name) + '）</button>';
+          }).join('') +
+          '<button type="button" class="btn-ghost" onclick="App.approveReg(\'' + esc(reqId) +
+          '\',{forceNew:true})">別人として新規登録する</button>' +
+          '</div>';
+        $('pendingRegResult').innerHTML = html;
+        return;
+      }
       $('pendingRegResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') + '">' + esc(res.message || res.code) + '</div>';
       loadPendingRegs();
       if (res.ok) loadStaffRosterOnly();   // ロスターだけ更新（申請一覧の二重読みを避ける）
