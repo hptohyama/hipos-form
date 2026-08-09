@@ -1865,6 +1865,23 @@ var App = (function() {
     }
     // 案件切替の起点で前案件の世帯数参照をクリア（caseTowns失敗時の他案件への誤適用を防ぐ）
     renderHhRef([], []);   // 前案件の世帯数参照を消す（新案件の取得成功で上書き）
+
+    // ★★別の案件に切り替えたら、前の案件の町行を残さない（2026-08-09 総点検）。
+    //   プリフィルは「入力済みの行があれば上書きしない」ので、前の案件の町名が
+    //   1行でも残っていると新しい案件の町が読み込まれず、**前の案件の町名のまま
+    //   別案件の報告として送信**されていた（同じ日に2案件ある人／報告忘れカードで必ず起きる）。
+    //   合計部数は合うので数字では気づけず、配布実績の記録が恒久的に狂う。
+    var newKey = caseKeyOf(c);
+    if (!state.correctingCase && state.townRowsKey && state.townRowsKey !== newKey) {
+      var hasTyped = readLinesRaw().some(function(l) { return String(l.qty || '') !== ''; });
+      if (!hasTyped || confirm('入力中の部数があります。別の案件に切り替えると入力は消えます。よろしいですか？')) {
+        hideTownUndo(); $('townRows').innerHTML = ''; addTownRow();
+        if ($('note')) $('note').value = '';
+        resetWorkFields();
+      }
+    }
+    state.townRowsKey = newKey;
+
     // ★下書きの復元は町リスト取得（非同期）より前に行う。
     //   プリフィルは「入力済みの行があれば上書きしない」ので、先に戻せば消されない。
     restoreDraft(c);
@@ -2005,6 +2022,29 @@ var App = (function() {
   // 従来は「有効期限切れ」とだけ出て入力が全部消え、打ち直しになっていた（＝二重計上の温床）。
   // 端末に下書きを持たせ、同じ案件を開いたときに復元する。
   var DRAFT_KEY = 'hipos_report_draft_v1';
+  // ★★下書きは案件ごとに分けて持つ（2026-08-09 総点検）。
+  //   以前は保存先が1つしかなく、「今日の案件」と「⚠報告忘れ」が同時にある人が
+  //   報告忘れの方を入力中に読み込み直すと、起動直後に今日の案件のプリフィルが走って
+  //   **本人が何もしていないのに10行の入力が消えていた**（画面は「保存しています。
+  //   読み込み直すと復元されます」と約束していたのに）。屋外での打ち直しは
+  //   記憶頼りの入力＝部数の打ち間違いを誘発するので、案件ごとに分ける。
+  function draftKeyOf(c) { return DRAFT_KEY + '|' + caseKeyOf(c); }
+  /** 古い下書きの掃除（7日超）。案件別に増えていくので、保存のたびに軽く掃く。 */
+  function pruneDrafts() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      var kill = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf(DRAFT_KEY) !== 0) continue;
+        try {
+          var o = JSON.parse(localStorage.getItem(k) || '{}');
+          if (!o.at || Date.now() - o.at > 7 * 86400000) kill.push(k);
+        } catch (e) { kill.push(k); }
+      }
+      kill.forEach(function(k) { lsDel(k); });
+    } catch (e) { /* 掃除に失敗しても本体は動く */ }
+  }
   function saveDraft() {
     try {
       var c = currentCase(); if (!c || state.correctingCase) return;   // 修正モードは対象外
@@ -2014,20 +2054,31 @@ var App = (function() {
         lines: readLinesRaw(),
         distStart: ($('distStart') || {}).value || '',
         distEnd: ($('distEnd') || {}).value || '',
-        workStart: ($('workStart') || {}).value || '',
-        workEnd: ($('workEnd') || {}).value || '',
+        // ★勤務時間を保存する（2026-08-09 総点検）。
+        //   これまで workStart / workEnd という**存在しないID**を読んでいたため、
+        //   実働5.5時間に直しても読み込み直すと黙って8時間に戻り、そのまま送信されていた。
+        workH: ($('workWorkH') || {}).value || '',
         note: ($('note') || {}).value || '',
         at: Date.now()
       };
-      if (!d.lines.length && !d.note) { lsDel(DRAFT_KEY); return; }
-      lsSet(DRAFT_KEY, JSON.stringify(d));
+      if (!d.lines.length && !d.note) { lsDel(draftKeyOf(c)); return; }
+      lsSet(draftKeyOf(c), JSON.stringify(d));
+      pruneDrafts();
     } catch (e) { /* 保存できない環境でも本体は動く */ }
   }
-  function clearDraft() { lsDel(DRAFT_KEY); }
+  function clearDraft() {
+    try {
+      var c = currentCase();
+      if (c) lsDel(draftKeyOf(c));
+    } catch (e) {}
+    lsDel(DRAFT_KEY);   // 旧方式（案件で分けていなかった頃）の残骸も消す
+  }
   /** 同じ案件×同じ配布日の下書きがあれば復元する（案件を開いた直後に呼ぶ） */
   function restoreDraft(c) {
     if (!c || state.correctingCase) return false;
-    var raw = lsGet(DRAFT_KEY); if (!raw) return false;
+    // ★案件別のキーで探す。見つからなければ旧方式（単一キー）も見る（移行のため）
+    var raw = lsGet(draftKeyOf(c)) || lsGet(DRAFT_KEY);
+    if (!raw) return false;
     var d; try { d = JSON.parse(raw); } catch (e) { return false; }
     if (!d || d.key !== caseKeyOf(c)) return false;
     if (!d.lines || !d.lines.length) return false;
@@ -2044,13 +2095,15 @@ var App = (function() {
       addTownRow(l.town, q);
     });
     addTownRow();
-    if (d.workStart && $('workStart')) $('workStart').value = d.workStart;
-    if (d.workEnd && $('workEnd')) $('workEnd').value = d.workEnd;
+    // ★勤務時間も戻す（2026-08-09 総点検。以前は存在しないIDを見ていて必ず8時間に戻っていた）
+    var restoredWorkH = '';
+    if (d.workH && $('workWorkH')) { $('workWorkH').value = d.workH; restoredWorkH = d.workH; }
     if (d.note && $('note')) $('note').value = d.note;
     recalc();
     var res = $('resultArea');
     if (res) res.innerHTML = '<div class="msg msg-warn">入力中だった内容を復元しました（' +
-      d.lines.length + '行）。内容をご確認のうえ送信してください。</div>';
+      d.lines.length + '行' + (restoredWorkH ? '／勤務 ' + esc(restoredWorkH) + '時間' : '') +
+      '）。内容をご確認のうえ送信してください。</div>';
     return true;
   }
 
@@ -3367,6 +3420,10 @@ var App = (function() {
     // ★同名の確認に答えたとき（2026-08-08・宿題I）
     if (opts && opts.targetStaffId) payload.targetStaffId = opts.targetStaffId;   // 既存へ紐づける
     if (opts && opts.forceNew) payload.forceNew = true;                            // 別人として新規で作る
+    // ★既存の人に別のメールが登録済みのとき、管理者が「切り替える」と答えたら付け替えを許す
+    //   （2026-08-09 総点検。これが無いと［この人に紐づける］が必ず失敗し、
+    //    結局［別人として新規登録する］しか押せず、同名で2つ目のIDができていた）
+    if (opts && opts.relink) payload.relink = true;
     state.submitting = true;
     $('pendingRegResult').innerHTML = '<div class="msg">処理中…</div>';
     api(payload).then(function(res) {
@@ -3385,6 +3442,20 @@ var App = (function() {
           '\',{forceNew:true})">別人として新規登録する</button>' +
           '</div>';
         $('pendingRegResult').innerHTML = html;
+        return;
+      }
+      // ★★「この人に紐づける」を押したが、その人には既に別のメールが入っていた場合
+      //   （2026-08-09 総点検）。ここで止まると管理者は［別人として新規登録］しか押せず、
+      //   同名で2つ目のIDができてしまうので、切り替えるかどうかをそのまま聞く。
+      if (res && res.code === 'E_STAFF_ALREADY_CLAIMED' && res.relinkable && opts && opts.targetStaffId) {
+        $('pendingRegResult').innerHTML =
+          '<div class="msg msg-warn" style="white-space:pre-wrap">' + esc(res.message) + '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">' +
+          '<button type="button" class="btn-primary" onclick="App.approveReg(\'' + esc(reqId) +
+          '\',{targetStaffId:\'' + esc(opts.targetStaffId) + '\',relink:true})">' +
+          'このアドレスに切り替える（IDと実績はそのまま）</button>' +
+          '<button type="button" class="btn-ghost" onclick="App.loadPendingRegs()">やめる</button>' +
+          '</div>';
         return;
       }
       $('pendingRegResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') + '">' + esc(res.message || res.code) + '</div>';
