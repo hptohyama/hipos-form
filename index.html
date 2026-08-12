@@ -119,6 +119,11 @@
   .summary .num { font-size: 22px; font-weight: 700; color: var(--c-primary); }
   .summary .lbl { font-size: 11px; color: var(--c-sub); }
   .hidden { display: none !important; }
+  /* 読み込み速度の実測（計測用・小さく目立たない1行） */
+  .perfbadge { margin-top: 8px; font-size: 11px; color: #9aa0a6; text-align: right; }
+  .perftbl { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .perftbl td { padding: 3px 6px; border-bottom: 1px solid #eee; }
+  .perftbl td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
   .case-info { font-size: 13px; color: var(--c-sub); background: #f1f3f4; border-radius: 8px; padding: 8px 10px; margin-top: 6px; line-height: 1.5; }
   details { margin-top: 10px; }
   details summary { font-size: 13px; color: var(--c-sub); cursor: pointer; }
@@ -509,6 +514,8 @@
       <h2>本日の担当</h2>
       <div id="todayList"><div class="empty">読み込み中…</div></div>
       <div class="summary" id="homeSummary"></div>
+      <!-- ★読み込み速度の実測（2026-08-12・計測用）。アカウント画面に内訳と履歴が出る -->
+      <div class="perfbadge hidden" id="perfBadge"></div>
     </div>
 
     <!-- 本日の配布禁止（要約のみ。詳細＋チェックは「配布禁止」タブ） -->
@@ -594,6 +601,11 @@
       <h2>ログイン情報</h2>
       <div id="accountBody"></div>
       <button class="btn-ghost" style="margin-top:12px" onclick="App.logout()">ログアウト</button>
+    </div>
+    <!-- ★読み込み速度（計測用・2026-08-12） -->
+    <div class="card">
+      <h2>読み込み速度</h2>
+      <div id="perfBody"></div>
     </div>
   </div>
 
@@ -876,6 +888,7 @@ var App = (function() {
     shiftData: null,        // myShiftCycles の応答（サイクル2枠＋提出状態）
     shiftForm: null,        // 編集中フォーム {no, key, cycle, days:{date:kubun}, note}
     saForm: null,           // 管理者シフト管理 {staffId, name, base, configured, viewY, viewM, selected:{}, today, dirty}
+    perf: null,             // ★読み込み速度の実測（{waitMs, serverMs, netMs, timing, at}）
     tab: 'home'
   };
 
@@ -1158,12 +1171,57 @@ var App = (function() {
     $('homeSummary').innerHTML = '';
   }
 
+  // ═══ ★読み込み速度の計測（2026-08-12） ═══
+  // 「どこで何秒かかっているか」を実測して画面に出す。当てずっぽうで直さないための土台。
+  //   待ち時間の内訳 = ①GASの起動待ち＋通信  ②サーバの中の処理（サーバが timing で返す）
+  //   ①は「往復にかかった時間 − サーバの中の処理時間」で求まる。
+  var _perfT0 = 0;
+  function perfStart() { _perfT0 = (window.performance && performance.now) ? performance.now() : Date.now(); }
+  function perfEnd(res) {
+    if (!_perfT0) return;
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    var waitMs = Math.round(now - _perfT0);
+    var t = (res && res.timing) || null;
+    var serverMs = t ? Number(t.total || 0) : 0;
+    state.perf = {
+      waitMs: waitMs,
+      serverMs: serverMs,
+      netMs: Math.max(waitMs - serverMs, 0),   // GASの起動待ち＋通信（コードでは縮められない部分）
+      timing: t,
+      at: new Date().toISOString()
+    };
+    _perfT0 = 0;
+    perfSaveHistory(state.perf);
+    renderPerfBadge();
+  }
+  /** 直近20回ぶんを端末に残す（朝いちばんと日中を見比べるため） */
+  function perfSaveHistory(p) {
+    try {
+      var arr = JSON.parse(lsGet('hipos_perf_log') || '[]');
+      arr.push({ at: p.at, w: p.waitMs, s: p.serverMs, g: (p.timing && p.timing.gapSec) });
+      while (arr.length > 20) arr.shift();
+      lsSet('hipos_perf_log', JSON.stringify(arr));
+    } catch (e) { /* 記録できなくても動作に影響させない */ }
+  }
+  function perfSec(ms) { return (Number(ms || 0) / 1000).toFixed(1); }
+  /** ホーム下部の小さな1行 */
+  function renderPerfBadge() {
+    var el = $('perfBadge');
+    if (!el || !state.perf) return;
+    var p = state.perf;
+    el.textContent = '読み込み ' + perfSec(p.waitMs) + '秒'
+      + '（起動待ち・通信 ' + perfSec(p.netMs) + ' ／ サーバ ' + perfSec(p.serverMs) + '）';
+    el.classList.remove('hidden');
+  }
+
   function afterAuth() {
     // ログイン直後の初期読込は bootstrap 1回に集約（旧: whoami→cases→myToday→myShiftCycles の4往復）。
     // ただし GASが未対応（旧デプロイでbootstrap無し）や一時エラーの場合は従来の個別取得へ自動フォールバック
     // する（フロントとサーバのデプロイ順に依存せず、必ず起動できるようにする）。
     showLoadingShell();   // 応答を待たずに枠を表示（体感速度）。中身は応答後に流し込む。
+    perfStart();
     api({ action: 'bootstrap' }).then(function(res) {
+      perfEnd(res);
       if (res && res.ok && res.registered !== undefined) { applyBootstrap(res); return; }
       // 認証系のはっきりしたエラーはそのまま案内（フォールバックしても同じ結果）
       if (res && !res.ok && String(res.code || '').indexOf('E_AUTH') === 0) { showAuthError(res); return; }
@@ -4178,6 +4236,68 @@ var App = (function() {
       '拠点: <b>' + esc(s.homeArea || '(未設定)') + '</b>' +
       '<br>権限: <b>' + esc(state.isAdmin ? (state.canReport ? '管理者（配布者）' : '管理者') : '配布員') + '</b>' +
       '</div>';
+    renderPerfBody();
+  }
+
+  /**
+   * ★読み込み速度の内訳と履歴（アカウント画面・2026-08-12）。
+   * 社長が「朝いちばん」と「日中の2回目以降」を見比べられるように、直近20回を残して表示する。
+   * 起動待ちが大きければ GAS のコールドスタート（コードでは消せない）、
+   * サーバが大きければ中の処理（＝直せる）と切り分けられる。
+   */
+  function renderPerfBody() {
+    var el = $('perfBody');
+    if (!el) return;
+    var p = state.perf;
+    var html = '';
+    if (p) {
+      var t = p.timing || {};
+      html += '<div class="case-info" style="line-height:1.9">' +
+        '今回の読み込み: <b>' + perfSec(p.waitMs) + ' 秒</b><br>' +
+        '　├ 起動待ち・通信: <b>' + perfSec(p.netMs) + ' 秒</b>' +
+        '<span style="font-size:11px"> （Googleの仕様。速くできない部分）</span><br>' +
+        '　└ サーバの中の処理: <b>' + perfSec(p.serverMs) + ' 秒</b>' +
+        '<span style="font-size:11px"> （ここが改善対象）</span>' +
+        '</div>';
+      if (t.total !== undefined) {
+        html += '<table class="perftbl" style="margin-top:8px">' +
+          (t.whoami  !== undefined ? '<tr><td>ログイン確認</td><td>' + perfSec(t.whoami) + ' 秒</td></tr>' : '') +
+          (t.cases   !== undefined ? '<tr><td>案件の一覧</td><td>' + perfSec(t.cases) + ' 秒</td></tr>' : '') +
+          (t.myToday !== undefined ? '<tr><td>本日の担当・配布禁止</td><td>' + perfSec(t.myToday) + ' 秒</td></tr>' : '') +
+          (t.shift   !== undefined ? '<tr><td>シフト</td><td>' + perfSec(t.shift) + ' 秒</td></tr>' : '') +
+          '</table>';
+        if (t.gapSec !== undefined && t.gapSec >= 0) {
+          html += '<div style="font-size:11px;color:#9aa0a6;margin-top:6px">' +
+            '前回この画面が使われてから ' + t.gapSec + ' 秒。' +
+            (t.gapSec > 300 ? '★間が空いているので「起動待ち」が大きく出ます（朝いちばんが遅い理由）。'
+                            : '間が空いていないので起動待ちは小さいはずです。') + '</div>';
+        }
+      } else {
+        html += '<div style="font-size:11px;color:#9aa0a6;margin-top:6px">' +
+          '※ 内訳はサーバ側の更新後に出ます。</div>';
+      }
+    } else {
+      html += '<div class="empty">まだ計測していません</div>';
+    }
+    // 履歴（直近20回）
+    var arr = [];
+    try { arr = JSON.parse(lsGet('hipos_perf_log') || '[]'); } catch (e) { arr = []; }
+    if (arr.length > 1) {
+      html += '<details style="margin-top:10px"><summary>これまでの記録（' + arr.length + '回）</summary>' +
+        '<table class="perftbl" style="margin-top:6px">';
+      for (var i = arr.length - 1; i >= 0; i--) {
+        var a = arr[i];
+        var d = new Date(a.at);
+        var hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+        var md = (d.getMonth() + 1) + '/' + d.getDate();
+        html += '<tr><td>' + md + ' ' + hm +
+          (a.g >= 0 && a.g > 300 ? ' <span style="color:#9aa0a6">(間隔' + Math.round(a.g / 60) + '分)</span>' : '') +
+          '</td><td>' + perfSec(a.w) + ' 秒<span style="color:#9aa0a6;font-size:11px">' +
+          '（サーバ ' + perfSec(a.s) + '）</span></td></tr>';
+      }
+      html += '</table></details>';
+    }
+    el.innerHTML = html;
   }
 
   // ─── 初期化 ───
