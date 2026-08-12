@@ -1217,6 +1217,31 @@ var App = (function() {
     };
     _perfT0 = 0;
     perfSaveHistory(state.perf);   // 表示していなくても記録だけは残す（あとから ?perf=1 で見返せる）
+    if (PERF_ON) perfProbe();      // 調査モードのときだけ「2回目の往復」を測る
+  }
+
+  /**
+   * ★「起動待ち・通信」の正体を切り分けるための追加計測（?perf=1 のときだけ・2026-08-12）。
+   *
+   * 同じ問い合わせをもう1回だけ投げて、往復時間を測る。
+   * 2回目は「つなぎ先との接続が済んでいて、Google側も完全に温まっている」状態なので、
+   *   1回目の通信時間 −  2回目の通信時間 ＝ 接続の準備にかかっていた時間
+   *   2回目の通信時間               ＝ どうやっても縮まない最低ライン
+   * が分かる。これを知らないまま「Googleの仕様だから」と決めつけない。
+   *
+   * ★安全性: bootstrap は読み取り専用（シートに1文字も書かない）ことを確認済みなので、
+   *   2回投げても記録や集計には一切影響しない。結果は画面に反映せず、捨てる。
+   */
+  function perfProbe() {
+    if (!state.perf || state.perf.probe) return;
+    var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    api({ action: 'bootstrap' }).then(function(res2) {
+      var now = (window.performance && performance.now) ? performance.now() : Date.now();
+      var w = Math.round(now - t0);
+      var s = (res2 && res2.timing) ? Number(res2.timing.total || 0) : 0;
+      state.perf.probe = { waitMs: w, serverMs: s, netMs: Math.max(w - s, 0) };
+      renderPerfBody();   // 表示中なら数字を足す（結果そのものは使わない＝画面は書き換えない）
+    }).catch(function() { /* 測れなくても実害なし */ });
   }
   /** 直近20回ぶんを端末に残す（朝いちばんと日中を見比べるため） */
   function perfSaveHistory(p) {
@@ -4277,10 +4302,19 @@ var App = (function() {
         (p.pageMs ? '画面の準備: <b>' + perfSec(p.pageMs) + ' 秒</b>' +
           '<span style="font-size:11px"> （ページを開いてから問い合わせを始めるまで）</span><br>' : '') +
         '今回の読み込み: <b>' + perfSec(p.waitMs) + ' 秒</b><br>' +
-        '　├ 起動待ち・通信: <b>' + perfSec(p.netMs) + ' 秒</b>' +
-        '<span style="font-size:11px"> （Googleの仕様。速くできない部分）</span><br>' +
+        '　├ 通信・Google側: <b>' + perfSec(p.netMs) + ' 秒</b>' +
+        '<span style="font-size:11px"> （接続の準備＋Googleの起動待ち。下の「2回目の往復」で内訳が分かる）</span><br>' +
         '　└ サーバの中の処理: <b>' + perfSec(p.serverMs) + ' 秒</b>' +
-        '<span style="font-size:11px"> （ここが改善対象）</span>' +
+        '<span style="font-size:11px"> （自作コード。下の表が内訳）</span>' +
+        (p.probe
+          ? '<hr style="border:none;border-top:1px solid #ddd;margin:8px 0">' +
+            '2回目の往復（接続ずみ・Googleも温まった状態）: <b>' + perfSec(p.probe.waitMs) + ' 秒</b><br>' +
+            '　├ 通信・Google側: <b>' + perfSec(p.probe.netMs) + ' 秒</b>' +
+            '<span style="font-size:11px"> ←★これがどうやっても縮まない最低ライン</span><br>' +
+            '　└ サーバの中の処理: <b>' + perfSec(p.probe.serverMs) + ' 秒</b><br>' +
+            '<span style="font-size:11px">接続の準備にかかっていた時間 ＝ ' +
+            perfSec(Math.max(p.netMs - p.probe.netMs, 0)) + ' 秒</span>'
+          : '<div style="font-size:11px;color:#9aa0a6;margin-top:6px">2回目の往復を計測中…</div>') +
         '</div>';
       if (t.total !== undefined) {
         html += '<table class="perftbl" style="margin-top:8px">' +
