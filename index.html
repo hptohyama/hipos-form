@@ -9,6 +9,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<!--
+  最初のAPI往復ぶんの接続（DNS＋TCP＋TLS）を、HTMLを読んでいる間に先に張っておく（2026-08-12）。
+  GASのWebアプリは /exec への POST が script.googleusercontent.com へ転送されるため、
+  つなぎ先が2つ要る。ここに書いておくと、その握手をページ読み込みと並行して済ませられる。
+  ★crossorigin を必ず付ける。api() の fetch はCookieを送らない「匿名」の接続で、
+    付け忘れると別枠の接続を温めるだけになり、**効いていないのに入れた気になる**。
+  ※accounts.google.com は下の gsi/client のタグが同じ働きをするので書かない（重複するだけ）。
+-->
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <title>Hiポス配布報告</title>
 <!-- PWA（ホーム画面アイコン・アプリ風のスタンドアロン表示） -->
 <link rel="manifest" href="manifest.json">
@@ -871,7 +881,7 @@ var App = (function() {
   var state = {
     idToken: null, tokenExp: 0,
     deviceId: null, reportUuid: null, reportUuidKey: '',   // 送信IDと、その送信IDが属する案件×配布日（取り違え防止）
-    email: '', cases: [], reportCase: null, allOpenCases: [], areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
+    email: '', cases: [], reportCase: null, areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
     regSel: {}, regOrder: [], regBase: '', registrations: [], regEdit: null, correctingCase: null,   // 予定登録の選択(staffId→役割)/表示・登録順/①拠点／登録済み一覧／編集フォームの状態／履歴修正の対象案件
     banListChoices: [], regBanSel: {}, regBanTouched: false,   // 配布禁止リストの選択肢(bootstrap・[{name,storeKw}])／新規登録での選択(name→true)／手動調整フラグ(trueなら自動おすすめしない)
     regShiftStaff: null, regShiftKey: '', regShiftAll: false,   // 担当候補のシフト絞込(当日シフトのあるstaffId配列/取得キー/全員表示フォールバック)
@@ -1017,7 +1027,7 @@ var App = (function() {
     if (t) {
       try {
         var claims = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-        if (claims.exp * 1000 > Date.now() + 60000) { onSignIn(t); return true; }
+        if (claims.exp * 1000 > Date.now() + 60000) { _restoredSession = true; onSignIn(t); return true; }
       } catch (e) { /* fallthrough */ }
     }
     // 旧「個別トークン」の残骸が端末に残っていても復元しない（撤去済み・2026-07-27）。掃除だけしておく。
@@ -1176,7 +1186,15 @@ var App = (function() {
   //   待ち時間の内訳 = ①GASの起動待ち＋通信  ②サーバの中の処理（サーバが timing で返す）
   //   ①は「往復にかかった時間 − サーバの中の処理時間」で求まる。
   var _perfT0 = 0;
-  function perfStart() { _perfT0 = (window.performance && performance.now) ? performance.now() : Date.now(); }
+  var _perfPageMs = 0;        // ページを開いてから「サーバへ問い合わせを始める」までの時間
+  var _restoredSession = false;   // 前回のログインが残っていて自動で始まったか（＝人の操作を挟まない）
+  function perfStart() {
+    var p = (window.performance && performance.now) ? performance.now() : 0;
+    _perfT0 = p || Date.now();
+    // performance.now() の基準はページを開いた瞬間。つまりこの値がそのまま
+    // 「画面の準備にかかった時間」になる。ログインボタンを押す経路は人の操作を含むので対象外。
+    _perfPageMs = (p && _restoredSession) ? Math.round(p) : 0;
+  }
   function perfEnd(res) {
     if (!_perfT0) return;
     var now = (window.performance && performance.now) ? performance.now() : Date.now();
@@ -1187,6 +1205,7 @@ var App = (function() {
       waitMs: waitMs,
       serverMs: serverMs,
       netMs: Math.max(waitMs - serverMs, 0),   // GASの起動待ち＋通信（コードでは縮められない部分）
+      pageMs: _perfPageMs,                     // 画面の準備（0＝ログイン操作を含むため計測対象外）
       timing: t,
       at: new Date().toISOString()
     };
@@ -1284,7 +1303,8 @@ var App = (function() {
   // cases相当（bootstrap上位 or cases応答）を反映
   function applyCases(res) {
     state.cases = res.cases || [];               // 報告フォーム用＝本人の割当案件（案件×割当日）
-    state.allOpenCases = res.allOpenCases || []; // 予定登録用＝全OPEN案件（管理者のみ）
+    // ※ allOpenCases（全OPEN案件）は 2026-08-12 に廃止。ここで受け取るだけで
+    //   画面のどこからも読んでいなかった＝管理者のログインが毎回無駄に重くなっていた。
     state.areas = res.areas || [];
     state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ・homeArea同梱）
     state.calendars = res.calendars || [];       // 予定登録の登録先カレンダー（管理者のみ）
@@ -4253,6 +4273,8 @@ var App = (function() {
     if (p) {
       var t = p.timing || {};
       html += '<div class="case-info" style="line-height:1.9">' +
+        (p.pageMs ? '画面の準備: <b>' + perfSec(p.pageMs) + ' 秒</b>' +
+          '<span style="font-size:11px"> （ページを開いてから問い合わせを始めるまで）</span><br>' : '') +
         '今回の読み込み: <b>' + perfSec(p.waitMs) + ' 秒</b><br>' +
         '　├ 起動待ち・通信: <b>' + perfSec(p.netMs) + ' 秒</b>' +
         '<span style="font-size:11px"> （Googleの仕様。速くできない部分）</span><br>' +
