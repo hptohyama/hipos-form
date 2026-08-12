@@ -969,7 +969,20 @@ var App = (function() {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); }).then(function(res) {
+    }).then(function(r) {
+      // ★Googleが一時的にJSONでなくHTMLのエラーページを返すことがある（2026-08-12 実機で発生）。
+      //   そのまま r.json() を呼ぶと画面に
+      //   「Unexpected token '<', "<!DOCTYPE "... is not valid JSON」という英語が出てしまい、
+      //   屋外のスタッフには何が起きたのか分からず、直しようもない。
+      //   本文を先に文字列で受け取り、JSONでなければ**日本語の案内**に置き換える。
+      return r.text().then(function(body) {
+        try { return JSON.parse(body); }
+        catch (e) {
+          return { ok: false, code: 'E_SERVER_BUSY', retryable: true,
+                   message: 'Googleに一時的につながりませんでした。少し待ってから画面を読み込み直してください。' };
+        }
+      });
+    }).then(function(res) {
       // ★ログインの有効期限切れを「無言」にしない（総点検 2026-07-27・A-5）。
       //   Googleのログイン証は1時間で切れる。従来は失効すると全APIが失敗し、
       //   配布禁止タブは古いチェック状況のまま固まり、報告は入力ごと消えていた。
@@ -1395,7 +1408,11 @@ var App = (function() {
     $('authCard').classList.remove('hidden');
     var box = $('gsiButton');
     box.insertAdjacentHTML('afterend',
-      '<div class="msg msg-err">' + esc(res.message || res.code || '認証に失敗しました') + '</div>');
+      '<div class="msg msg-err">' + esc(res.message || res.code || '認証に失敗しました') + '</div>' +
+      // 一時的な不調（つながらない・Google側の混雑）は読み込み直せば直る。押すだけで戻れるようにする。
+      (res && res.retryable
+        ? '<button type="button" class="btn-ghost" style="margin-top:10px" onclick="location.reload()">読み込み直す</button>'
+        : ''));
   }
 
   // ─── タブ切替 ───
