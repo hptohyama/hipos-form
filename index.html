@@ -129,8 +129,7 @@
   .summary .num { font-size: 22px; font-weight: 700; color: var(--c-primary); }
   .summary .lbl { font-size: 11px; color: var(--c-sub); }
   .hidden { display: none !important; }
-  /* 読み込み速度の実測（計測用・小さく目立たない1行） */
-  .perfbadge { margin-top: 8px; font-size: 11px; color: #9aa0a6; text-align: right; }
+  /* 読み込み速度の実測（?perf=1 のときだけ表示する調査用の表） */
   .perftbl { width: 100%; font-size: 12px; border-collapse: collapse; }
   .perftbl td { padding: 3px 6px; border-bottom: 1px solid #eee; }
   .perftbl td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
@@ -524,8 +523,6 @@
       <h2>本日の担当</h2>
       <div id="todayList"><div class="empty">読み込み中…</div></div>
       <div class="summary" id="homeSummary"></div>
-      <!-- ★読み込み速度の実測（2026-08-12・計測用）。アカウント画面に内訳と履歴が出る -->
-      <div class="perfbadge hidden" id="perfBadge"></div>
     </div>
 
     <!-- 本日の配布禁止（要約のみ。詳細＋チェックは「配布禁止」タブ） -->
@@ -612,8 +609,10 @@
       <div id="accountBody"></div>
       <button class="btn-ghost" style="margin-top:12px" onclick="App.logout()">ログアウト</button>
     </div>
-    <!-- ★読み込み速度（計測用・2026-08-12） -->
-    <div class="card">
+    <!-- ★読み込み速度（計測用・2026-08-12）。
+         ふだんは出さない（本番運用ではスタッフにも管理者にも見えない）。
+         URLの末尾に ?perf=1 を付けて開いたときだけ表示する。 -->
+    <div class="card hidden" id="perfCard">
       <h2>読み込み速度</h2>
       <div id="perfBody"></div>
     </div>
@@ -876,6 +875,13 @@ if (PRESET_CASE.indexOf('HIPOS_PRESET') >= 0) {
   try { PRESET_CASE = new URLSearchParams(location.search).get('case') || ''; } catch (e) { PRESET_CASE = ''; }
 }
 PRESET_CASE = PRESET_CASE.replace(/[^A-Za-z0-9]/g, '');
+
+// ★読み込み速度の表示スイッチ（2026-08-12）。
+//   ふだんは出さない＝本番運用ではスタッフにも管理者にも見えない。
+//   調べたいときだけ URL の末尾に ?perf=1 を付けて開く（アカウントタブに内訳と履歴が出る）。
+//   記録（直近20回）は表示していなくても裏で取り続けるので、あとから見返せる。
+var PERF_ON = false;
+try { PERF_ON = new URLSearchParams(location.search).get('perf') === '1'; } catch (e) { PERF_ON = false; }
 
 var App = (function() {
   var state = {
@@ -1210,8 +1216,7 @@ var App = (function() {
       at: new Date().toISOString()
     };
     _perfT0 = 0;
-    perfSaveHistory(state.perf);
-    renderPerfBadge();
+    perfSaveHistory(state.perf);   // 表示していなくても記録だけは残す（あとから ?perf=1 で見返せる）
   }
   /** 直近20回ぶんを端末に残す（朝いちばんと日中を見比べるため） */
   function perfSaveHistory(p) {
@@ -1223,15 +1228,6 @@ var App = (function() {
     } catch (e) { /* 記録できなくても動作に影響させない */ }
   }
   function perfSec(ms) { return (Number(ms || 0) / 1000).toFixed(1); }
-  /** ホーム下部の小さな1行 */
-  function renderPerfBadge() {
-    var el = $('perfBadge');
-    if (!el || !state.perf) return;
-    var p = state.perf;
-    el.textContent = '読み込み ' + perfSec(p.waitMs) + '秒'
-      + '（起動待ち・通信 ' + perfSec(p.netMs) + ' ／ サーバ ' + perfSec(p.serverMs) + '）';
-    el.classList.remove('hidden');
-  }
 
   function afterAuth() {
     // ログイン直後の初期読込は bootstrap 1回に集約（旧: whoami→cases→myToday→myShiftCycles の4往復）。
@@ -4268,6 +4264,11 @@ var App = (function() {
   function renderPerfBody() {
     var el = $('perfBody');
     if (!el) return;
+    // ★ふだんは丸ごと出さない（本番運用ではスタッフにも管理者にも見えない）。
+    //   調べたいときだけ URL の末尾に ?perf=1 を付けて開く。
+    var card = $('perfCard');
+    if (!PERF_ON) { if (card) card.classList.add('hidden'); return; }
+    if (card) card.classList.remove('hidden');
     var p = state.perf;
     var html = '';
     if (p) {
