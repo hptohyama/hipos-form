@@ -103,7 +103,6 @@
   /* ★配布エリアの町＝消せない行（2026-08-12 社長要望）。
      ✖ は出さない。マークも一切出さない。ただし ✖ と同じ幅の**空の余白**だけ置いて、
      消せる行と消せない行で町名・部数の欄の幅がずれないようにする（見た目は何も増えない）。 */
-  .town-row .rowpad { flex: 0 0 40px; }
   .town-row input.town[readonly] { background: #f1f3f4; color: var(--c-text); }
   .total-bar { display: flex; justify-content: space-between; align-items: center;
                padding: 10px 12px; border-radius: 8px; background: #f1f3f4; margin-top: 8px; font-size: 14px; }
@@ -118,11 +117,6 @@
   .errcode { display: block; margin-top: 8px; font-size: 11px; font-weight: 400;
              color: #a2a6ac; letter-spacing: .02em; }
   /* 町の行を消したときの「元に戻す」（5秒だけ出る） */
-  .townundo { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 10px 12px;
-              border-radius: 8px; background: #f1f3f4; font-size: 13px; color: var(--c-sub); }
-  .townundo span { flex: 1; min-width: 0; }
-  .townundo button { width: auto; flex: 0 0 auto; padding: 8px 14px; font-size: 13px;
-                     background: #fff; border: 1px solid var(--c-primary); color: var(--c-primary); }
   /* GPS未添付の案内（添付必須） */
   .gpsneed { margin-top: 8px; padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.6;
              background: var(--c-warn-bg); color: var(--c-warn); font-weight: 600; }
@@ -564,11 +558,8 @@
         <div id="hhRef" class="hhref hidden"></div>
         <!-- ★配布エリアの町があるときだけ出る案内（消せない理由がどこにも無いと現場が困る）。
              行ごとの印は出さない（社長指示）ので、ここに1行だけ常設する。 -->
-        <div class="lockhint hidden" id="townLockHint">配布エリアの町は消せません。<b>配らなかった町は空欄（0部）のまま</b>にしてください（配布していない記録として残ります）。</div>
+        <div class="lockhint hidden" id="townLockHint">この案件に登録されている配布エリアです。町の<b>追加・削除はできません</b>。<b>配らなかった町は空欄（0部）のまま</b>にしてください（配布していない記録として残ります）。</div>
         <div id="townRows"></div>
-        <div id="townUndo" class="townundo hidden"></div>
-        <button type="button" class="btn-ghost" onclick="App.addTownRow()">＋ 行を追加</button>
-        <datalist id="townList"></datalist>
         <div class="total-bar" id="totalBar">
           <span>合計部数（自動）</span><strong id="autoTotal">0</strong>
         </div>
@@ -588,10 +579,10 @@
       </div>
 
       <div class="card">
-        <h2 id="gpsHeading">④ GPS軌跡画像（必須）</h2>
+        <h2 id="gpsHeading">④ GPS軌跡画像（必須・4枚以上）</h2>
         <input type="file" id="gpsFiles" accept="image/*" multiple onchange="App.onGpsSelect(this)">
         <div id="gpsList" style="margin-top:8px"></div>
-        <div class="case-info">GPSアプリの軌跡スクリーンショットを<b>1枚以上</b>添付してください。添付が無いと送信できません。<br>※「✏️数字を修正」で送り直すときは、<b>前回の画像がそのまま引き継がれます</b>（追加もできます）。</div>
+        <div class="case-info" id="gpsHint">GPSアプリの軌跡スクリーンショットを<b>4枚以上</b>添付してください。足りないと送信できません。<br>※「✏️数字を修正」で送り直すときは、<b>前回の画像がそのまま引き継がれます</b>（追加もできます）。</div>
         <div id="gpsProgress"></div>
       </div>
 
@@ -908,7 +899,7 @@ var App = (function() {
     banLoadSeq: 0,  // 取得のたびに進む世代。遅れて返ってきた古い応答で新しい画面を上書きしない
     correcting: false,             // 履歴からの取消→修正の実行中フラグ（二重押し防止）
     submitting: false, retryCount: 0,
-    gpsFiles: [], gpsMax: 50, gpsUploading: false,
+    gpsFiles: [], gpsMax: 50, gpsMin: 4, gpsUploading: false,
     gpsAddTarget: null,   // 履歴からGPS追加する対象 reportUuid
     restoringDetail: false, // 修正プリフィル中フラグ（caseTowns応答の誤上書き防止）
     shiftData: null,        // myShiftCycles の応答（サイクル2枠＋提出状態）
@@ -1353,7 +1344,11 @@ var App = (function() {
     state.staffList = res.staffList || [];       // 予定登録の担当者候補（管理者のみ・homeArea同梱）
     state.calendars = res.calendars || [];       // 予定登録の登録先カレンダー（管理者のみ）
     state.gpsMax = Number(res.gpsMax) || 50;
-    $('gpsHeading').textContent = '④ GPS軌跡画像（必須・最大' + state.gpsMax + '枚）';
+    state.gpsMin = (res.gpsMin === undefined) ? 4 : (Number(res.gpsMin) || 0);   // ★最低枚数（サーバと同じ数字を使う）
+    $('gpsHeading').textContent = '④ GPS軌跡画像（必須・' + state.gpsMin + '枚以上／最大' + state.gpsMax + '枚）';
+    var gh = $('gpsHint');
+    if (gh) gh.innerHTML = 'GPSアプリの軌跡スクリーンショットを<b>' + state.gpsMin + '枚以上</b>添付してください。' +
+      '足りないと送信できません。<br>※「✏️数字を修正」で送り直すときは、<b>前回の画像がそのまま引き継がれます</b>（追加もできます）。';
     renderReportCases();
   }
 
@@ -2001,7 +1996,7 @@ var App = (function() {
     if (!state.correctingCase && state.townRowsKey && state.townRowsKey !== newKey) {
       var hasTyped = readLinesRaw().some(function(l) { return String(l.qty || '') !== ''; });
       if (!hasTyped || confirm('入力中の部数があります。別の案件に切り替えると入力は消えます。よろしいですか？')) {
-        hideTownUndo(); $('townRows').innerHTML = ''; addTownRow();
+        $('townRows').innerHTML = '';   // 登録された配布エリアはこのあと読み直して入れ直す
         if ($('note')) $('note').value = '';
         resetWorkFields();
       } else if (state.townRowsCase) {
@@ -2015,7 +2010,7 @@ var App = (function() {
         return;
       } else {
         // 戻り先が分からないときは、前の案件の行を残さない（別案件の実績にしないことを優先）
-        hideTownUndo(); $('townRows').innerHTML = ''; addTownRow();
+        $('townRows').innerHTML = '';   // 登録された配布エリアはこのあと読み直して入れ直す
       }
     }
     state.townRowsKey = newKey;
@@ -2035,127 +2030,83 @@ var App = (function() {
     api({ action: 'caseTowns', caseNo: c.caseNo, reportDate: c.dEnd || c.distEnd || '' }).then(function(res) {
       if (caseKeyOf(currentCase()) !== reqKey) return;   // 投げたときと別の案件になっている＝この応答は捨てる
       if (!res.ok) {
-        $('caseInfo').innerHTML += '<br>⚠️ 町リストの取得に失敗しました（' + esc(res.code || '') + '）— 町名は下の欄に手入力してください';
+        $('caseInfo').innerHTML += '<br>⚠️ 配布エリアの読み込みに失敗しました（' + esc(res.code || '') + '）— 画面を読み込み直してください';
         return;
       }
       renderHhRef(res.distTowns || [], res.households || []);   // 🏠 世帯数（町名の横に・順対応）
-      var dl = $('townList');
-      dl.innerHTML = '';
-      (res.towns || []).forEach(function(t) {
-        if (!t.display) return;
-        var opt = document.createElement('option'); opt.value = t.display; dl.appendChild(opt);
-      });
-      // 入力済みの行がある場合は上書きしない（誤消去・修正プリフィルの保護）
+      // ※町名の入力候補(datalist)は廃止した（町名は手で打てないため候補が要らない）。
+      // ★2026-08-19 社長指示: 報告できるのは「その日に登録されている配布エリア」だけ。
+      //   手入力の行は作れないので、ここで作る行がその報告の全てになる。
       if (state.restoringDetail) return;
       var pre = res.prefill || [];
       if (pre.length > 0) {
-        if (lockedRowCount() > 0) return;          // 既に配布エリアが入っている（下書き復元など）＝触らない
-        var typed = readLinesRaw();                 // 応答を待たずに本人が打ち始めていた行
-        hideTownUndo();
-        if (typed.length === 0) {
-          $('townRows').innerHTML = '';
-          pre.forEach(function(t) { addTownRow(t.display, null, null, true); });   // ★消せない行（配布エリア）
-          addTownRow();
-        } else {
-          // ★打ちかけの内容は消さず、配布エリアの町を**上に足す**（2026-08-12 点検で判明）。
-          //   以前は「入力済みの行があれば丸ごと諦める」だったので、応答（約2秒）を待たずに
-          //   町名を1文字でも打つと、その報告だけ**消せない行が1つも作られず**、
-          //   配らなかった町の0部記録が残らなかった＝機能が静かに効かない状態だった。
-          var have = {};
-          typed.forEach(function(l) { have[String(l.town).trim()] = true; });
-          var at = 0;
-          pre.forEach(function(t) {
-            var name = String(t.display || '').trim();
-            if (!name || have[name]) return;        // 本人が既に打った町は二重に作らない
-            addTownRow(name, null, at, true);
-            at++;
-          });
-        }
+        // ★★サーバが返した「その日の配布エリア」を**必ず正**とする（2026-08-19 点検）。
+        //   以前は「行が既にあれば触らない」だったため、いちど画面を開いた時点の町が
+        //   端末の下書きに焼き付き、**管理者が配布エリアを直しても二度と反映されなかった**。
+        //   手入力を廃止した今は現場で直す手段が無く、古い町のまま送られてしまう。
+        //   入力済みの部数は町名で引き継ぐので、打ち直しにはならない。
+        var entered = {};
+        readLinesRaw().forEach(function(l) {
+          if (String(l.qty || '') !== '') entered[String(l.town).trim()] = l.qty;
+        });
+        var keep = {};
+        pre.forEach(function(t) { keep[String(t.display || '').trim()] = true; });
+        var dropped = Object.keys(entered).filter(function(t) { return !keep[t]; });
+        $('townRows').innerHTML = '';
+        pre.forEach(function(t) {
+          var name = String(t.display || '').trim();
+          addTownRow(name, (entered[name] === undefined ? null : entered[name]));
+        });
         recalc();
-        // ※「消せません／空欄は0部」の案内は #townLockHint に常設したのでここでは繰り返さない
         $('caseInfo').innerHTML += '<br>📋 <b>配布エリアを読み込みました（' + pre.length + '町）</b> — 各町の部数を入力してください';
+        if (dropped.length) {
+          // 入力済みの町が配布エリアから外れた＝黙って消さずに知らせる
+          $('caseInfo').innerHTML += '<br><span style="color:var(--c-warn)">⚠️ 配布エリアが変更されたため、' +
+            esc(dropped.join('・')) + ' の入力は取り消されました（現在の配布エリアに含まれていません）。</span>';
+        }
       } else {
-        $('caseInfo').innerHTML += '<br>📝 この案件は<b>町リスト未登録</b>です（カレンダー予定・配布エリアの町データなし）— 下の欄に町名を手入力してください';
+        // ★配布エリアが1つも登録されていない＝この案件は報告できない。
+        //   以前は「下の欄に手入力してください」と案内していたが、手入力は廃止したので、
+        //   スタッフが自分では解決できない。誰に何を頼めばよいかまで書く。
+        $('caseInfo').innerHTML +=
+          '<br><span style="color:var(--c-err)">⚠️ <b>この案件には配布エリアが登録されていません</b>。' +
+          'このままでは報告できません。<br>管理者に「' + esc(c.caseNo) + '（' + esc(c.storeClean || '') + '）の配布エリアを登録してください」とご連絡ください。</span>';
       }
     }).catch(function(e) {
       if (caseKeyOf(currentCase()) !== reqKey) return;   // 別案件に切り替わったあとのエラーは出さない
-      $('caseInfo').innerHTML += '<br>⚠️ 通信エラー（' + esc(e && e.message || '') + '）— 町名は下の欄に手入力してください';
+      $('caseInfo').innerHTML += '<br>⚠️ 通信エラー（' + esc(e && e.message || '') + '）— 画面を読み込み直してください';
     });
   }
 
   // ─── 町×部数の行UI ───
   /**
    * 町×部数の1行を作る。
-   * @param {boolean} [locked] ★true = この案件の配布エリアの町（2026-08-12 社長要望）。
-   *   削除できず、町名も変更できない。★印やマークは一切出さない（社長指示）。配らなかった日は空欄（=0部）のままにしてもらい、
+   *
+   * ★2026-08-19 社長指示: **配布報告で扱えるのは「その日に登録されている配布エリア」だけ**。
+   *   スタッフが勝手に町を足して報告できないようにするため、
+   *   行の追加（＋行を追加）も削除（✖）も廃止した。
+   *   したがってここで作る行は**常に**「町名は変更不可・削除不可」。印やマークは一切出さない。
+   *   配らなかった町は空欄（＝0部）のままにしてもらい、
    *   「配布していないエリア」として記録に残す（明細に SKIPPED_ZERO で残る）。
-   *   消せてしまうと、その町は記録から丸ごと消え、配ったのか配っていないのか分からなくなる。
    */
-  function addTownRow(town, qty, atIndex, locked) {
+  function addTownRow(town, qty, atIndex) {
     var div = document.createElement('div');
     div.className = 'town-row';
-    if (locked) div.setAttribute('data-locked', '1');
+    div.setAttribute('data-locked', '1');
     div.innerHTML =
-      '<input class="town" list="townList" placeholder="町名" value="' + esc(town || '') + '"' +
-        (locked ? ' readonly' : '') + '>' +
-      '<input class="qty" type="number" min="0" step="1" inputmode="numeric" placeholder="部数" value="' + (qty != null ? qty : '') + '">' +
-      (locked
-        ? '<span class="rowpad"></span>'                      // ★何も表示しない（幅だけそろえる）
-        : '<button type="button" tabindex="-1">×</button>');
-    var delBtn = div.querySelector('button');
-    if (delBtn) delBtn.onclick = function() { removeTownRow(div); };
+      '<input class="town" placeholder="町名" value="' + esc(town || '') + '" readonly>' +
+      '<input class="qty" type="number" min="0" step="1" inputmode="numeric" placeholder="部数" value="' + (qty != null ? qty : '') + '">';
     div.querySelector('.qty').oninput = recalc;
-    div.querySelector('.town').oninput = recalc;   // 町名の入力/消去でも合計・警告を再評価
     var rows = $('townRows');
     var at = (atIndex != null) ? rows.children[atIndex] : null;
     if (at) rows.insertBefore(div, at); else rows.appendChild(div);
     return div;
   }
 
-  // ═══ 行の削除は「元に戻す」を5秒だけ出す（U-3） ═══
-  // 15町ぶん入力したあとの誤タップで1行消えると、何を消したのか思い出せないまま送ってしまう。
-  // 確認ダイアログは毎回出ると邪魔なので、消してから戻せる形にする。
-  var _townUndo = null, _townUndoTimer = null;
-  function removeTownRow(div) {
-    // ★配布エリアの町は消せない（2026-08-12 社長指示）。ボタン自体を出していないので
-    //   ふつうはここへ来ないが、将来ほかの経路から呼ばれても消えないように歯止めを置く。
-    if (div && div.getAttribute && div.getAttribute('data-locked') === '1') return;
-    var rows = $('townRows');
-    var idx = Array.prototype.indexOf.call(rows.children, div);
-    var town = div.querySelector('.town').value;
-    var qty = div.querySelector('.qty').value;
-    div.remove();
-    recalc();
-    _townUndo = { index: idx, town: town, qty: qty };
-    var box = $('townUndo');
-    if (!box) return;
-    var label = String(town || '').trim() || '（町名なし）';
-    box.innerHTML = '<span>「' + esc(label) + (String(qty).trim() ? ' ' + esc(qty) + '部' : '') + '」の行を削除しました</span>' +
-                    '<button type="button" onclick="App.undoTownRow()">元に戻す</button>';
-    box.classList.remove('hidden');
-    if (_townUndoTimer) clearTimeout(_townUndoTimer);
-    _townUndoTimer = setTimeout(hideTownUndo, 5000);
-  }
-  function hideTownUndo() {
-    if (_townUndoTimer) { clearTimeout(_townUndoTimer); _townUndoTimer = null; }
-    _townUndo = null;
-    var box = $('townUndo');
-    if (box) { box.innerHTML = ''; box.classList.add('hidden'); }
-  }
-  function undoTownRow() {
-    var u = _townUndo;
-    if (!u) return;
-    hideTownUndo();
-    addTownRow(u.town, u.qty === '' ? null : u.qty, u.index);
-    recalc();
-  }
 
-  /** いま画面にある「消せない行」（配布エリアの町）の数 */
+  /** いま画面にある行数（＝登録された配布エリアの数）。案内の出し分けに使う。 */
   function lockedRowCount() {
-    var rows = $('townRows').querySelectorAll('.town-row');
-    var n = 0;
-    for (var i = 0; i < rows.length; i++) if (rows[i].getAttribute('data-locked') === '1') n++;
-    return n;
+    return $('townRows').querySelectorAll('.town-row').length;
   }
 
   function readLines() {
@@ -2185,8 +2136,7 @@ var App = (function() {
     for (var i = 0; i < rows.length; i++) {
       var town = rows[i].querySelector('.town').value.trim();
       if (!town) continue;
-      lines.push({ town: town, qty: rows[i].querySelector('.qty').value,
-                    locked: rows[i].getAttribute('data-locked') === '1' });   // 文字列のまま（''もある）
+      lines.push({ town: town, qty: rows[i].querySelector('.qty').value });   // 文字列のまま（''もある）
     }
     return lines;
   }
@@ -2250,7 +2200,12 @@ var App = (function() {
         note: ($('note') || {}).value || '',
         at: Date.now()
       };
-      if (!d.lines.length && !d.note) { lsDel(draftKeyOf(c)); return; }
+      // ★「開いただけ」で下書きを作らない（2026-08-19 点検）。
+      //   配布エリアを読み込んだ直後にも recalc→saveDraft が走るため、
+      //   以前は**部数を1つも入れていなくても**その日の町が下書きに焼き付き、
+      //   管理者が配布エリアを直しても画面に出なくなっていた。
+      var hasInput = d.lines.some(function(l) { return String(l.qty || '') !== ''; }) || !!d.note;
+      if (!hasInput) { lsDel(draftKeyOf(c)); return; }
       lsSet(draftKeyOf(c), JSON.stringify(d));
       pruneDrafts();
     } catch (e) { /* 保存できない環境でも本体は動く */ }
@@ -2273,7 +2228,7 @@ var App = (function() {
     if (!d.lines || !d.lines.length) return false;
     if (readLines().length > 0) return false;             // 既に入力があるなら触らない
     if (Date.now() - (d.at || 0) > 7 * 86400000) { clearDraft(); return false; }   // 1週間で失効
-    hideTownUndo(); $('townRows').innerHTML = '';
+    $('townRows').innerHTML = '';
     // 空欄は空欄のまま戻す（0を入れない）。v が無い古い下書きは「空欄を0で保存していた」版なので、
     // 0 は「触っていない行」とみなして空に戻す（自分で0と入れた行が空に戻る程度の実害はある）。
     var old = (d.v || 1) < 2;
@@ -2281,9 +2236,8 @@ var App = (function() {
       var q = l.qty;
       if (q === '' || q == null) q = null;
       else if (old && Number(q) === 0) q = null;
-      addTownRow(l.town, q, null, !!l.locked);   // ★配布エリアの行は消せないまま戻す
+      addTownRow(l.town, q);
     });
-    addTownRow();
     // ★勤務時間も戻す（2026-08-09 総点検。以前は存在しないIDを見ていて必ず8時間に戻っていた）
     var restoredWorkH = '';
     if (d.workH && $('workWorkH')) { $('workWorkH').value = d.workH; restoredWorkH = d.workH; }
@@ -2337,9 +2291,15 @@ var App = (function() {
     var c = currentCase();
     if (!c) { alert('催事を選択してください'); return; }
     var lines = readLines();
-    if (lines.length === 0) { alert('町×部数を1行以上入力してください'); return; }
+    // ★行は「登録された配布エリア」からしか作られない（手入力は廃止・2026-08-19）。
+    //   0行＝その案件に配布エリアが登録されていない＝スタッフ側では解決できない。
+    if (lines.length === 0) {
+      alert('この案件には配布エリアが登録されていないため、報告できません。\n\n' +
+            '管理者に「' + c.caseNo + '（' + (c.storeClean || '') + '）の配布エリアを登録してください」とご連絡ください。');
+      return;
+    }
     if (hasEmptyTownWithQty()) {
-      alert('町名が入っていない行に部数があります。\n・町名を入力するか\n・×ボタンでその行を削除してから送信してください');
+      alert('町名が入っていない行に部数があります。\n画面を読み込み直してから、もう一度お試しください。');
       return;
     }
     // ★桁ミスの最終確認（総点検 2026-07-27・A-6）。
@@ -2351,8 +2311,13 @@ var App = (function() {
     // ★GPS軌跡画像の添付を必須にする（U-2・社長判断 2026-07-28）。
     //   「④ GPS軌跡画像」まで指が届かず未添付のまま送られると、あとから本人に頼み直すことになる。
     //   ただし「✏️数字を修正」の再送は、前回の報告に付いていた画像をサーバが引き継ぐので免除する。
-    if (state.gpsFiles.length === 0 && !gpsCarryFrom()) {
-      alert('GPS軌跡画像の添付が必要です。\n\n「④ GPS軌跡画像」から、GPSアプリの軌跡スクリーンショットを1枚以上選んでください。');
+    // ★「✏️数字を修正」は押した時点で取消（減算）が確定しているので、
+    //   前回の画像を引き継げるときは枚数で止めない（止めると入れ直せず部数が消える）。
+    var gpsCarried = gpsCarryCount();
+    var gpsHave = state.gpsFiles.length + gpsCarried;
+    if (gpsCarried === 0 && gpsHave < state.gpsMin) {
+      alert('GPS軌跡画像が' + state.gpsMin + '枚以上必要です（いま ' + gpsHave + '枚）。'+'\n\n' +
+            '「④ GPS軌跡画像」から、GPSアプリの軌跡スクリーンショットを選んでください。');
       var gp = $('gpsHeading'); if (gp) gp.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
@@ -2384,6 +2349,7 @@ var App = (function() {
       }
     };
     // 修正の再送＝前回の報告のGPS画像を引き継ぐ（サーバが同じ担当・案件・配布日だけ許可する）
+    payload.gpsPlanned = state.gpsFiles.length;   // ★サーバ側でも最低枚数を確かめるため
     var carryFrom = gpsCarryFrom();
     if (carryFrom) payload.carryGpsFrom = carryFrom;
     doSend(payload);
@@ -2493,8 +2459,7 @@ var App = (function() {
     state.correctingCase = null;                // 修正モード解除
     if (wasMissed) state.reportCase = null;     // 報告忘れを完了＝カードが消え、次の対象（今日 or 次の報告忘れ）へ
     $('noDistCard').classList.add('hidden');
-    hideTownUndo(); $('townRows').innerHTML = '';
-    addTownRow(); addTownRow(); addTownRow();
+    $('townRows').innerHTML = '';   // 次の案件を選ぶと、その案件の配布エリアが読み込まれる
     $('distStart').value = todayIso();
     $('distEnd').value = todayIso();
     resetWorkFields();   // 送信後は勤務実績を初期値（休憩1h・勤務8h）に戻す
@@ -2522,6 +2487,12 @@ var App = (function() {
 
   function removeGpsFile(idx) { state.gpsFiles.splice(idx, 1); renderGpsList(); }
 
+  /** 修正の再送で引き継がれる画像の枚数（0枚なら0）。最低枚数の判定に使う。 */
+  function gpsCarryCount() {
+    var c = state.correctingCase;
+    return (c && c.gpsFrom) ? (Number(c.gpsFromCount) || 0) : 0;
+  }
+
   /** 修正の再送で引き継ぐ元報告のUUID（前回の画像が1枚以上あるときだけ）。無ければ '' */
   function gpsCarryFrom() {
     var c = state.correctingCase;
@@ -2538,7 +2509,7 @@ var App = (function() {
       : '';
     // 未添付＝送信できない状態なので、その場で分かるように出す（U-2）
     if (state.gpsFiles.length === 0) {
-      box.innerHTML = carried || '<div class="gpsneed">📷 まだ添付されていません（1枚以上が必要です）</div>';
+      box.innerHTML = carried || '<div class="gpsneed">📷 まだ添付されていません（' + state.gpsMin + '枚以上が必要です）</div>';
       return;
     }
     box.innerHTML = carried + gpsFileListHtml();
@@ -2551,7 +2522,9 @@ var App = (function() {
       return '<div class="town-row"><input class="town" value="📷 ' + esc(f.name) + '（' + kb + 'KB）" readonly>' +
              '<button type="button" onclick="App.removeGpsFile(' + i + ')">×</button></div>';
     }).join('');
-    return html + '<div class="case-info">選択中: ' + state.gpsFiles.length + '/' + state.gpsMax + '枚</div>';
+    var need = gpsCarryCount() > 0 ? 0 : (state.gpsMin - state.gpsFiles.length);
+    return html + '<div class="case-info">選択中: ' + state.gpsFiles.length + '/' + state.gpsMax + '枚' +
+      (need > 0 ? '<b style="color:var(--c-err)">（あと ' + need + '枚必要）</b>' : '（枚数OK）') + '</div>';
   }
 
   function shrinkImage(file) {
@@ -2715,12 +2688,11 @@ var App = (function() {
     };
     $('distStart').value = state.correctingCase.distStart;
     $('distEnd').value = state.correctingCase.distEnd;
-    hideTownUndo(); $('townRows').innerHTML = '';
+    $('townRows').innerHTML = '';
     // ★履歴からの修正でも、前回報告した町は消せない（2026-08-12 社長指示）。
     //   「配布報告ではエリアを消せないようにする」＝入れ直しのときも同じ。
     //   間違って多く入れた町は 0 に直す。足りない町は「＋行を追加」で足す。
-    (detail.lines || []).forEach(function(l) { addTownRow(l.town, l.qty, null, true); });
-    if (!(detail.lines || []).length) { addTownRow(); addTownRow(); }
+    (detail.lines || []).forEach(function(l) { addTownRow(l.town, l.qty); });
     onCaseChange();   // caseInfo・サジェスト更新（restoringDetail中はプリフィルは走らない）。合計は町行から自動算出。
     recalc();
     // caseTowns応答が返るまで少し待ってからフラグ解除（誤上書き防止）
@@ -4458,7 +4430,6 @@ var App = (function() {
     if (!state.deviceId) { state.deviceId = uuid(); lsSet('hipos_device_id', state.deviceId); }
     $('distStart').value = todayIso();
     $('distEnd').value = todayIso();
-    addTownRow(); addTownRow(); addTownRow();
     renderGpsList();                            // 「GPS未添付」の案内を最初から出す（U-2・添付必須）
     $('workWorkH').oninput = updateCph;        // 勤務時間を直すと部数毎時も再計算
     resetWorkFields();                          // 勤務実績の初期値（休憩1h・勤務8h）
@@ -4481,7 +4452,7 @@ var App = (function() {
   document.addEventListener('DOMContentLoaded', init);
 
   return {
-    submit: submit, addTownRow: addTownRow, undoTownRow: undoTownRow,
+    submit: submit,
     onGpsSelect: onGpsSelect, removeGpsFile: removeGpsFile, retryGps: retryGps,
     switchTab: switchTab, pickCase: pickCase,
     toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
