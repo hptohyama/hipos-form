@@ -836,21 +836,16 @@
     <div class="card">
       <h2>時間を変更する</h2>
       <label>スタッフ</label>
-      <select id="otStaff"><option value="">— スタッフを選択 —</option></select>
+      <select id="otStaff" onchange="App.loadOvertimeDays()"><option value="">— スタッフを選択 —</option></select>
 
-      <label style="margin-top:10px">日付</label>
-      <input type="date" id="otDate">
-
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <div style="flex:1"><label>開始</label><input type="time" id="otStart" step="300"></div>
-        <div style="flex:1"><label>終了</label><input type="time" id="otEnd" step="300"></div>
+      <div id="otRangePills" class="subtabs hidden" style="margin-top:12px">
+        <button type="button" class="subtab on" id="otRange7" onclick="App.otRange(7)">直近7日</button>
+        <button type="button" class="subtab" id="otRange14" onclick="App.otRange(14)">14日</button>
+        <button type="button" class="subtab" id="otRange31" onclick="App.otRange(31)">31日</button>
       </div>
 
-      <label style="margin-top:10px">メモ（任意）</label>
-      <input type="text" id="otNote" placeholder="例：急な追加案件のため" autocomplete="off">
-
-      <button type="button" class="btn-primary" id="otSaveBtn" style="margin-top:14px" onclick="App.saveOvertime()">この時間で変更する</button>
       <div id="otResult" style="margin-top:10px"></div>
+      <div id="otDays"><div class="empty">まずスタッフを選んでください</div></div>
     </div>
 
     <div class="card">
@@ -860,6 +855,7 @@
         <div class="sa-title" id="otMonthLabel" style="flex:1;text-align:center">—</div>
         <button type="button" class="sa-nav" onclick="App.otMonth(1)">›</button>
       </div>
+      <div class="case-info">この月に勤務時間を変更した人の一覧です（スタッフを選ばなくても見られます）。</div>
       <div id="otList" style="margin-top:10px"><div class="empty">読み込み中…</div></div>
       <button type="button" class="btn-ghost" onclick="App.loadOvertime()" style="margin-top:10px">↻ 更新</button>
     </div>
@@ -4081,9 +4077,6 @@ var App = (function() {
                  (s.homeArea ? '（' + esc(s.homeArea) + '）' : '') + '</option>';
         }).join('');
       if (keep) sel.value = keep;
-      // 時刻の初期値（まだ触っていなければ既定の10:00-19:00を入れておく）
-      if (!$('otStart').value) $('otStart').value = state.otDefaults.start;
-      if (!$('otEnd').value) $('otEnd').value = state.otDefaults.end;
       renderOvertimeList(res.overtimes || []);
     }).catch(function(e) {
       $('otList').innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
@@ -4107,32 +4100,127 @@ var App = (function() {
     }).join('');
   }
 
-  function saveOvertime() {
+  /** 表示する範囲（直近何日）を切り替える */
+  function otRange(days) {
+    state.otDays = days;
+    ['otRange7', 'otRange14', 'otRange31'].forEach(function(id) {
+      var el = $(id); if (el) el.classList.toggle('on', id === 'otRange' + days);
+    });
+    loadOvertimeDays();
+  }
+
+  /**
+   * スタッフを選んだら、その人の直近◯日を一覧で出す（2026-08-25 社長要望）。
+   * ★「時間を入れてから案件を探す」形をやめ、**案件を見てから書き込む**形にする。
+   */
+  /**
+   * @param {boolean} [keepResult] true なら結果メッセージを消さない
+   *   （保存直後の読み直しで「✅変更しました」が一瞬で消えてしまうのを防ぐ）
+   */
+  function loadOvertimeDays(keepResult) {
+    var staffId = $('otStaff').value;
+    if (!keepResult) $('otResult').innerHTML = '';
+    if (!staffId) {
+      $('otRangePills').classList.add('hidden');
+      $('otDays').innerHTML = '<div class="empty">まずスタッフを選んでください</div>';
+      return;
+    }
+    $('otRangePills').classList.remove('hidden');
+    $('otDays').innerHTML = '<div class="empty">読み込み中…</div>';
+    api({ action: 'overtimeDays', staffId: staffId, days: state.otDays || 7 }).then(function(res) {
+      if ($('otStaff').value !== staffId) return;   // 選び直されていたら捨てる
+      if (!res.ok) { $('otDays').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
+      state.otDefaults = res.defaults || { start: '10:00', end: '19:00' };
+      renderOvertimeDays(res);
+    }).catch(function(e) {
+      $('otDays').innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function otWeekday(iso) {
+    var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return '（' + ['日', '月', '火', '水', '木', '金', '土'][d.getDay()] + '）';
+  }
+
+  function renderOvertimeDays(res) {
+    var rows = res.rows || [];
+    if (!rows.length) {
+      $('otDays').innerHTML = '<div class="empty">' + esc(res.from) + '〜' + esc(res.to) +
+        ' に、この方の案件・出勤日はありません</div>';
+      return;
+    }
+    $('otDays').innerHTML = rows.map(function(r) {
+      var caseTxt = r.cases.length
+        ? r.cases.map(function(c) { return esc(c.storeClean) + '（' + esc(c.role) + '）'; }).join('　/　')
+        : '<span style="color:var(--c-sub)">案件の割当なし</span>';
+      var rep = r.reportedNoDist ? '<span class="badge-inline badge-done">報告済（部数なし）</span>'
+        : (r.reported ? '<span class="badge-inline badge-done">報告済 ' + r.reportedQty + '部</span>'
+                      : '<span class="badge-inline badge-todo">未報告</span>');
+      var ot = r.overtime;
+      var nowTxt = ot
+        ? '<b>' + esc(ot.start) + '〜' + esc(ot.end) + '</b>' +
+          '<span style="color:var(--c-sub)">（元 ' + esc(ot.baseStart) + '〜' + esc(ot.baseEnd) + '）</span>'
+        : esc(r.nowStart) + '〜' + esc(r.nowEnd);
+      var body;
+      if (!r.canEdit) {
+        body = '<div class="msg msg-warn" style="margin-top:8px">' + esc(r.reason) + '</div>';
+      } else {
+        var id = r.date.replace(/-/g, '');
+        body =
+          '<div style="display:flex;gap:8px;margin-top:8px">' +
+            '<div style="flex:1"><label>開始</label>' +
+              '<input type="time" step="300" id="otS_' + id + '" value="' + esc(r.nowStart) + '"></div>' +
+            '<div style="flex:1"><label>終了</label>' +
+              '<input type="time" step="300" id="otE_' + id + '" value="' + esc(r.nowEnd) + '"></div>' +
+          '</div>' +
+          '<input type="text" id="otN_' + id + '" placeholder="メモ（任意）例：急な追加案件のため" ' +
+            'autocomplete="off" style="margin-top:8px" value="">' +
+          '<div style="display:flex;gap:8px;margin-top:10px">' +
+            '<button type="button" class="btn-primary" style="flex:1" onclick="App.saveOvertime(\'' +
+              esc(r.date) + '\')">' + (ot ? 'この時間に変更する' : 'この時間で残業を付ける') + '</button>' +
+            (ot ? '<button type="button" class="btn-ghost" style="flex:1" onclick="App.clearOvertime(\'' +
+                  esc(res.staffId) + '\',\'' + esc(r.date) + '\')">元の時間に戻す</button>' : '') +
+          '</div>';
+      }
+      return '<div class="assign" style="display:block;margin-bottom:10px' +
+          (ot ? ';border-color:#1a73e8' : '') + '">' +
+        '<div class="store">' + esc(r.date) + otWeekday(r.date) +
+          (ot ? ' <span class="badge-inline badge-todo">残業あり</span>' : '') + '</div>' +
+        '<div class="meta" style="margin-top:4px">' + caseTxt + '</div>' +
+        '<div class="meta" style="margin-top:4px">勤務時間: ' + nowTxt + '　' + rep + '</div>' +
+        body +
+      '</div>';
+    }).join('');
+  }
+
+  function saveOvertime(dateIso) {
     if (state.submitting) return;
     var staffId = $('otStaff').value;
-    var dateIso = $('otDate').value;
-    var start = $('otStart').value;
-    var end = $('otEnd').value;
     if (!staffId) { alert('スタッフを選んでください'); return; }
-    if (!dateIso) { alert('日付を選んでください'); return; }
+    var id = String(dateIso).replace(/-/g, '');
+    var start = ($('otS_' + id) || {}).value || '';
+    var end = ($('otE_' + id) || {}).value || '';
+    var note = ($('otN_' + id) || {}).value || '';
     if (!start || !end) { alert('開始と終了の時刻を入れてください'); return; }
     var name = $('otStaff').options[$('otStaff').selectedIndex].text;
     if (!confirm(name + '\n' + dateIso + ' の勤務時間を\n' + start + '〜' + end + ' に変更します。\n\n' +
                  'カレンダーの予定の時刻が変わり、名前の右に「•」が付きます。よろしいですか？')) return;
     state.submitting = true;
-    $('otSaveBtn').disabled = true;
     $('otResult').innerHTML = '<div class="msg"><span class="spin"></span>変更しています…</div>';
-    api({ action: 'setOvertime', staffId: staffId, dateIso: dateIso, start: start, end: end,
-          note: ($('otNote') || {}).value || '' }).then(function(res) {
-      state.submitting = false; $('otSaveBtn').disabled = false;
-      $('otResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') +
-        '" style="white-space:pre-wrap">' + esc(res.message || res.code) + '</div>';
-      if (res.ok) { if ($('otNote')) $('otNote').value = ''; loadOvertime(); }
-    }).catch(function(e) {
-      state.submitting = false; $('otSaveBtn').disabled = false;
-      $('otResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) +
-        '<br>変わったかどうかは下の一覧を「↻ 更新」でご確認ください。</div>';
-    });
+    api({ action: 'setOvertime', staffId: staffId, dateIso: dateIso, start: start, end: end, note: note })
+      .then(function(res) {
+        state.submitting = false;
+        $('otResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') +
+          '" style="white-space:pre-wrap">' + esc(res.message || res.code) + '</div>';
+        loadOvertimeDays(true);      // 結果メッセージは残したまま一覧を最新化
+        if (res.ok) loadOvertime();
+      }).catch(function(e) {
+        state.submitting = false;
+        $('otResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) +
+          '<br>変わったかどうかは、スタッフを選び直して一覧をご確認ください。</div>';
+      });
   }
 
   function clearOvertime(staffId, dateIso) {
@@ -4144,6 +4232,7 @@ var App = (function() {
       state.submitting = false;
       $('otResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') +
         '" style="white-space:pre-wrap">' + esc(res.message || res.code) + '</div>';
+      loadOvertimeDays(true);        // 結果メッセージは残したまま一覧を最新化
       loadOvertime();
     }).catch(function(e) {
       state.submitting = false;
@@ -4972,6 +5061,7 @@ var App = (function() {
     toggleRegBan: toggleRegBan, updateRegHh: updateRegHh,
     loadPendingAmends: loadPendingAmends, approveAmend: approveAmend, rejectAmend: rejectAmend,
     loadOvertime: loadOvertime, saveOvertime: saveOvertime, clearOvertime: clearOvertime, otMonth: otMonth,
+    loadOvertimeDays: loadOvertimeDays, otRange: otRange,
     loadRegistrations: loadRegistrations, deleteRegistration: deleteRegistration,
     regStartEdit: regStartEdit, regCancelEdit: regCancelEdit, regDoSave: regDoSave,
     regEditSetRole: regEditSetRole, regEditRemoveMember: regEditRemoveMember, regEditAddMember: regEditAddMember,
