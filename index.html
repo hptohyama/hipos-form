@@ -648,6 +648,34 @@
       <div id="shiftDone"></div>
       <div id="shiftTopWarn"></div>
       <div id="shiftCards"><div class="empty">読み込み中…</div></div>
+
+      <!-- ═══ シフト変更の申請（締切を過ぎた日の変更・欠勤の連絡） ═══ -->
+      <div class="card" id="scCard">
+        <h2>🔄 シフト変更の申請</h2>
+        <div class="case-info">提出の<b>締切を過ぎた日</b>は、ここから変更を申請できます。<b>管理者が承認すると反映</b>されます。<br>
+          ※申請できるのは<b>前日まで</b>です。<b>当日</b>の変更は担当者へ直接ご連絡ください。</div>
+        <div id="scMine" style="margin-top:10px"><div class="empty">読み込み中…</div></div>
+
+        <div id="scFormBox" class="hidden" style="margin-top:14px;border-top:1px solid var(--c-line);padding-top:12px">
+          <label>対象日</label>
+          <input type="date" id="scDate" onchange="App.scOnDate()">
+          <div id="scDateNote" class="footer-note" style="margin-top:6px"></div>
+
+          <label style="margin-top:12px">変更後</label>
+          <div class="subtabs" id="scKubunPills">
+            <button type="button" class="subtab on" id="scKoff" onclick="App.scPick('不可')">欠勤（出られない）</button>
+            <button type="button" class="subtab" id="scKon" onclick="App.scPick('終日')">出勤（10:00〜19:00）</button>
+          </div>
+
+          <label style="margin-top:12px">理由（任意）</label>
+          <textarea id="scReason" rows="2" placeholder="例）家族の用事のため"></textarea>
+
+          <div id="scResult"></div>
+          <button type="button" class="btn-primary" id="scSend" onclick="App.submitShiftChange()" style="margin-top:10px">この内容で申請する</button>
+          <button type="button" class="btn-ghost" style="margin-top:8px" onclick="App.scCloseForm()">閉じる</button>
+        </div>
+        <button type="button" class="btn-ghost" id="scOpenBtn" onclick="App.scOpenForm('')" style="margin-top:10px">＋ 変更を申請する</button>
+      </div>
     </div>
 
     <!-- 提出フォーム（①/②別・カレンダーをタップして出勤日を選択） -->
@@ -825,6 +853,18 @@
 
   <!-- ═══ ⏰残業（勤務時間の変更・__設定__ OVERTIME_ADMINS の人だけ） ═══ -->
   <div class="view hidden" id="overtimeView">
+
+    <!-- ═══ シフト変更の申請（配布員からの申請を承認する） ═══ -->
+    <div class="card" id="scAdminCard">
+      <h2>🔄 シフト変更の申請</h2>
+      <div class="case-info">配布員から出ている<b>シフト変更の申請</b>です。<b>承認するとカレンダーとシフトがその場で変わります</b>。<br>
+        却下してもシフトは変わりません（本人に電話などで伝えてください）。</div>
+      <div id="scAdminResult"></div>
+      <div id="scPending" style="margin-top:10px"><div class="empty">読み込み中…</div></div>
+      <button type="button" class="btn-ghost" onclick="App.loadShiftChangeBoard()" style="margin-top:10px">↻ 更新</button>
+      <div id="scRecentWrap" style="margin-top:14px"></div>
+    </div>
+
     <div class="card">
       <h2>⏰ 残業（勤務時間の変更）</h2>
       <div class="case-info">スタッフとその日を選んで、<b>出勤の時間</b>を変更します（役割は問いません）。<br>
@@ -920,7 +960,7 @@
   <button type="button" data-tab="register" id="navRegister" onclick="App.switchTab('register')" style="display:none"><span class="ic">🗓️</span>予定登録</button>
   <button type="button" data-tab="staff" id="navStaff" onclick="App.switchTab('staff')" style="display:none"><span class="ic">👥</span>スタッフ管理</button>
   <button type="button" data-tab="shiftadmin" id="navShiftAdmin" onclick="App.switchTab('shiftadmin')" style="display:none"><span class="ic">🗂️</span>シフト管理</button>
-  <button type="button" data-tab="overtime" id="navOvertime" onclick="App.switchTab('overtime')" style="display:none"><span class="ic">⏰</span>残業</button>
+  <button type="button" data-tab="overtime" id="navOvertime" onclick="App.switchTab('overtime')" style="display:none"><span class="ic">⏰</span>勤務調整</button>
 </nav>
 
 <script>
@@ -4057,6 +4097,7 @@ var App = (function() {
   }
 
   function loadOvertime() {
+    loadShiftChangeBoard();   // 同じタブの上段＝シフト変更の申請（承認できる人は同じ）
     $('otList').innerHTML = '<div class="empty">読み込み中…</div>';
     var month = state.otMonth || todayIso().slice(0, 7);
     $('otMonthLabel').textContent = otMonthLabel(month);
@@ -4458,6 +4499,257 @@ var App = (function() {
     return state.shiftView;
   }
 
+  // ═══════════════════════════════════════════════════════════
+  //  シフト変更の申請（配布員が申請 → 決められた管理者が承認・2026-08-25）
+  //
+  //  提出の締切を過ぎた日は本人が直せない。ここから申請すると管理者が承認でき、
+  //  承認された時点で初めてカレンダーとシフトが変わる（申請だけでは何も動かない）。
+  //  ★配布のシフトは 10:00〜19:00 固定なので、選べるのは「出勤」か「欠勤」の2つだけ。
+  // ═══════════════════════════════════════════════════════════
+
+  function scStateBadge(st) {
+    if (st === '申請中') return '<span class="badge-big bb-todo">承認待ち</span>';
+    if (st === '承認済') return '<span class="badge-big bb-done">承認 ✓</span>';
+    if (st === '却下') return '<span class="badge-big bb-over">却下</span>';
+    return '<span class="badge-big bb-wait">取下げ</span>';
+  }
+
+  function loadMyShiftChanges() {
+    var box = $('scMine');
+    if (!box) return;
+    box.innerHTML = '<div class="empty">読み込み中…</div>';
+    api({ action: 'myShiftChanges' }).then(function(res) {
+      if (!res.ok) { box.innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
+      state.scData = res;
+      renderMyShiftChanges();
+    }).catch(function(e) {
+      box.innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function renderMyShiftChanges() {
+    var v = state.scData;
+    if (!v || !$('scMine')) return;
+    var html = '';
+
+    var pend = (v.requests || []).filter(function(r) { return r.state === '申請中'; });
+    if (pend.length) {
+      html += '<div class="footer-note" style="margin-bottom:6px"><b>承認待ちの申請</b></div>';
+      html += pend.map(function(r) {
+        return '<div class="assign" style="display:block;margin-bottom:8px">' +
+          '<div class="store">' + esc(fmtMdw(r.date)) + '　' + esc(r.beforeLabel) + ' → <b>' + esc(r.afterLabel) + '</b></div>' +
+          (r.reason ? '<div class="footer-note">理由: ' + esc(r.reason) + '</div>' : '') +
+          '<div style="margin-top:6px">' + scStateBadge(r.state) +
+          '<button type="button" class="btn-ghost" style="width:auto;padding:6px 10px;margin:0 0 0 8px;display:inline-block" ' +
+          'onclick="App.cancelShiftChange(\'' + esc(r.reqId) + '\')">取り下げる</button></div>' +
+          '</div>';
+      }).join('');
+    }
+
+    var up = v.upcoming || [];
+    html += '<div class="footer-note" style="margin:10px 0 6px"><b>これからの予定</b>（明日以降）</div>';
+    if (!up.length) {
+      html += '<div class="empty">これからの出勤予定はありません</div>';
+    } else {
+      html += up.map(function(d) {
+        var can = !d.canSelfEdit && !d.pending;
+        return '<div class="assign" style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+          '<div style="flex:1"><b>' + esc(fmtMdw(d.date)) + '</b>　' + esc(d.label) +
+          (d.canSelfEdit ? '<div class="footer-note">まだご自分で直せます（上の「修正する」から）</div>' : '') +
+          (d.pending ? '<div class="footer-note">申請中（承認待ち）</div>' : '') +
+          '</div>' +
+          (can ? '<button type="button" class="btn-ghost" style="width:auto;padding:6px 10px;margin:0" ' +
+                 'onclick="App.scOpenForm(\'' + esc(d.date) + '\')">変更を申請</button>' : '') +
+          '</div>';
+      }).join('');
+    }
+
+    var done = (v.requests || []).filter(function(r) { return r.state !== '申請中'; }).slice(0, 5);
+    if (done.length) {
+      html += '<div class="footer-note" style="margin:12px 0 6px"><b>これまでの申請</b></div>';
+      html += done.map(function(r) {
+        return '<div class="assign" style="display:block;margin-bottom:6px">' +
+          '<div class="store">' + esc(fmtMdw(r.date)) + '　' + esc(r.beforeLabel) + ' → ' + esc(r.afterLabel) +
+          '　' + scStateBadge(r.state) + '</div>' +
+          (r.memo ? '<div class="footer-note">' + esc(r.memo) + '</div>' : '') +
+          '</div>';
+      }).join('');
+    }
+    $('scMine').innerHTML = html;
+  }
+
+  function scOpenForm(dateIso) {
+    var box = $('scFormBox');
+    if (!box) return;
+    box.classList.remove('hidden');
+    var ob = $('scOpenBtn'); if (ob) ob.classList.add('hidden');
+    var v = state.scData || {};
+    var inp = $('scDate');
+    if (inp) {
+      if (v.tomorrow) inp.min = v.tomorrow;
+      if (v.maxDate) inp.max = v.maxDate;
+      if (dateIso) inp.value = dateIso;
+    }
+    // 既定は「欠勤」＝いちばん多い用件（やはり出られなくなった）
+    state.scKubun = '不可';
+    scSyncPills();
+    scOnDate();
+    $('scResult').innerHTML = '';
+    box.scrollIntoView({ block: 'nearest' });
+  }
+
+  function scCloseForm() {
+    var box = $('scFormBox'); if (box) box.classList.add('hidden');
+    var ob = $('scOpenBtn'); if (ob) ob.classList.remove('hidden');
+    var r = $('scResult'); if (r) r.innerHTML = '';
+  }
+
+  function scPick(k) { state.scKubun = k; scSyncPills(); scOnDate(); }
+
+  function scSyncPills() {
+    var on = state.scKubun || '不可';
+    var a = $('scKoff'), b = $('scKon');
+    if (a) a.classList.toggle('on', on === '不可');
+    if (b) b.classList.toggle('on', on === '終日');
+  }
+
+  /** 日付を選ぶたびに「いまの予定」と注意書きを出す（送ってから弾かれるのを減らす） */
+  function scOnDate() {
+    var el = $('scDateNote');
+    if (!el) return;
+    var d = ($('scDate') || {}).value || '';
+    var v = state.scData || {};
+    if (!d) { el.innerHTML = ''; return; }
+    var hit = null;
+    (v.upcoming || []).forEach(function(x) { if (x.date === d) hit = x; });
+    var note;
+    if (hit) {
+      note = 'いまの予定: <b>' + esc(hit.label) + '</b>';
+      if (hit.canSelfEdit) note += '<br>⚠ この日はまだ<b>ご自分で直せます</b>（申請は不要です）';
+      if (hit.pending) note += '<br>⚠ この日の申請は<b>既に出ています</b>';
+    } else {
+      note = 'いまの予定: <b>なし</b>（出勤日として登録されていません）';
+      if (v.tomorrow && d < v.tomorrow) note += '<br>⚠ <b>当日・過ぎた日は申請できません</b>（前日まで）';
+    }
+    el.innerHTML = note;
+  }
+
+  function submitShiftChange() {
+    if (state.submitting) return;
+    var d = ($('scDate') || {}).value || '';
+    var k = state.scKubun || '不可';
+    if (!d) { $('scResult').innerHTML = '<div class="msg msg-warn">対象日を選んでください。</div>'; return; }
+    var label = (k === '不可') ? '欠勤（出られない）' : '出勤（10:00〜19:00）';
+    if (!confirm(d + ' を「' + label + '」に変更する申請を出します。\n\n' +
+                 '管理者が承認するまで、シフトは変わりません。\nよろしいですか？')) return;
+    state.submitting = true;
+    var btn = $('scSend'); if (btn) btn.disabled = true;
+    $('scResult').innerHTML = '<div class="msg"><span class="spin"></span>申請しています…</div>';
+    api({ action: 'submitShiftChange', date: d, after: k,
+          reason: ($('scReason') || {}).value || '' }).then(function(res) {
+      state.submitting = false; if (btn) btn.disabled = false;
+      $('scResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') +
+        '" style="white-space:pre-wrap">' + esc(res.message || res.code) + '</div>';
+      if (res.ok) {
+        var ta = $('scReason'); if (ta) ta.value = '';
+        loadMyShiftChanges();
+      }
+    }).catch(function(e) {
+      state.submitting = false; if (btn) btn.disabled = false;
+      $('scResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) +
+        '<br>申請できたかどうかは「これからの予定」の表示でご確認ください。</div>';
+    });
+  }
+
+  function cancelShiftChange(reqId) {
+    if (state.submitting) return;
+    if (!confirm('この申請を取り下げますか？')) return;
+    state.submitting = true;
+    api({ action: 'cancelShiftChange', reqId: reqId }).then(function(res) {
+      state.submitting = false;
+      if (!res.ok) { alert(res.message || res.code); return; }
+      loadMyShiftChanges();
+    }).catch(function(e) { state.submitting = false; alert('接続できません: ' + e.message); });
+  }
+
+  // ─── 管理者側（⏰勤務調整タブの中） ───
+
+  function loadShiftChangeBoard() {
+    var box = $('scPending');
+    if (!box) return;
+    box.innerHTML = '<div class="empty">読み込み中…</div>';
+    api({ action: 'shiftChangeBoard' }).then(function(res) {
+      if (!res.ok) { box.innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
+      renderShiftChangeBoard(res);
+    }).catch(function(e) {
+      box.innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function renderShiftChangeBoard(res) {
+    var p = res.pending || [];
+    $('scPending').innerHTML = p.length ? p.map(function(r) {
+      return '<div class="assign" style="display:block;margin-bottom:10px">' +
+        '<div class="store">' + esc(r.name) + '（' + esc(r.base || '拠点未設定') + '）</div>' +
+        '<div style="margin-top:4px"><b>' + esc(fmtMdw(r.date)) + '</b>　' +
+        esc(r.beforeLabel) + ' → <b>' + esc(r.afterLabel) + '</b>' +
+        (r.past ? '　<span class="badge-big bb-over">対象日が過ぎました</span>' : '') + '</div>' +
+        (r.reason ? '<div class="footer-note" style="margin-top:4px">理由: ' + esc(r.reason) + '</div>' : '') +
+        '<div class="footer-note">申請 ' + esc(String(r.reqAt).replace('T', ' ').slice(0, 16)) +
+        '（' + esc(r.reqId) + '）</div>' +
+        '<div style="display:flex;gap:8px;margin-top:8px">' +
+        (r.past ? '<div class="footer-note" style="flex:1">対象日が過ぎているため反映できません。却下してください。</div>'
+                : '<button type="button" class="btn-primary" style="flex:1" onclick="App.approveShiftChange(\'' +
+                  esc(r.reqId) + '\')">承認して反映</button>') +
+        '<button type="button" class="btn-ghost" style="flex:1;margin:0" onclick="App.rejectShiftChange(\'' +
+        esc(r.reqId) + '\')">却下</button>' +
+        '</div></div>';
+    }).join('') : '<div class="empty">承認待ちの申請はありません</div>';
+
+    var rec = res.recent || [];
+    $('scRecentWrap').innerHTML = rec.length
+      ? '<div class="footer-note" style="margin-bottom:6px"><b>最近の処理</b></div>' + rec.map(function(r) {
+          return '<div class="footer-note">' + esc(fmtMdw(r.date)) + '　' + esc(r.name) + '　' +
+                 esc(r.beforeLabel) + '→' + esc(r.afterLabel) + '　' + esc(r.state) +
+                 (r.memo ? '（' + esc(r.memo) + '）' : '') + '</div>';
+        }).join('')
+      : '';
+  }
+
+  function approveShiftChange(reqId) {
+    if (state.submitting) return;
+    if (!confirm('この申請を承認します。\n\n承認すると、その日のGoogleカレンダーの予定とシフトが変わります。\nよろしいですか？')) return;
+    state.submitting = true;
+    $('scAdminResult').innerHTML = '<div class="msg"><span class="spin"></span>反映しています…</div>';
+    api({ action: 'approveShiftChange', reqId: reqId }).then(function(res) {
+      state.submitting = false;
+      $('scAdminResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') +
+        '" style="white-space:pre-wrap">' + esc(res.message || res.code) + '</div>';
+      loadShiftChangeBoard();
+    }).catch(function(e) {
+      state.submitting = false;
+      $('scAdminResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) +
+        '<br>反映できたかは「↻ 更新」で確認してください（一覧から消えていれば承認できています）。</div>';
+    });
+  }
+
+  function rejectShiftChange(reqId) {
+    if (state.submitting) return;
+    var reason = prompt('この申請を却下します。理由があれば入力してください（空欄でも却下できます）。', '');
+    if (reason === null) return;
+    state.submitting = true;
+    $('scAdminResult').innerHTML = '<div class="msg">処理中…</div>';
+    api({ action: 'rejectShiftChange', reqId: reqId, reason: reason }).then(function(res) {
+      state.submitting = false;
+      $('scAdminResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') + '">' +
+        esc(res.message || res.code) + '</div>';
+      loadShiftChangeBoard();
+    }).catch(function(e) {
+      state.submitting = false;
+      $('scAdminResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
   function loadShifts() {
     showShiftList();
     $('shiftCards').innerHTML = '<div class="empty">読み込み中…</div>';
@@ -4470,6 +4762,7 @@ var App = (function() {
     }).catch(function(e) {
       $('shiftCards').innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
     });
+    loadMyShiftChanges();   // シフト変更の申請（別のactionで取る＝ログインの往復は増やさない）
   }
 
   // ログイン直後・月替わり時のバックグラウンド取得（ホーム警告＋ナビ赤丸の材料）
@@ -5062,6 +5355,12 @@ var App = (function() {
     loadPendingAmends: loadPendingAmends, approveAmend: approveAmend, rejectAmend: rejectAmend,
     loadOvertime: loadOvertime, saveOvertime: saveOvertime, clearOvertime: clearOvertime, otMonth: otMonth,
     loadOvertimeDays: loadOvertimeDays, otRange: otRange,
+    // シフト変更の申請（配布員＝申請／管理者＝承認・却下）
+    loadMyShiftChanges: loadMyShiftChanges, scOpenForm: scOpenForm, scCloseForm: scCloseForm,
+    scPick: scPick, scOnDate: scOnDate, submitShiftChange: submitShiftChange,
+    cancelShiftChange: cancelShiftChange,
+    loadShiftChangeBoard: loadShiftChangeBoard, approveShiftChange: approveShiftChange,
+    rejectShiftChange: rejectShiftChange,
     loadRegistrations: loadRegistrations, deleteRegistration: deleteRegistration,
     regStartEdit: regStartEdit, regCancelEdit: regCancelEdit, regDoSave: regDoSave,
     regEditSetRole: regEditSetRole, regEditRemoveMember: regEditRemoveMember, regEditAddMember: regEditAddMember,
