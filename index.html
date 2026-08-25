@@ -265,8 +265,13 @@
   .blink { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--c-border); font-size: 14px; }
   .blink .nm { font-weight: 600; flex: 1; }
   .blink a { color: var(--c-primary); text-decoration: none; font-size: 13px; white-space: nowrap; }
-  #bottomNav.dense button { font-size: 10px; letter-spacing: -0.02em; white-space: nowrap; padding: 8px 1px 10px; }
+  #bottomNav.dense button { font-size: 10px; letter-spacing: -0.02em; white-space: nowrap; padding: 8px 1px 10px;
+                            min-width: 0; overflow: hidden; }
   #bottomNav.dense button .ic { font-size: 18px; }
+  /* ★7個以上（残業タブが出る管理者）でも1行に収める（2026-08-25）。
+     min-width:0 が無いと nowrap の文字がボタンからはみ出し、ナビ全体が横に溢れる。 */
+  #bottomNav.dense7 button { font-size: 9px; padding: 8px 0 10px; }
+  #bottomNav.dense7 button .ic { font-size: 16px; }
   .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent;
           border-radius: 50%; animation: sp 0.8s linear infinite; vertical-align: -3px; margin-right: 6px; }
   @keyframes sp { to { transform: rotate(360deg); } }
@@ -818,6 +823,48 @@
     </div>
   </div>
 
+  <!-- ═══ ⏰残業（勤務時間の変更・__設定__ OVERTIME_ADMINS の人だけ） ═══ -->
+  <div class="view hidden" id="overtimeView">
+    <div class="card">
+      <h2>⏰ 残業（勤務時間の変更）</h2>
+      <div class="case-info">スタッフとその日を選んで、<b>出勤の時間</b>を変更します（役割は問いません）。<br>
+        変更するとGoogleカレンダーの<b>その日の予定の時刻が変わり、名前の右に「•」</b>が付きます。<br>
+        ※<b>配布報告の勤務時間（本人が入力した数字）には触れません</b>。</div>
+      <div class="footer-note" style="margin-top:8px">先にその日が<b>出勤日として登録</b>されている必要があります（シフト管理で登録）。</div>
+    </div>
+
+    <div class="card">
+      <h2>時間を変更する</h2>
+      <label>スタッフ</label>
+      <select id="otStaff"><option value="">— スタッフを選択 —</option></select>
+
+      <label style="margin-top:10px">日付</label>
+      <input type="date" id="otDate">
+
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <div style="flex:1"><label>開始</label><input type="time" id="otStart" step="300"></div>
+        <div style="flex:1"><label>終了</label><input type="time" id="otEnd" step="300"></div>
+      </div>
+
+      <label style="margin-top:10px">メモ（任意）</label>
+      <input type="text" id="otNote" placeholder="例：急な追加案件のため" autocomplete="off">
+
+      <button type="button" class="btn-primary" id="otSaveBtn" style="margin-top:14px" onclick="App.saveOvertime()">この時間で変更する</button>
+      <div id="otResult" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <h2>この月の変更ぶん</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button type="button" class="sa-nav" onclick="App.otMonth(-1)">‹</button>
+        <div class="sa-title" id="otMonthLabel" style="flex:1;text-align:center">—</div>
+        <button type="button" class="sa-nav" onclick="App.otMonth(1)">›</button>
+      </div>
+      <div id="otList" style="margin-top:10px"><div class="empty">読み込み中…</div></div>
+      <button type="button" class="btn-ghost" onclick="App.loadOvertime()" style="margin-top:10px">↻ 更新</button>
+    </div>
+  </div>
+
   <!-- ═══ 配布禁止（配布員・管理者(配布者)） ═══ -->
   <div class="view hidden" id="banView">
     <div class="card">
@@ -877,6 +924,7 @@
   <button type="button" data-tab="register" id="navRegister" onclick="App.switchTab('register')" style="display:none"><span class="ic">🗓️</span>予定登録</button>
   <button type="button" data-tab="staff" id="navStaff" onclick="App.switchTab('staff')" style="display:none"><span class="ic">👥</span>スタッフ管理</button>
   <button type="button" data-tab="shiftadmin" id="navShiftAdmin" onclick="App.switchTab('shiftadmin')" style="display:none"><span class="ic">🗂️</span>シフト管理</button>
+  <button type="button" data-tab="overtime" id="navOvertime" onclick="App.switchTab('overtime')" style="display:none"><span class="ic">⏰</span>残業</button>
 </nav>
 
 <script>
@@ -1309,6 +1357,7 @@ var App = (function() {
     state.isAdmin = !!res.isAdmin;
     // canReport: サーバが返さない旧デプロイでは undefined → 従来どおり全員報告可(true)に倒す
     state.canReport = (res.canReport === undefined) ? true : !!res.canReport;
+    state.canOvertime = !!res.canOvertime;   // ⏰残業タブの出し分け（__設定__ OVERTIME_ADMINS）
     state.registered = !!res.registered;
     state.staff = res.staff || null;
     if (res.colorPalette) state.colorPalette = res.colorPalette;   // 色ピッカー用パレット（Googleカレンダー標準11色）
@@ -1344,6 +1393,8 @@ var App = (function() {
     $('navRegister').style.display = state.isAdmin ? '' : 'none';
     $('navStaff').style.display = state.isAdmin ? '' : 'none';
     $('navShiftAdmin').style.display = state.isAdmin ? '' : 'none';
+    // ⏰残業＝__設定__ OVERTIME_ADMINS に書かれた人だけ（管理者でも書かれていなければ出さない）
+    $('navOvertime').style.display = state.canOvertime ? '' : 'none';
     // 配布禁止=配布員(報告する非管理者)／配布禁止管理=管理者（管理者(配布者)は管理タブに自分の当日も同居）
     $('navBan').style.display = (state.canReport && !state.isAdmin) ? '' : 'none';
     $('navBanAdmin').style.display = state.isAdmin ? '' : 'none';
@@ -1352,6 +1403,7 @@ var App = (function() {
     var visibleTabs = 0;
     for (var bi = 0; bi < navBtns.length; bi++) { if (navBtns[bi].style.display !== 'none') visibleTabs++; }
     $('bottomNav').classList.toggle('dense', visibleTabs >= 6);
+    $('bottomNav').classList.toggle('dense7', visibleTabs >= 7);   // ⏰残業タブが出る管理者（2026-08-25）
     return true;
   }
 
@@ -1441,15 +1493,29 @@ var App = (function() {
   }
 
   // ─── タブ切替 ───
+  /**
+   * 画面（view）の切替。
+   * ★★ここの一覧に載っていない画面は「hidden が一度も外れない＝真っ白」になる（2026-08-25 レビューで発覚）。
+   *   タブを増やしたら **TAB_VIEWS と この一覧の両方** に必ず足すこと。
+   *   （tests/test-overtime.js が「全タブを switchTab して hidden が外れるか」を実際に確かめている）
+   */
+  var ALL_VIEWS = ['homeView', 'historyView', 'accountView', 'shiftView', 'shiftAdminView',
+                   'registerView', 'staffView', 'banView', 'banAdminView', 'overtimeView', 'unregView'];
+  /** タブ名 → 画面id（switchTab と、上の ALL_VIEWS の突合に使う） */
+  var TAB_VIEWS = { home: 'homeView', history: 'historyView', account: 'accountView',
+                    shift: 'shiftView', shiftadmin: 'shiftAdminView', register: 'registerView',
+                    staff: 'staffView', ban: 'banView', banadmin: 'banAdminView',
+                    overtime: 'overtimeView' };
+
   function showOnly(viewId) {
-    ['homeView', 'historyView', 'accountView', 'shiftView', 'shiftAdminView', 'registerView', 'staffView', 'banView', 'banAdminView', 'unregView'].forEach(function(v) {
-      $(v).classList.toggle('hidden', v !== viewId);
+    ALL_VIEWS.forEach(function(v) {
+      var el = $(v); if (el) el.classList.toggle('hidden', v !== viewId);
     });
   }
   function switchTab(name, skipLoad) {
     state.tab = name;
     if (name !== 'ban' && name !== 'banadmin') banAutoSyncStop();   // 配布禁止タブを離れたら自動更新を止める
-    var map = { home: 'homeView', history: 'historyView', account: 'accountView', shift: 'shiftView', shiftadmin: 'shiftAdminView', register: 'registerView', staff: 'staffView', ban: 'banView', banadmin: 'banAdminView' };
+    var map = TAB_VIEWS;
     showOnly(map[name]);
     var btns = document.querySelectorAll('#bottomNav button');
     for (var i = 0; i < btns.length; i++) {
@@ -1467,6 +1533,7 @@ var App = (function() {
     else if (name === 'shiftadmin') loadShiftAdmin();
     else if (name === 'ban') loadBanBoard();
     else if (name === 'banadmin') loadBanAdmin();
+    else if (name === 'overtime') loadOvertime();
   }
 
   // ─── ホーム: 本日の担当 ───
@@ -2040,7 +2107,9 @@ var App = (function() {
       $('caseInfo').innerHTML =
         '店舗: <b>' + esc(c.storeClean) + '</b> ／ エリア: <b>' + esc(c.areaDisplay) + '</b>' +
         '<br>報告する日: <b>' + when + '</b> ／ 役割: <b>' + roleTxt + '</b>' +
-        (c.done ? '<br><span style="color:var(--c-ok)">✓ この日は対応済みです（再送信すると重複になります）</span>' : '') +
+        (c.done ? '<br><span style="color:var(--c-ok)">✓ この日は報告済みです。</span>' +
+                  '<br><span style="color:var(--c-sub)">数字を直すときは「履歴」タブ →「✏️ 数字を修正」から申請してください' +
+                  '（ここから送り直すと部数が二重になるため、送信できないようにしています）。</span>' : '') +
         (c.material ? '<br>配布物: ' + esc(c.material) : '');
       // 送迎・現場指導＝配布エリアもGPSも不要。役割の案内カードだけ出す。
       if (isNoDistRole(c)) {
@@ -2405,6 +2474,14 @@ var App = (function() {
     if (state.submitting) return;
     var c = currentCase();
     if (!c) { alert('催事を選択してください'); return; }
+    // ★★報告済みの日は送らない（2026-08-25 最終点検。ボタンも止めているが最後の砦）。
+    //   ここを通すと部数が二重に積まれ、合計が合うので誰も気づけない。
+    if (!state.correctingCase && c.done) {
+      alert('この案件のこの日は、すでに報告が送信されています。\n\n' +
+            '数字を直したいときは「履歴」タブ →「✏️ 数字を修正」から申請してください。\n' +
+            '（ここから送り直すと部数が二重になってしまいます）');
+      return;
+    }
     // ★送迎・現場指導の日は、部数もGPSも無しで報告を完了する（2026-08-24 社長指示）
     if (isNoDistRole(c)) { submitNoDist(c); return; }
     // ★履歴からの修正は「申請」＝ここでは数字を動かさない。管理者が承認して初めて反映される。
@@ -2601,8 +2678,14 @@ var App = (function() {
   function setSubmitting(flag, label) {
     state.submitting = flag;
     var btn = $('submitBtn');
-    btn.disabled = flag;
-    btn.innerHTML = flag ? '<span class="spin"></span>' + esc(label || '送信中…') : submitLabel();
+    if (flag) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spin"></span>' + esc(label || '送信中…');
+    } else {
+      // ★戻すときは applyFormMode に任せる（報告済みの日は disabled のままにするため。
+      //   ここで無条件に disabled=false にすると、二重送信の止めが外れてしまう）
+      applyFormMode(currentCase());
+    }
   }
 
   /** 送信ボタンの文言（修正の申請中だけ変える） */
@@ -2621,7 +2704,15 @@ var App = (function() {
     if (t) t.classList.toggle('hidden', noDist);
     if (g) g.classList.toggle('hidden', noDist || correcting);
     if (a) a.classList.toggle('hidden', !correcting);
-    if (b && !state.submitting) b.textContent = submitLabel();
+    // ★★報告済みの日は送信ボタンごと止める（2026-08-25 最終点検）。
+    //   以前は「✓ この日は対応済みです」と文字で出すだけで、そのまま送れてしまい
+    //   **部数が二重に積まれた**（数字が合うので誰も気づけない）。
+    //   直したいときは 履歴 →「✏️ 数字を修正」＝承認制の経路へ誘導する。
+    if (b && !state.submitting) {
+      var done = !correcting && !!(c && c.done);
+      b.disabled = done;
+      b.textContent = done ? 'この日は報告済みです' : submitLabel();
+    }
   }
 
   function showResult(res) {
@@ -3953,6 +4044,113 @@ var App = (function() {
     });
   }
 
+  // ─── ⏰残業（勤務時間の変更・決められた管理者のみ・2026-08-25） ───
+  function otMonthLabel(ym) {
+    var m = String(ym || '').match(/^(\d{4})-(\d{2})$/);
+    return m ? (m[1] + '年' + Number(m[2]) + '月') : String(ym || '');
+  }
+
+  /** 月を前後に動かす（サーバが範囲外なら断ってくれるので、ここでは動かすだけ） */
+  function otMonth(delta) {
+    var cur = state.otMonth || todayIso().slice(0, 7);
+    var y = Number(cur.slice(0, 4)), m = Number(cur.slice(5, 7)) + delta;
+    while (m < 1) { m += 12; y -= 1; }
+    while (m > 12) { m -= 12; y += 1; }
+    state.otMonth = y + '-' + ('0' + m).slice(-2);
+    loadOvertime();
+  }
+
+  function loadOvertime() {
+    $('otList').innerHTML = '<div class="empty">読み込み中…</div>';
+    var month = state.otMonth || todayIso().slice(0, 7);
+    $('otMonthLabel').textContent = otMonthLabel(month);
+    api({ action: 'overtimeBoard', month: month }).then(function(res) {
+      if (!res.ok) {
+        $('otList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>';
+        return;
+      }
+      state.otMonth = res.month;
+      state.otDefaults = res.defaults || { start: '10:00', end: '19:00' };
+      $('otMonthLabel').textContent = otMonthLabel(res.month);
+      // スタッフ選択（選択は保つ）
+      var sel = $('otStaff');
+      var keep = sel.value;
+      sel.innerHTML = '<option value="">— スタッフを選択 —</option>' +
+        (res.staffList || []).map(function(s) {
+          return '<option value="' + esc(s.staffId) + '">' + esc(s.name) +
+                 (s.homeArea ? '（' + esc(s.homeArea) + '）' : '') + '</option>';
+        }).join('');
+      if (keep) sel.value = keep;
+      // 時刻の初期値（まだ触っていなければ既定の10:00-19:00を入れておく）
+      if (!$('otStart').value) $('otStart').value = state.otDefaults.start;
+      if (!$('otEnd').value) $('otEnd').value = state.otDefaults.end;
+      renderOvertimeList(res.overtimes || []);
+    }).catch(function(e) {
+      $('otList').innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
+  function renderOvertimeList(list) {
+    if (!list.length) { $('otList').innerHTML = '<div class="empty">この月に変更した日はありません</div>'; return; }
+    $('otList').innerHTML = list.map(function(r) {
+      return '<div class="assign" style="display:block;margin-bottom:8px">' +
+        '<div class="store">' + esc(r.name) + '<span style="color:var(--c-sub)">•</span>' +
+          ' <span class="badge-inline badge-todo">' + esc(r.date) + '</span></div>' +
+        '<div class="total-bar" style="margin-top:8px"><span>勤務時間</span>' +
+          '<strong>' + esc(r.baseStart || '') + '〜' + esc(r.baseEnd || '') +
+          ' → ' + esc(r.start) + '〜' + esc(r.end) + '</strong></div>' +
+        '<div class="footer-note" style="margin-top:6px">' +
+          esc(String(r.at || '').replace('T', ' ').slice(0, 16)) + ' ／ ' + esc(r.by || '') + '</div>' +
+        '<button type="button" class="btn-ghost" style="margin-top:8px" onclick="App.clearOvertime(\'' +
+          esc(r.staffId) + '\',\'' + esc(r.date) + '\')">元の時間に戻す</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  function saveOvertime() {
+    if (state.submitting) return;
+    var staffId = $('otStaff').value;
+    var dateIso = $('otDate').value;
+    var start = $('otStart').value;
+    var end = $('otEnd').value;
+    if (!staffId) { alert('スタッフを選んでください'); return; }
+    if (!dateIso) { alert('日付を選んでください'); return; }
+    if (!start || !end) { alert('開始と終了の時刻を入れてください'); return; }
+    var name = $('otStaff').options[$('otStaff').selectedIndex].text;
+    if (!confirm(name + '\n' + dateIso + ' の勤務時間を\n' + start + '〜' + end + ' に変更します。\n\n' +
+                 'カレンダーの予定の時刻が変わり、名前の右に「•」が付きます。よろしいですか？')) return;
+    state.submitting = true;
+    $('otSaveBtn').disabled = true;
+    $('otResult').innerHTML = '<div class="msg"><span class="spin"></span>変更しています…</div>';
+    api({ action: 'setOvertime', staffId: staffId, dateIso: dateIso, start: start, end: end,
+          note: ($('otNote') || {}).value || '' }).then(function(res) {
+      state.submitting = false; $('otSaveBtn').disabled = false;
+      $('otResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') +
+        '" style="white-space:pre-wrap">' + esc(res.message || res.code) + '</div>';
+      if (res.ok) { if ($('otNote')) $('otNote').value = ''; loadOvertime(); }
+    }).catch(function(e) {
+      state.submitting = false; $('otSaveBtn').disabled = false;
+      $('otResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) +
+        '<br>変わったかどうかは下の一覧を「↻ 更新」でご確認ください。</div>';
+    });
+  }
+
+  function clearOvertime(staffId, dateIso) {
+    if (state.submitting) return;
+    if (!confirm(dateIso + ' の勤務時間を元に戻します。\n（カレンダーの時刻が戻り、名前の「•」も消えます）\n\nよろしいですか？')) return;
+    state.submitting = true;
+    $('otResult').innerHTML = '<div class="msg"><span class="spin"></span>戻しています…</div>';
+    api({ action: 'clearOvertime', staffId: staffId, dateIso: dateIso }).then(function(res) {
+      state.submitting = false;
+      $('otResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') +
+        '" style="white-space:pre-wrap">' + esc(res.message || res.code) + '</div>';
+      loadOvertime();
+    }).catch(function(e) {
+      state.submitting = false;
+      $('otResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+
   // ロスターだけ再読込（承認直後の反映用・申請一覧は別途 loadPendingRegs で更新）
   function loadStaffRosterOnly() {
     api({ action: 'listStaff' }).then(function(res) {
@@ -4773,6 +4971,7 @@ var App = (function() {
     gotoBanTab: gotoBanTab, loadBanAdmin: loadBanAdmin, toggleAvoid: toggleAvoid,
     toggleRegBan: toggleRegBan, updateRegHh: updateRegHh,
     loadPendingAmends: loadPendingAmends, approveAmend: approveAmend, rejectAmend: rejectAmend,
+    loadOvertime: loadOvertime, saveOvertime: saveOvertime, clearOvertime: clearOvertime, otMonth: otMonth,
     loadRegistrations: loadRegistrations, deleteRegistration: deleteRegistration,
     regStartEdit: regStartEdit, regCancelEdit: regCancelEdit, regDoSave: regDoSave,
     regEditSetRole: regEditSetRole, regEditRemoveMember: regEditRemoveMember, regEditAddMember: regEditAddMember,
