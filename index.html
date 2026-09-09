@@ -3915,9 +3915,16 @@ var App = (function() {
   }
 
   // ─── 登録申請の承認/却下（管理者） ───
-  function loadPendingRegs() {
+  /**
+   * @param {boolean=} keepResult true=処理結果の表示を消さない。
+   *   ★承認・却下の直後に一覧を読み直すと、この関数の先頭で結果表示を消してしまい、
+   *     「1bMZの月次タブから手で引いてください」「なぜ承認できなかったか」が
+   *     管理者に**一度も見えないまま**消える（2026-08-26 総点検で発見）。
+   *     手押しの「↻ 更新」だけが消す（引数なし）。
+   */
+  function loadPendingRegs(keepResult) {
     $('pendingRegList').innerHTML = '<div class="empty">読み込み中…</div>';
-    $('pendingRegResult').innerHTML = '';
+    if (!keepResult) $('pendingRegResult').innerHTML = '';
     api({ action: 'listPendingRegistrations' }).then(function(res) {
       if (!res.ok) { $('pendingRegList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
       state.regUnclaimed = res.unclaimed || [];
@@ -4004,7 +4011,7 @@ var App = (function() {
         return;
       }
       $('pendingRegResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') + '">' + esc(res.message || res.code) + '</div>';
-      loadPendingRegs();
+      loadPendingRegs(true);
       if (res.ok) loadStaffRosterOnly();   // ロスターだけ更新（申請一覧の二重読みを避ける）
     }).catch(function(e) {
       state.submitting = false;
@@ -4021,7 +4028,7 @@ var App = (function() {
       state.submitting = false;
       $('pendingRegResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') + '">' + esc(res.message || res.code) + '</div>';
       if (res.ok && res.undo) showUndoToast(res.undo, loadPendingRegs);
-      loadPendingRegs();
+      loadPendingRegs(true);
     }).catch(function(e) {
       state.submitting = false;
       $('pendingRegResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
@@ -4029,9 +4036,16 @@ var App = (function() {
   }
 
   // ─── 修正報告の承認/却下（管理者・2026-08-24） ───
-  function loadPendingAmends() {
+  /**
+   * @param {boolean=} keepResult true=処理結果の表示を消さない。
+   *   ★承認・却下の直後に一覧を読み直すと、この関数の先頭で結果表示を消してしまい、
+   *     「1bMZの月次タブから手で引いてください」「なぜ承認できなかったか」が
+   *     管理者に**一度も見えないまま**消える（2026-08-26 総点検で発見）。
+   *     手押しの「↻ 更新」だけが消す（引数なし）。
+   */
+  function loadPendingAmends(keepResult) {
     $('pendingAmendList').innerHTML = '<div class="empty">読み込み中…</div>';
-    $('pendingAmendResult').innerHTML = '';
+    if (!keepResult) $('pendingAmendResult').innerHTML = '';
     api({ action: 'listPendingAmends' }).then(function(res) {
       if (!res.ok) { $('pendingAmendList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
       renderPendingAmends(res.pending || []);
@@ -4079,7 +4093,7 @@ var App = (function() {
       $('pendingAmendResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') +
         '" style="white-space:pre-wrap">' + esc(res.message || res.code) + '</div>';
       if (res.ok && res.undo) showUndoToast(res.undo, loadPendingAmends);
-      loadPendingAmends();
+      loadPendingAmends(true);
     }).catch(function(e) {
       state.submitting = false;
       $('pendingAmendResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) +
@@ -4097,7 +4111,7 @@ var App = (function() {
       state.submitting = false;
       $('pendingAmendResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') + '">' + esc(res.message || res.code) + '</div>';
       if (res.ok && res.undo) showUndoToast(res.undo, loadPendingAmends);
-      loadPendingAmends();
+      loadPendingAmends(true);
     }).catch(function(e) {
       state.submitting = false;
       $('pendingAmendResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
@@ -5199,6 +5213,14 @@ var App = (function() {
   }
 
   function onSaStaffChange() {
+    // ★月移動（saMonth）と同じ2つの門をここにも置く。無いと、保存中に担当者を切り替えたときに
+    //   保存の応答が**別人の画面**で再描画を起こし、未保存の変更も黙って消える（2026-08-26 総点検で発見）。
+    var prev = state.saForm;
+    if (state.submitting) { if (prev) $('saStaff').value = prev.staffId; return; }
+    if (prev && prev.dirty && !confirm('保存していない変更があります。破棄して担当者を切り替えますか？')) {
+      $('saStaff').value = prev.staffId;
+      return;
+    }
     var staffId = $('saStaff').value;
     if (!staffId) {
       state.saForm = null;
@@ -5212,19 +5234,30 @@ var App = (function() {
     saLoadMonth();
   }
 
-  function saLoadMonth() {
+  /**
+   * @param {boolean=} keepResult true=保存結果の表示を消さない。
+   *   ★保存の直後に再描画すると、この関数の先頭で #saResult を消してしまい、
+   *     「保全 N日（読込後に欠勤になった分＝シフト変更の承認など。復活させていません）」や
+   *     「カレンダー反映に一部失敗 N件」が**管理者に一度も見えないまま**消える（2026-08-26 総点検で発見）。
+   *     保存からの呼び出しだけは消さない。
+   */
+  function saLoadMonth(keepResult) {
     var f = state.saForm;
     if (!f) return;
     var reqStaff = f.staffId, reqY = f.viewY, reqM = f.viewM;   // 応答レース対策の照合キー
     $('saCalCard').classList.remove('hidden');
     $('saSum').textContent = '読み込み中…';
     $('saGrid').innerHTML = '';
-    $('saResult').innerHTML = '';
+    if (!keepResult) $('saResult').innerHTML = '';
     api({ action: 'adminStaffShifts', staffId: f.staffId, year: f.viewY, month: f.viewM + 1 }).then(function(res) {
       var cur = state.saForm;
       if (!cur || cur.staffId !== reqStaff || cur.viewY !== reqY || cur.viewM !== reqM) return;   // 別スタッフ/別月に切替済み→古い応答は破棄
       f = cur;
-      if (!res.ok) { $('saSum').textContent = res.message || res.code; return; }
+      // ★読み込めなかったときは baseline が**保存前のまま**残る。そのまま次の保存をすると、
+      //   管理者が自分で戻したつもりの日が「読込後に変わった分」と誤解されて保全＝捨てられる。
+      //   読み直せていないことを覚えておき、保存を止める（2026-08-26 総点検で発見）。
+      if (!res.ok) { $('saSum').textContent = res.message || res.code; f.loadFailed = true; return; }
+      f.loadFailed = false;
       f.name = res.staffName || ''; f.base = res.base || ''; f.configured = !!res.baseConfigured;
       f.selected = {}; f.dirty = false;
       (res.dates || []).forEach(function(d) { f.selected[d] = true; });
@@ -5236,7 +5269,11 @@ var App = (function() {
         ? '拠点: <b>' + esc(f.base || '（既定）') + '</b>'
         : '<span style="color:var(--c-err)">⚠ ' + esc(f.name) + ' さんの拠点が未設定です。配布員マスタの「主エリア」を設定してください（このままでは保存できません）。</span>';
       renderSaCal();
-    }).catch(function(e) { $('saSum').textContent = '接続できません: ' + e.message; });
+    }).catch(function(e) {
+      $('saSum').textContent = '接続できません: ' + e.message;
+      var cur = state.saForm;
+      if (cur && cur.staffId === reqStaff && cur.viewY === reqY && cur.viewM === reqM) cur.loadFailed = true;
+    });
   }
 
   function saMonth(delta) {
@@ -5296,14 +5333,23 @@ var App = (function() {
     var f = state.saForm;
     if (!f || state.submitting) return;
     if (!f.configured) { alert(f.name + ' さんの拠点が未設定です。配布員マスタの主エリアを設定してください。'); return; }
+    if (f.loadFailed) {
+      alert('いまの状態を読み込めていません。\n月の «‹ ›» を押すか、担当者を選び直して読み込み直してから保存してください。\n' +
+            '（古い状態のまま保存すると、直したはずの日が元に戻ってしまいます）');
+      return;
+    }
     var dates = Object.keys(f.selected).sort();
     var btn = $('saSave');
     state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>保存中…';
     api({ action: 'adminSubmitStaffShifts', staffId: f.staffId, year: f.viewY, month: f.viewM + 1, dates: dates, baseline: (f.baseline || []) }).then(function(res) {
       state.submitting = false; btn.disabled = false; btn.textContent = 'この月の内容で保存';
       if (res.ok) {
-        $('saResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + res.message) + '</div>';
-        saLoadMonth();   // サーバの実状態で再描画（部分失敗も反映）
+        // ★「保全」や「カレンダー反映に一部失敗」があるときは緑のチェックで流さない。
+        //   保全＝管理者が画面で見ていない変更を守ったという**お知らせ**なので、必ず読ませる。
+        var warn = (res.preserved > 0) || (res.errors && res.errors.length > 0);
+        $('saResult').innerHTML = '<div class="msg ' + (warn ? 'msg-warn' : 'msg-ok') + '">' +
+                                  esc((warn ? '⚠ ' : '✅ ') + res.message) + '</div>';
+        saLoadMonth(true);   // サーバの実状態で再描画（部分失敗も反映）★結果表示は消さない
       } else {
         $('saResult').innerHTML = errHtml(res, 'エラー');
       }
