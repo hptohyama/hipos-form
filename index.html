@@ -595,13 +595,24 @@
 
       <div class="card">
         <h2>③ 勤務実績</h2>
-        <div class="case-info">実働が違う日は<b>勤務時間</b>だけ直してください（部数毎時は自動で計算し直します）。</div>
+        <div class="case-info">実働が違う日は<b>勤務時間</b>だけ直してください。</div>
         <label>勤務時間（h）</label>
         <input type="number" id="workWorkH" min="0" step="0.5" inputmode="decimal">
+
+        <!-- ★配布時間＝ランキーパーの計測時間（2026-09-11 社長指示）。部数毎時はこの時間で割る。 -->
+        <label style="margin-top:12px" id="workDistLabel">配布時間（ランキーパーの計測時間）</label>
+        <div class="case-info" id="workDistHelp">ランキーパーに出た時間を、そのまま<b>時間</b>と<b>分</b>に分けて入れてください（例 2:15 →「2」時間「15」分）。</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" id="workDistH" min="0" max="23" step="1" inputmode="numeric" placeholder="0" style="flex:1"
+                 oninput="App.updateCph()"><span style="white-space:nowrap">時間</span>
+          <input type="number" id="workDistM" min="0" max="59" step="1" inputmode="numeric" placeholder="0" style="flex:1"
+                 oninput="App.updateCph()"><span style="white-space:nowrap">分</span>
+        </div>
+
         <div class="total-bar" style="margin-top:10px">
           <span>部数毎時（部/1h・自動）</span><strong id="workCphView">0</strong>
         </div>
-        <div class="case-info" style="margin-top:6px">休憩時間：1時間（自動）</div>
+        <div class="case-info" style="margin-top:6px">配布部数 ÷ 配布時間 で自動計算します。／休憩時間：1時間（自動）</div>
         <input type="hidden" id="workCph">
         <input type="hidden" id="workBreakH">
       </div>
@@ -1009,7 +1020,7 @@ var App = (function() {
     idToken: null, tokenExp: 0,
     deviceId: null, reportUuid: null, reportUuidKey: '',   // 送信IDと、その送信IDが属する案件×配布日（取り違え防止）
     email: '', cases: [], reportCase: null, areas: [], staffList: [], calendars: [], isAdmin: false, staff: null, registered: false,
-    regSel: {}, regOrder: [], regBase: '', registrations: [], regEdit: null, correctingCase: null,   // 予定登録の選択(staffId→役割)/表示・登録順/①拠点／登録済み一覧／編集フォームの状態／履歴修正の対象案件
+    regSel: {}, regOrder: [], regBase: '', registrations: [], regEdit: null, correctingCase: null, correctingHadDistMin: false,   // 予定登録の選択(staffId→役割)/表示・登録順/①拠点／登録済み一覧／編集フォームの状態／履歴修正の対象案件
     banListChoices: [], regBanSel: {}, regBanTouched: false,   // 配布禁止リストの選択肢(bootstrap・[{name,storeKw}])／新規登録での選択(name→true)／手動調整フラグ(trueなら自動おすすめしない)
     regShiftStaff: null, regShiftKey: '', regShiftAll: false,   // 担当候補のシフト絞込(当日シフトのあるstaffId配列/取得キー/全員表示フォールバック)
     banToday: {},   // 配布禁止タブ: scope('board'|'admin')別の当日禁止（トグル表示）
@@ -2018,6 +2029,7 @@ var App = (function() {
    */
   function exitAmendMode() {
     state.correctingCase = null;
+    state.correctingHadDistMin = false;   // ★次の修正へ持ち越さない（持ち越すと関係ない報告で止まる）
     state.townRowsKey = '';       // ★空にしておく＝このあと案件切替の確認が二重に出ない
     state.townRowsCase = null;
     $('townRows').innerHTML = '';
@@ -2427,6 +2439,9 @@ var App = (function() {
         //   これまで workStart / workEnd という**存在しないID**を読んでいたため、
         //   実働5.5時間に直しても読み込み直すと黙って8時間に戻り、そのまま送信されていた。
         workH: ($('workWorkH') || {}).value || '',
+        // ★配布時間（ランキーパーの計測時間）も残す（2026-09-11）
+        distH: ($('workDistH') || {}).value || '',
+        distM: ($('workDistM') || {}).value || '',
         note: ($('note') || {}).value || '',
         at: Date.now()
       };
@@ -2438,7 +2453,9 @@ var App = (function() {
       //   その日は「既定の8時間から変えた」ことを入力とみなして保存する
       //   （町行があるふつうの日は従来どおり＝開いただけで下書きを作らない）。
       var workChanged = d.lines.length === 0 && String(d.workH || '') !== '' && Number(d.workH) !== 8;
-      var hasInput = d.lines.some(function(l) { return String(l.qty || '') !== ''; }) || !!d.note || workChanged;
+      // ★配布時間を入れたら、それだけでも「入力した」とみなす（消えると入れ直しになる）
+      var distTyped = String(d.distH || '') !== '' || String(d.distM || '') !== '';
+      var hasInput = d.lines.some(function(l) { return String(l.qty || '') !== ''; }) || !!d.note || workChanged || distTyped;
       if (!hasInput) { lsDel(draftKeyOf(c)); return; }
       lsSet(draftKeyOf(c), JSON.stringify(d));
       pruneDrafts();
@@ -2461,7 +2478,7 @@ var App = (function() {
     if (!d || d.key !== caseKeyOf(c)) return false;
     // ★送迎・現場指導の日は町行が無く、勤務時間だけの下書きになる（2026-08-24）
     var workOnly = !d.lines || !d.lines.length;
-    if (workOnly && !d.workH) return false;
+    if (workOnly && !d.workH && !d.distH && !d.distM) return false;
     if (readLines().length > 0) return false;             // 既に入力があるなら触らない
     if (Date.now() - (d.at || 0) > 7 * 86400000) { clearDraft(); return false; }   // 1週間で失効
     if (!workOnly) $('townRows').innerHTML = '';
@@ -2477,6 +2494,9 @@ var App = (function() {
     // ★勤務時間も戻す（2026-08-09 総点検。以前は存在しないIDを見ていて必ず8時間に戻っていた）
     var restoredWorkH = '';
     if (d.workH && $('workWorkH')) { $('workWorkH').value = d.workH; restoredWorkH = d.workH; }
+    // ★配布時間も戻す（2026-09-11）
+    if (d.distH !== undefined && $('workDistH')) $('workDistH').value = d.distH;
+    if (d.distM !== undefined && $('workDistM')) $('workDistM').value = d.distM;
     if (d.note && $('note')) $('note').value = d.note;
     recalc();
     var res = $('resultArea');
@@ -2505,19 +2525,36 @@ var App = (function() {
     updateCph();        // 合計部数が変わると部数毎時（=合計÷勤務時間）を再計算
   }
 
-  // 部数毎時 = 合計部数（自動） ÷ 勤務時間。合計・勤務時間が変わるたび自動計算（表示は読み取り専用）。
+  // ★配布時間（分）＝ランキーパーの計測時間。時間＋分の2つの欄から作る（2026-09-11 社長指示）。
+  //   空（どちらも未入力）のときは null＝「計測していない」。0分とは区別する。
+  function distMinValue() {
+    var hEl = $('workDistH'), mEl = $('workDistM');
+    if (!hEl || !mEl) return null;
+    var hs = String(hEl.value || '').trim(), ms = String(mEl.value || '').trim();
+    if (hs === '' && ms === '') return null;
+    var h = Number(hs || 0), m = Number(ms || 0);
+    if (!isFinite(h) || !isFinite(m) || h < 0 || m < 0) return null;
+    var total = Math.round(h * 60 + m);
+    return total > 0 ? total : null;
+  }
+
+  // ★部数毎時 = 合計部数（自動） ÷ 配布時間（2026-09-11 社長指示で「勤務時間」から変更）。
+  //   配布時間が未入力なら空にする＝「計測していない」と「0部毎時」を取り違えない。
   function updateCph() {
     var total = autoSum();
-    var wh = Number($('workWorkH').value);
-    var cph = (total > 0 && wh > 0) ? Math.round(total / wh) : '';
+    var dm = distMinValue();
+    var cph = (total > 0 && dm > 0) ? Math.round(total * 60 / dm) : '';
     $('workCph').value = cph;
     if ($('workCphView')) $('workCphView').textContent = cph || 0;
   }
 
-  // 勤務実績の初期値（休憩1h・勤務8h）を入れる。部数毎時は自動。勤務時間のみ本人が直せる。
+  // 勤務実績の初期値（休憩1h・勤務8h）を入れる。部数毎時は自動。
+  // ★配布時間は毎日ちがう実測値なので、初期値を入れない（空欄から始める）。
   function resetWorkFields() {
     $('workBreakH').value = 1;
     $('workWorkH').value = 8;
+    if ($('workDistH')) $('workDistH').value = '';
+    if ($('workDistM')) $('workDistM').value = '';
     updateCph();
   }
 
@@ -2570,6 +2607,18 @@ var App = (function() {
       var gp = $('gpsHeading'); if (gp) gp.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
+    // ★配布時間（ランキーパーの計測時間）も必須（2026-09-11 社長指示）。
+    //   部数毎時をこの時間で割って出すので、無いと「1時間あたり何部配ったか」が出せない。
+    //   ※送迎・現場指導の日はこの経路を通らない（submitNoDistribution 側＝任意のまま）。
+    //   ※サーバでも #3.6 で必ず確かめる（画面が古い端末・通信を直接叩かれた場合の保険）。
+    if (distMinValue() == null) {
+      alert('配布時間が入力されていません。\n\n' +
+            '「③ 勤務実績」の「配布時間」に、ランキーパーで計測した時間を\n' +
+            '「時間」と「分」に分けて入れてください（例 2:15 →「2」時間「15」分）。');
+      var dh = $('workDistLabel'); if (dh) dh.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var dfocus = $('workDistH'); if (dfocus) dfocus.focus();
+      return;
+    }
     // 配布禁止物件の回避確認は報告送信ゲートから撤去（Phase2/3）。回避は「配布禁止」タブで行う。
     // ★送信IDは「案件×配布日」に紐づける（総点検 2026-07-28）。
     //   電波が切れて送信が失敗すると、再送できるよう state.reportUuid を残す（これは正しい）。
@@ -2593,7 +2642,8 @@ var App = (function() {
         // 勤務実績（任意・M4.5でUI復活。空欄は null = 未入力として保存され 0 と区別される）
         work: { copiesPerHour: numOrNull($('workCph').value),
                 breakH: numOrNull($('workBreakH').value),
-                workH: numOrNull($('workWorkH').value) },
+                workH: numOrNull($('workWorkH').value),
+                distMin: distMinValue() },   // ★配布時間（分）2026-09-11
         note: ''
       }
     };
@@ -2627,7 +2677,9 @@ var App = (function() {
           report: { caseNo: c.caseNo, distEnd: day,
                     work: { copiesPerHour: null,
                             breakH: numOrNull($('workBreakH').value),
-                            workH: numOrNull($('workWorkH').value) } } }).then(function(res) {
+                            workH: numOrNull($('workWorkH').value),
+                            // ★送迎・現場指導の日は配布時間は任意（空欄で送れる・社長判断 2026-09-11）
+                            distMin: distMinValue() } } }).then(function(res) {
       setSubmitting(false);
       if (res.ok) {
         state.reportUuid = null;
@@ -2660,6 +2712,16 @@ var App = (function() {
       alert('町名が入っていない行に部数があります。\n画面を読み込み直してから、もう一度お試しください。');
       return;
     }
+    // ★配布時間を空にしたままの申請は、承認した瞬間に元の配布時間と部数毎時を消してしまう。
+    //   承認は「取消 → 入れ直し」で必須検査を免除しているので、止めるならここ（2026-09-11）。
+    //   ※この機能より前の報告（元から配布時間が無い）は、空のままでも直せる。
+    if (state.correctingHadDistMin && distMinValue() == null) {
+      alert('配布時間が入力されていません。\n\n' +
+            '「配布時間」に、ランキーパーで計測した時間を「時間」と「分」に分けて入れてください。\n' +
+            '※配布時間だけを空にすることはできません。');
+      var dfx = $('workDistH'); if (dfx) dfx.focus();
+      return;
+    }
     var qtyWarn = checkQtySanity(lines);
     if (qtyWarn && !confirm(qtyWarn + '\n\nこの内容で申請しますか？')) return;
     var total = autoSum();
@@ -2672,7 +2734,8 @@ var App = (function() {
       lines: lines, totalReported: total,
       work: { copiesPerHour: numOrNull($('workCph').value),
               breakH: numOrNull($('workBreakH').value),
-              workH: numOrNull($('workWorkH').value) },
+              workH: numOrNull($('workWorkH').value),
+              distMin: distMinValue() },
       reason: ($('amendReason') || {}).value || ''
     }).then(function(res) {
       setSubmitting(false);
@@ -3060,8 +3123,19 @@ var App = (function() {
     resetWorkFields();
     if (detail.workH != null && detail.workH !== '' && $('workWorkH')) {
       $('workWorkH').value = detail.workH;
-      updateCph();
     }
+    // ★前回の配布時間も戻す（2026-09-11）。戻さないと空欄になり、
+    //   「配布時間が未入力です」で修正申請が送れない／直すつもりのない時間が消える。
+    // ★この機能より前の報告は配布時間を持っていない。持っていたかどうかを覚えておき、
+    //   持っていた報告では**空にして申請できない**ようにする（サーバ側でも同じ判断をする）。
+    state.correctingHadDistMin = (detail.distMin != null && detail.distMin !== '' &&
+                                  Number(detail.distMin) > 0);
+    if (state.correctingHadDistMin && $('workDistH') && $('workDistM')) {
+      var dm = Math.max(0, Math.round(Number(detail.distMin) || 0));
+      $('workDistH').value = Math.floor(dm / 60);
+      $('workDistM').value = dm % 60;
+    }
+    updateCph();
     $('townRows').innerHTML = '';
     // ★履歴からの修正でも、前回報告した町は消せない（2026-08-12 社長指示）。
     //   「配布報告ではエリアを消せないようにする」＝入れ直しのときも同じ。
@@ -4050,6 +4124,16 @@ var App = (function() {
     });
   }
 
+  // 配布時間（分）→ '2時間15分'。未計測なら空（サーバの ReportList.distLabel と同じ考え方）
+  function distMinLabel(min) {
+    if (min == null || min === '') return '';
+    var n = Number(min);
+    if (!isFinite(n) || n <= 0) return '';
+    n = Math.round(n);
+    var h = Math.floor(n / 60), m = n % 60;
+    return (h ? h + '時間' : '') + (m ? m + '分' : (h ? '' : '0分'));
+  }
+
   function renderPendingAmends(list) {
     if (!list.length) { $('pendingAmendList').innerHTML = '<div class="empty">承認待ちの修正報告はありません</div>'; return; }
     $('pendingAmendList').innerHTML = list.map(function(r) {
@@ -4069,8 +4153,11 @@ var App = (function() {
         '<div class="total-bar" style="margin-top:8px"><span>合計部数</span>' +
           '<strong>' + (r.oldQty || 0) + ' → ' + (r.newQty || 0) + '（' + esc(deltaTxt) + '）</strong></div>' +
         (diff ? '<div style="margin-top:8px">' + diff + '</div>'
-              : '<div class="footer-note" style="margin-top:8px">町ごとの部数の変更はありません（勤務時間のみの修正）</div>') +
+              : '<div class="footer-note" style="margin-top:8px">町ごとの部数の変更はありません（時間のみの修正）</div>') +
         (r.workH != null ? '<div class="footer-note">勤務時間: ' + esc(String(r.workH)) + ' 時間</div>' : '') +
+        // ★配布時間（ランキーパーの計測時間）も承認画面に出す。出さないと、部数が同じで
+        //   配布時間だけを直した申請が「何も変わっていない申請」に見えてしまう（2026-09-11）
+        (distMinLabel(r.distMin) ? '<div class="footer-note">配布時間: ' + esc(distMinLabel(r.distMin)) + '</div>' : '') +
         (r.reason ? '<div class="footer-note" style="margin-top:6px">理由: ' + esc(r.reason) + '</div>' : '') +
         '<div style="display:flex;gap:8px;margin-top:10px">' +
           '<button type="button" class="btn-primary" style="flex:1" onclick="App.approveAmend(\'' + esc(r.reqId) + '\')">承認して反映</button>' +
@@ -5438,6 +5525,12 @@ var App = (function() {
     //   端末に保存されず、読み込み直すと初期値の8時間に戻っていた。
     //   送迎・現場指導の日は勤務時間が唯一の入力欄なので、ここが効かないと何も残らない。
     $('workWorkH').oninput = function() { updateCph(); saveDraft(); };
+    // ★配布時間も同じく下書きに残す（2026-09-11）。
+    //   ここを忘れると、時間と分を入れたあと画面を読み込み直すだけで消え、
+    //   本人は入れたつもりのまま「配布時間を入れてください」で止まる。
+    ['workDistH', 'workDistM'].forEach(function(id) {
+      var el = $(id); if (el) el.oninput = function() { updateCph(); saveDraft(); };
+    });
     resetWorkFields();                          // 勤務実績の初期値（休憩1h・勤務8h）
     setInterval(refreshShiftDisplays, 60000);  // JST判定を1分ごとに再評価（8日0時・19時跨ぎで表示が自動切替）
     if (!tryRestoreSession()) {
@@ -5489,6 +5582,7 @@ var App = (function() {
     loadStaff: loadStaff,
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
     submitShiftCycle: submitShiftCycle, pickMyColor: pickMyColor, toggleColorPalette: toggleColorPalette,
+    updateCph: updateCph,   // ★配布時間の欄（時間・分）から呼ぶ（2026-09-11）
     saMonth: saMonth, toggleSaDay: toggleSaDay, saSave: saSave
   };
 })();
