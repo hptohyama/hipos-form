@@ -702,13 +702,9 @@
         <div class="ssum" id="shiftSum"></div>
         <div id="shiftWeekWarn"></div>
       </div>
-      <div class="card" id="shiftColorCard" style="display:none">
-        <div class="mc-row">
-          <div class="mc-label"><b>マイカラー</b><span>シフトがこの色でカレンダーに表示されます</span></div>
-          <button type="button" class="btn-color" id="myColorBtn" onclick="App.toggleColorPalette()"><span class="mc-dot" id="myColorDot"></span><span id="myColorName">未設定</span><span class="mc-caret">▼</span></button>
-        </div>
-        <div id="colorPaletteBox" class="cpal hidden"></div>
-      </div>
+      <!-- ★マイカラー（本人が色を選ぶ）は撤去（2026-09-11 社長指示）。
+           シフトの色は全拠点で統一し、配布員マスタ O列「区分」から自動で決まる
+           （社員=フラミンゴ／運転=ピーコック／その他=セージ）。 -->
       <div id="shiftFormResult"></div>
       <button type="button" class="btn-primary" id="shiftSend" onclick="App.submitShiftCycle()">この内容で提出</button>
       <button type="button" class="btn-ghost" style="margin-top:8px" onclick="App.closeShiftForm()">← 一覧に戻る</button>
@@ -5012,32 +5008,13 @@ var App = (function() {
     $('shiftListBox').classList.remove('hidden');
   }
 
-  // マイカラー（ボタン→コンパクトなパレット・選んだ瞬間にM列へ保存）
-  function renderMyColor() {
-    var pal = state.colorPalette || [];
-    var card = $('shiftColorCard');
-    if (!pal.length) { if (card) card.style.display = 'none'; return; }
-    if (card) card.style.display = '';
-    var cur = null;
-    for (var i = 0; i < pal.length; i++) { if (String(pal[i].id) === String(state.shiftColorId)) { cur = pal[i]; break; } }
-    var dot = $('myColorDot'), nm = $('myColorName');
-    if (dot) dot.style.background = cur ? cur.hex : '#ced4da';
-    if (nm) nm.textContent = cur ? cur.name : '未設定（タップで選ぶ）';
-    var box = $('colorPaletteBox');
-    if (box) box.innerHTML = pal.map(function(c) {
-      var sel = (String(c.id) === String(state.shiftColorId)) ? ' sel' : '';
-      return '<button type="button" class="csw2' + sel + '" onclick="App.pickMyColor(\'' + c.id + '\')">' +
-             '<span class="csw2-dot" style="background:' + c.hex + '"></span>' +
-             '<span class="csw2-name">' + esc(c.name) + '</span></button>';
-    }).join('');
-  }
-  function toggleColorPalette() { var b = $('colorPaletteBox'); if (b) b.classList.toggle('hidden'); }
+  // ★マイカラーは廃止（2026-09-11 社長指示）。シフトの色は全拠点で統一し、
+  //   配布員マスタ O列「区分」から自動で決まる（社員=フラミンゴ／運転=ピーコック／その他=セージ）。
+  //   関数だけは残す＝呼び出し元（シフト画面の描画・App の公開一覧）を壊さないため。何もしない。
+  function renderMyColor() { /* 何もしない（色ピッカーは撤去） */ }
+  function toggleColorPalette() { /* 何もしない（色ピッカーは撤去） */ }
   function pickMyColor(id) {
-    state.shiftColorId = String(id);
-    if (state.staff) state.staff.color = String(id);
-    renderMyColor();
-    var b = $('colorPaletteBox'); if (b) b.classList.add('hidden');   // 選んだら閉じる
-    api({ action: 'setMyColor', colorId: String(id) }).catch(function () {});   // M列へ即保存
+    /* 何もしない（色ピッカーは撤去）。サーバ側 setMyColor も断るようになっている */
   }
 
   function openShiftForm(no) {
@@ -5068,8 +5045,7 @@ var App = (function() {
     $('shiftDone').innerHTML = '';
     renderShiftFormHead();
     renderShiftGrid();
-    state.shiftColorId = (state.staff && state.staff.color) || '';   // 本人の現在色を初期選択（M列から）
-    renderMyColor();
+    // ★色は本人に選ばせない（2026-09-11）。区分から自動で決まるので、ここで読むものは無い。
     $('shiftListBox').classList.add('hidden');
     $('shiftFormBox').classList.remove('hidden');
     window.scrollTo(0, 0);
@@ -5177,13 +5153,12 @@ var App = (function() {
     });
     if (!confirm(f.cycle.label + 'のシフトを提出します。\n\n出勤できる日: ' + ok + '日\n出られない日: ' + ng + '日\n\nよろしいですか？')) return;
 
-    var payload = { action: 'submitShiftCycle', cycleKey: f.key, days: send, note: '', colorId: state.shiftColorId || '' };
+    var payload = { action: 'submitShiftCycle', cycleKey: f.key, days: send, note: '' };   // ★色は送らない
     var btn = $('shiftSend');
     state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>送信中…';
     api(payload).then(function(res) {
       state.submitting = false; btn.disabled = false; btn.textContent = 'この内容で提出';
       if (res.ok) {
-        if (state.staff && state.shiftColorId) state.staff.color = state.shiftColorId;   // セッション中の色を最新に
         lsDel(shiftDraftKey(f.key));
         closeShiftForm();
         $('shiftDone').innerHTML = '<div class="msg msg-ok">✅ ' + esc(res.message) + '<br>カレンダーにも自動反映されました。</div>';
