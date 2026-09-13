@@ -603,9 +603,14 @@
         <label style="margin-top:12px" id="workDistLabel">配布時間（ランキーパーの計測時間）</label>
         <div class="case-info" id="workDistHelp">ランキーパーに出た時間を、そのまま<b>時間</b>と<b>分</b>に分けて入れてください（例 2:15 →「2」時間「15」分）。</div>
         <div style="display:flex;gap:8px;align-items:center">
-          <input type="number" id="workDistH" min="0" max="23" step="1" inputmode="numeric" placeholder="0" style="flex:1"
+          <!-- ★max / step を付けない（2026-09-11 レビュー）。この form は novalidate では無いので、
+               max を付けると「分」に 135（＝2:15 をそのまま分で入れた人）を入れたとき
+               ブラウザが submit ごと止めてしまい、こちらの日本語の案内が一切出ない。
+               135分は 2時間15分として正しく扱えるので、値としては受けてよい。
+               行き過ぎた時間は送信のときに日本語で確認する。 -->
+          <input type="number" id="workDistH" min="0" inputmode="numeric" placeholder="0" style="flex:1"
                  oninput="App.updateCph()"><span style="white-space:nowrap">時間</span>
-          <input type="number" id="workDistM" min="0" max="59" step="1" inputmode="numeric" placeholder="0" style="flex:1"
+          <input type="number" id="workDistM" min="0" inputmode="numeric" placeholder="0" style="flex:1"
                  oninput="App.updateCph()"><span style="white-space:nowrap">分</span>
         </div>
 
@@ -2538,6 +2543,19 @@ var App = (function() {
     return total > 0 ? total : null;
   }
 
+  // 配布時間が現実的な範囲かを見る（純粋関数）。行き過ぎていれば確認の文面を返す。
+  // ★ブラウザの max で黙って止めるのをやめた代わりに、ここで日本語で聞く。
+  //   「分」に 135 と入れた人は 2時間15分のつもりなので、それは正しいものとして通す。
+  function checkDistSanity(min) {
+    var n = Number(min);
+    if (!isFinite(n) || n <= 0) return '';
+    if (n > 12 * 60) {
+      return '配布時間が ' + Math.floor(n / 60) + '時間' + (n % 60) + '分 になっています。' +
+             '\n\n「時間」と「分」の欄を取り違えていませんか。';
+    }
+    return '';
+  }
+
   // ★部数毎時 = 合計部数（自動） ÷ 配布時間（2026-09-11 社長指示で「勤務時間」から変更）。
   //   配布時間が未入力なら空にする＝「計測していない」と「0部毎時」を取り違えない。
   function updateCph() {
@@ -2619,6 +2637,8 @@ var App = (function() {
       var dfocus = $('workDistH'); if (dfocus) dfocus.focus();
       return;
     }
+    var distWarn = checkDistSanity(distMinValue());
+    if (distWarn && !confirm(distWarn + '\n\nこの時間で報告しますか？')) return;
     // 配布禁止物件の回避確認は報告送信ゲートから撤去（Phase2/3）。回避は「配布禁止」タブで行う。
     // ★送信IDは「案件×配布日」に紐づける（総点検 2026-07-28）。
     //   電波が切れて送信が失敗すると、再送できるよう state.reportUuid を残す（これは正しい）。
@@ -2722,6 +2742,8 @@ var App = (function() {
       var dfx = $('workDistH'); if (dfx) dfx.focus();
       return;
     }
+    var distWarn2 = checkDistSanity(distMinValue());
+    if (distWarn2 && !confirm(distWarn2 + '\n\nこの時間で申請しますか？')) return;
     var qtyWarn = checkQtySanity(lines);
     if (qtyWarn && !confirm(qtyWarn + '\n\nこの内容で申請しますか？')) return;
     var total = autoSum();
