@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Hiポス アプリ化の手順</title>
+<!--
+  install.html — スマホのホーム画面に「Hiポス」のアイコンを置く手順（2026-09-13 社長依頼）
+  ★アプリ（index.html）を重くしないため、別ファイルにしている。アプリの［アプリ化はこちら］を押したときだけ、
+    アプリの画面の上に重ねて読み込む（アドレスはアプリのまま＝LINE WORKS の「ブラウザで開く」でアプリ自体が開く）。
+  ★画像は frontend/install/ 。社長のスクショを縮小し、上端（時刻・電池）を切り、赤丸を描き、個人名とメールはぼかしてある。
+  ★#android / #iphone で最初に開くタブを指定できる。無ければ端末で決める。
+-->
+<style>
+  :root { --c-primary: #1a73e8; --c-text: #202124; --c-sub: #5f6368; --c-bg: #f6f8fb; --c-red: #e52828; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+         color: var(--c-text); background: var(--c-bg); font-size: 17px; line-height: 1.6; }
+  header { background: var(--c-primary); color: #fff; padding: 12px 16px; }
+  header h1 { margin: 0; font-size: 18px; }
+  .framed header, .framed .back, .framed .direct { display: none; }   /* アプリの中に重ねて表示するときは、アプリ側の見出しと［閉じる］を使う */
+  .direct { background: #fff3e0; border: 2px solid #fb8c00; border-radius: 12px; padding: 10px 14px; margin: 0 0 14px; font-size: 16px; }
+  .direct a { font-weight: 700; color: var(--c-primary); }
+  main { max-width: 560px; margin: 0 auto; padding: 14px 14px 40px; }
+  .intro { background: #fff; border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; }
+  .tabs { display: flex; gap: 8px; position: sticky; top: 0; background: var(--c-bg); padding: 6px 0 10px; z-index: 2; }
+  .tabs button { flex: 1; font-size: 18px; font-weight: 700; padding: 12px 6px; border-radius: 12px; cursor: pointer;
+                 border: 2px solid var(--c-primary); background: #fff; color: var(--c-primary); }
+  .tabs button[aria-selected="true"] { background: var(--c-primary); color: #fff; }
+  .hint { font-size: 15px; color: var(--c-sub); margin: 0 0 12px; }
+  ol.steps { list-style: none; margin: 0; padding: 0; }
+  ol.steps li { background: #fff; border-radius: 12px; padding: 14px; margin: 0 0 14px; }
+  .num { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%;
+         background: var(--c-primary); color: #fff; font-weight: 700; font-size: 16px; margin-right: 8px; vertical-align: 2px; }
+  .say { font-weight: 700; }
+  .say em { font-style: normal; color: var(--c-red); }
+  .shot { display: block; width: 100%; max-width: 300px; height: auto; margin: 10px auto 0; border-radius: 10px;
+          border: 1px solid #d0d4da; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .note { font-size: 15px; color: var(--c-sub); margin: 8px 0 0; }
+  .done { background: #e8f5e9; border: 2px solid #43a047; }
+  .back { display: block; text-align: center; margin: 18px 0 0; font-weight: 700; color: var(--c-primary); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header><h1>アプリ化の手順</h1></header>
+<main>
+  <!-- ★このページを直接開いてホーム画面に追加すると、手順のページがアイコンになってしまう（レビュー 2026-09-13）。アプリに重ねたときは出さない -->
+  <p class="direct">この画面は手順の説明です。ホーム画面に追加するときは、先に <a href="./">Hiポスを開く</a> を押して、Hiポスの画面の右上の［アプリ化はこちら］から進めてください。</p>
+  <p class="intro">スマホのホーム画面に「Hiポス」のアイコンを置くと、次からはアイコンを押すだけで開けます。<br>お使いのスマホを選んで、上から順に進めてください。</p>
+
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-iphone" aria-controls="panel-iphone" aria-selected="true" onclick="showTab('iphone')">iPhone</button>
+    <button type="button" role="tab" id="tab-android" aria-controls="panel-android" aria-selected="false" onclick="showTab('android')">Android</button>
+  </div>
+
+  <section id="panel-iphone" role="tabpanel" aria-labelledby="tab-iphone">
+    <p class="hint">すでに Safari で開いている人は、手順3から始めてください。</p>
+    <ol class="steps">
+      <li><span class="num">1</span><span class="say">画面の右下の<em>ボタン</em>を押します。</span>
+        <img class="shot" src="install/iphone-1.jpg" width="540" height="1100" loading="lazy" alt="LINE WORKSで開いた画面。右下のボタンに赤丸"></li>
+      <li><span class="num">2</span><span class="say"><em>「ブラウザで開く」</em>を押します。</span>
+        <img class="shot" src="install/iphone-2.jpg" width="540" height="1100" loading="lazy" alt="「ブラウザで開く」に赤丸">
+        <p class="note">※Safari で開くと、この手順は閉じます。開いた画面の右上の［アプリ化はこちら］をもう一度押して、手順3から続けてください。</p></li>
+      <li><span class="num">3</span><span class="say">Safari で開いたら、右下の<em>「…」</em>を押します。</span>
+        <img class="shot" src="install/iphone-3.jpg" width="540" height="1100" loading="lazy" alt="Safariの画面。右下の「…」に赤丸">
+        <p class="note">※「…」が無いときは、画面の下の共有ボタン（四角に上向きの矢印）を押します。出てきた一覧を指で上に動かして「ホーム画面に追加」を押し、手順7へ進んでください。</p></li>
+      <li><span class="num">4</span><span class="say"><em>「共有」</em>を押します。</span>
+        <img class="shot" src="install/iphone-4.jpg" width="540" height="1100" loading="lazy" alt="メニューの「共有」に赤丸"></li>
+      <li><span class="num">5</span><span class="say"><em>「表示を増やす」</em>を押します。</span>
+        <img class="shot" src="install/iphone-5.jpg" width="540" height="1100" loading="lazy" alt="共有の画面。「表示を増やす」に赤丸"></li>
+      <li><span class="num">6</span><span class="say"><em>「ホーム画面に追加」</em>を押します。</span>
+        <img class="shot" src="install/iphone-6.jpg" width="540" height="1100" loading="lazy" alt="一覧の「ホーム画面に追加」に赤丸"></li>
+      <li><span class="num">7</span><span class="say">右上の<em>「追加」</em>を押します。</span>
+        <img class="shot" src="install/iphone-7.jpg" width="540" height="1100" loading="lazy" alt="ホーム画面に追加の画面。右上の「追加」に赤丸">
+        <p class="note">※「Webアプリとして開く」はオンのままで大丈夫です。</p></li>
+      <li class="done"><span class="num">8</span><span class="say">ホーム画面に<em>「Hiポス」</em>のアイコンができたら完了です。</span>
+        <img class="shot" src="install/iphone-8.jpg" width="540" height="1100" loading="lazy" alt="ホーム画面にできたHiポスのアイコンに赤丸">
+        <p class="note">次からは、このアイコンを押して開いてください。</p></li>
+    </ol>
+  </section>
+
+  <section id="panel-android" role="tabpanel" aria-labelledby="tab-android" hidden>
+    <p class="hint">すでに Chrome で開いている人は、手順2から始めてください。</p>
+    <ol class="steps">
+      <li><span class="num">1</span><span class="say">画面の右下の<em>ボタン</em>を押します。Chrome で開きます。</span>
+        <img class="shot" src="install/android-1.jpg" width="540" height="1176" loading="lazy" alt="LINE WORKSで開いた画面。右下のボタンに赤丸">
+        <p class="note">※Chrome で開くと、この手順は閉じます。開いた画面の右上の［アプリ化はこちら］をもう一度押して、手順2から続けてください。</p></li>
+      <li><span class="num">2</span><span class="say">Chrome で開いたら、右上の<em>「︙」</em>を押します。</span>
+        <img class="shot" src="install/android-2.jpg" width="540" height="447" loading="lazy" alt="Chromeの画面の上の部分。右上の「︙」に赤丸"></li>
+      <li><span class="num">3</span><span class="say"><em>「ホーム画面に追加」</em>を押します。</span>
+        <img class="shot" src="install/android-3.jpg" width="540" height="1176" loading="lazy" alt="メニューの「ホーム画面に追加」に赤丸"></li>
+      <li><span class="num">4</span><span class="say"><em>「インストール」</em>を押します。</span>
+        <img class="shot" src="install/android-4.jpg" width="540" height="1176" loading="lazy" alt="「インストール」に赤丸"></li>
+      <li><span class="num">5</span><span class="say">もう一度<em>「インストール」</em>を押します。</span>
+        <img class="shot" src="install/android-5.jpg" width="540" height="1176" loading="lazy" alt="アプリをインストールの画面。「インストール」に赤丸"></li>
+      <li class="done"><span class="num">6</span><span class="say">ホーム画面に<em>「Hiポス」</em>のアイコンができたら完了です。</span>
+        <img class="shot" src="install/android-6.jpg" width="540" height="1176" loading="lazy" alt="ホーム画面にできたHiポスのアイコンに赤丸">
+        <p class="note">次からは、このアイコンを押して開いてください。</p></li>
+    </ol>
+  </section>
+
+  <a class="back" href="./">Hiポスを開く</a>
+</main>
+<script>
+  /** 最初に開くタブ: #android / #iphone があればそれ、無ければ端末（Android 以外は iPhone） */
+  function pickTab(ua, hash) {
+    if (/^#android$/.test(hash || '')) return 'android';
+    if (/^#iphone$/.test(hash || '')) return 'iphone';
+    return /Android/i.test(ua || '') ? 'android' : 'iphone';
+  }
+  function showTab(name) {
+    ['iphone', 'android'].forEach(function(n) {
+      var on = (n === name);
+      document.getElementById('tab-' + n).setAttribute('aria-selected', on ? 'true' : 'false');
+      document.getElementById('panel-' + n).hidden = !on;
+    });
+    try { window.scrollTo(0, 0); } catch (e) {}
+  }
+  try { if (window.self !== window.top) document.documentElement.className += ' framed'; } catch (e) { document.documentElement.className += ' framed'; }
+  showTab(pickTab(navigator.userAgent, location.hash));
+</script>
+</body>
+</html>

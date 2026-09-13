@@ -75,6 +75,20 @@
   .acct-btn:hover { background: rgba(255,255,255,.28); }
   .acct-btn:active { transform: scale(.94); background: rgba(255,255,255,.36); }
   .acct-btn.acct-on { background: #fff; color: var(--c-primary); border-color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+  /* ［アプリ化はこちら］（ログイン前の画面だけ）と手順の重ね表示（2026-09-13 社長依頼）。
+     ★画面全体の button{width:100%} に負けないよう width:auto。隠す指定は display:flex に負けないよう明示する */
+  .install-btn { flex: 0 0 auto; width: auto; padding: 7px 12px; border-radius: 999px; border: 1.5px solid rgba(255,255,255,.85);
+                 background: rgba(255,255,255,.16); color: #fff; font-size: 13px; font-weight: 700; line-height: 1.2;
+                 white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .install-btn:active { background: rgba(255,255,255,.34); }
+  /* ★z-index は期限切れの赤いバー（.expiredbar 90）より上。手順を開いているときに被さらないように（レビュー 2026-09-13） */
+  .install-modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 100; background: #fff; display: flex; flex-direction: column; }
+  .install-bar { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+                 background: var(--c-primary); color: #fff; padding: 10px 12px 10px 16px; font-size: 17px; }
+  .install-close { flex: 0 0 auto; width: auto; padding: 8px 16px; border-radius: 999px; border: 1.5px solid #fff;
+                   background: #fff; color: var(--c-primary); font-size: 15px; font-weight: 700; cursor: pointer; }
+  .install-frame { flex: 1 1 auto; width: 100%; border: 0; }
+  .install-modal.hidden, .install-btn.hidden { display: none; }
   /* ログイン画面のロゴ（文字ありロゴ） */
   .login-logo { text-align: center; margin: 2px 0 18px; }
   .login-logo img { width: 120px; height: 120px; border-radius: 24px; box-shadow: 0 6px 18px rgba(0,0,0,.14); }
@@ -371,7 +385,7 @@
     #undoToast { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
     .expiredbar { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
   }
-  /* ★ログインの案内（LINEなどのアプリ内・iPhoneのホーム画面から開いたとき・2026-09-13） */
+  /* ★ログインの案内（LINEなどのアプリの中で開いたとき・2026-09-13） */
   .inapp-guide { border: 1.5px solid #f0b400; background: #fffbe9; border-radius: 10px; padding: 12px;
                  margin: 4px 0 14px; font-size: 13px; line-height: 1.6; text-align: left; }
   .inapp-guide .btns { display: flex; gap: 8px; margin-top: 10px; }
@@ -484,8 +498,15 @@
     <h1>Hiポス配布報告</h1>
     <div class="sub" id="userBar">未サインイン</div>
   </div>
+  <button type="button" class="install-btn hidden" id="installBtn" onclick="App.openInstallGuide()">アプリ化はこちら</button>
   <button type="button" class="acct-btn hidden" id="acctBtn" onclick="App.switchTab('account')" aria-label="アカウント" title="アカウント"><span id="acctInitial">👤</span></button>
 </header>
+<!-- ★アプリ化の手順（2026-09-13）。中身は install.html。押したときに初めて読み込む（アプリを重くしない）。
+     別ページへ移動せず重ねるのは、LINE WORKS の中で「ブラウザで開く」を押したときにアプリのアドレスのまま開くため -->
+<div id="installModal" class="install-modal hidden" role="dialog" aria-modal="true" aria-label="アプリ化の手順">
+  <div class="install-bar"><b>アプリ化の手順</b><button type="button" class="install-close" onclick="App.closeInstallGuide()">閉じる</button></div>
+  <iframe id="installFrame" class="install-frame" title="アプリ化の手順"></iframe>
+</div>
 <main>
 
   <!-- ═══ サインイン ═══ -->
@@ -493,7 +514,7 @@
     <div class="login-logo"><img src="logo.png" alt="Hiポス" width="120" height="120"></div>
     <h2>サインイン</h2>
     <p class="signin-note">配布報告には本人確認が必要です。会社に登録済みのGoogleアカウントでサインインしてください。</p>
-    <!-- ★LINEなどのアプリの中・iPhoneのホーム画面から開いたときの案内（2026-09-13）。中身は renderLoginGuide が書く -->
+    <!-- ★LINEなどのアプリの中で開いたときの案内（2026-09-13）。中身は renderLoginGuide が書く -->
     <div id="inAppGuide" class="inapp-guide hidden"></div>
     <div id="gsiButton"></div>
     <p class="signin-note" id="gsiWhiteNote" style="margin-top:10px;font-size:12px">LINE WORKSなどのアプリの中の画面には対応していません。ログインできないときは、Safari（AndroidはChrome）で開いてください。</p>
@@ -1243,7 +1264,9 @@ var App = (function() {
   // ─── ログインの案内（2026-09-13 「iPhoneでLINEのリンクから開くと真っ白」の対策） ───
   // ★LINEなどのアプリの中の画面では、Googleの決まりでログインできない（LINE公式FAQ・Google OAuth ポリシー）。
   //   このアプリのログインは別窓方式なので、エラーも出ずに白い画面で止まる。止まる前に開き直し方を見せる。
-  // ★iPhoneのホーム画面アイコンから開くと、Googleの画面から戻ってこないことがある（Google公式: iOSはリダイレクト方式が必要）。
+  // ★iPhoneのホーム画面アイコンから開くと戻ってこないことがある、と調べていたが、社長が実機でログインできることを確認した
+  //   （2026-09-13）→ その注意書き（'ios-home'）は出さない。'ios-home' の判定は残っているが、今は画面の出し分けに使っていない
+  //   （ホーム画面のアイコンから開いたか＝アプリとして使っているかは isStandaloneApp で見る）。
   // ★判定を外しても害が無いように、案内を出すだけ。ログインボタンは止めず、自動で別の画面へは飛ばさない
   //   （LINEの版によっては openExternalBrowser=1 が効かず、自動で飛ばすと同じ画面を読み込み続けるため）。
 
@@ -1282,7 +1305,11 @@ var App = (function() {
     //   出したままだと「〜の中の画面には対応していません」が1画面に2回並ぶ。枠が出ない環境（普通のブラウザ・
     //   見分けられない iPhone の LINE WORKS）では、その一文だけが案内になるので必ず見せる。
     var note = $('gsiWhiteNote');
-    if (!kind) { box.classList.add('hidden'); box.innerHTML = ''; if (note) note.classList.remove('hidden'); return; }
+    // ★ホーム画面のアイコンから開いたとき（アプリとして使っている）は、ボタンの下の一文も出さない（2026-09-13）
+    var standalone = isStandaloneApp(nav);
+    if (!kind || kind === 'ios-home') {
+      box.classList.add('hidden'); box.innerHTML = '';
+      if (note) { if (standalone) note.classList.add('hidden'); else note.classList.remove('hidden'); } return; }
     var href = String((typeof location !== 'undefined' && location.href) || '');
     var tried = EXT_PARAM_RE.test(href);          // 付けて開き直したのに、まだLINEの中＝外へ出られなかった
     // ★［URLをコピー］＋URL欄。iOS は select() が効かないので setSelectionRange で全選択する。
@@ -1290,7 +1317,6 @@ var App = (function() {
     var btnCopy = '<button type="button" onclick="App.copyAppUrl()">URLをコピー</button>';
     var urlBox = '<input type="text" class="inapp-url" readonly value="' + esc(withoutExternalParam(href)) + '"' +
                  ' onclick="this.focus();this.setSelectionRange(0,this.value.length)" aria-label="このアプリのURL">';
-    var copyHow = '［URLをコピー］を押して（うまくいかなければ下のURL欄を長押しして）コピーし、';
     // ★文言は短く（社長指示 2026-09-13）:「〜の中の画面には対応していません」＋開き直し方だけ。
     //   「Googleの決まりで止められて」「画面が真っ白に」といった理由の説明は書かない。
     var pasteHow = '［URLをコピー］を押して、アドレス欄に貼り付けると開けます。';
@@ -1311,11 +1337,6 @@ var App = (function() {
       html = '<b>LINE WORKSには対応していません</b><br>' +
         'Safari（AndroidはChrome）で開き直してください。' + pasteHow +
         '<div class="btns">' + btnCopy + '</div>' + urlBox;
-    } else {
-      html = '<b>iPhoneでログインが戻ってこないときは</b><br>' +
-        'ホーム画面のアイコンから開くと、Googleの画面から戻ってこないことがあります。' +
-        'そのときは、' + copyHow + 'Safariに貼り付けて開いてください。' +
-        '<div class="btns">' + btnCopy + '</div>' + urlBox;
     }
     box.innerHTML = html;
     box.classList.remove('hidden');
@@ -1324,6 +1345,39 @@ var App = (function() {
 
   /** ［ブラウザで開く］: openExternalBrowser=1 を付けて開き直す（押したときだけ・自動では飛ばさない） */
   function openInBrowser() { location.href = withExternalParam(location.href); }
+
+  // ─── アプリ化の手順（2026-09-13 社長依頼） ───
+  // ★ログイン前の画面の右上に［アプリ化はこちら］。ホーム画面のアイコンから開いたとき以外は、すべて出す
+  //   （社長決定: iPhone の LINE WORKS は Safari と見分けられないため）。押すと手順（install.html）を重ねて読み込む。
+  /** ホーム画面のアイコンから開いているか（iPhone: navigator.standalone／Android など: display-mode: standalone） */
+  function isStandaloneApp(nav) {
+    nav = nav || ((typeof navigator !== 'undefined' && navigator) || {});
+    if (nav.standalone === true) return true;
+    try { return !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); } catch (e) { return false; }
+  }
+  /** ［アプリ化はこちら］を出す／隠す（出すのはログイン前の画面だけ・アイコンから開いたときは出さない） */
+  function showInstallBtn(on) {
+    var b = $('installBtn'); if (!b) return;
+    if (on && !isStandaloneApp()) b.classList.remove('hidden'); else b.classList.add('hidden');
+  }
+  // ★スマホの「戻る」で手順だけを閉じられるように、開くときに履歴を1つ積む（積まないとページごと離れる・レビュー 2026-09-13）
+  var _installHist = false, _installPopBound = false;
+  function onInstallPop() { if (_installHist) { _installHist = false; closeInstallGuide(true); } }
+  /** 手順を開く。★iframe の読み込みは押したときの1回だけ（アプリを重くしない）。アドレスは変えない（別ページへ移動しない） */
+  function openInstallGuide() {
+    var m = $('installModal'), f = $('installFrame'); if (!m || !f) return;
+    if (!f.getAttribute('src')) f.setAttribute('src', 'install.html');
+    m.classList.remove('hidden');
+    try {
+      if (!_installPopBound && window.addEventListener) { window.addEventListener('popstate', onInstallPop); _installPopBound = true; }
+      if (!_installHist && typeof history !== 'undefined' && history.pushState) { history.pushState({ hiposInstall: 1 }, ''); _installHist = true; }
+    } catch (e) { /* 履歴を使えないブラウザでも［閉じる］で閉じられる */ }
+  }
+  /** 手順を閉じる。［閉じる］で閉じたときは、積んだ履歴も1つ戻す（fromBack=true は「戻る」で閉じたとき） */
+  function closeInstallGuide(fromBack) {
+    var m = $('installModal'); if (m) m.classList.add('hidden');
+    if (_installHist && fromBack !== true) { _installHist = false; try { history.back(); } catch (e) {} }
+  }
 
   /** ［URLをコピー］: openExternalBrowser を外したURLをコピーする（コピーの機能が使えなければ、選べる形で出す） */
   function copyAppUrl() {
@@ -1461,6 +1515,7 @@ var App = (function() {
   // 中身（本日の担当・サマリ）は bootstrap 応答が来てから流し込む。認証失敗時は showAuthError が枠を畳む。
   function showLoadingShell() {
     $('authCard').classList.add('hidden');
+    showInstallBtn(false);   // ログインしたら［アプリ化はこちら］は出さない（ログイン前の画面だけ）
     $('bottomNav').classList.remove('hidden');
     showOnly('homeView');
     state.tab = 'home';
@@ -1568,6 +1623,7 @@ var App = (function() {
     if (!state.registered) {
       $('authCard').classList.add('hidden');
       $('bottomNav').classList.add('hidden');   // 先に出した枠を畳む（未登録は案内画面のみ）
+      showInstallBtn(false);
       $('unregEmail').value = state.email || '(メール取得できず)';
       $('userBar').textContent = (state.email || '') + '（未登録）';
       if (res.pendingRequest) {
@@ -1584,6 +1640,7 @@ var App = (function() {
     $('userBar').textContent = state.staff.name + '（' + state.staff.staffId + '）' + permLabel;
     var aini = $('acctInitial'); if (aini) aini.textContent = (state.staff.name || '').trim().charAt(0) || '👤';
     var abtn = $('acctBtn'); if (abtn) abtn.classList.remove('hidden');   // 右上アカウントボタンを表示
+    showInstallBtn(false);   // 右上はアカウントボタンだけにする
     $('authCard').classList.add('hidden');
     $('bottomNav').classList.remove('hidden');
     // 権限3種でタブを出し分け:
@@ -1686,6 +1743,7 @@ var App = (function() {
     $('bottomNav').classList.add('hidden');
     showOnly('');   // 全ビューを隠す（該当なしなので何も表示されない）
     $('authCard').classList.remove('hidden');
+    showInstallBtn(true);   // サインイン画面に戻ったので［アプリ化はこちら］も戻す
     var box = $('gsiButton');
     box.insertAdjacentHTML('afterend',
       '<div class="msg msg-err">' + esc(res.message || res.code || '認証に失敗しました') + '</div>' +
@@ -5771,7 +5829,8 @@ var App = (function() {
     });
     resetWorkFields();                          // 勤務実績の初期値（休憩1h・勤務8h）
     setInterval(refreshShiftDisplays, 60000);  // JST判定を1分ごとに再評価（8日0時・19時跨ぎで表示が自動切替）
-    renderLoginGuide();   // ★LINEなどのアプリ内・iPhoneのホーム画面から開いたときの案内（ログイン画面にだけ見える）
+    showInstallBtn(true);   // ★［アプリ化はこちら］（ログイン前の画面・アイコンから開いたとき以外）
+    renderLoginGuide();   // ★LINEなどのアプリの中で開いたときの案内（ログイン画面にだけ見える）
     if (!tryRestoreSession()) {
       if (hasValidClientId()) {
         // Googleログインを主導線として初期化（読み込めない時だけトークンにフォールバック）
@@ -5791,6 +5850,7 @@ var App = (function() {
 
   return {
     submit: submit,
+    openInstallGuide: openInstallGuide, closeInstallGuide: closeInstallGuide,
     onGpsSelect: onGpsSelect, removeGpsFile: removeGpsFile, retryGps: retryGps,
     switchTab: switchTab, pickCase: pickCase,
     toggleRep: toggleRep, correctReport: correctReport, addGpsToReport: addGpsToReport,
