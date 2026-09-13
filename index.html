@@ -496,7 +496,7 @@
     <!-- ★LINEなどのアプリの中・iPhoneのホーム画面から開いたときの案内（2026-09-13）。中身は renderLoginGuide が書く -->
     <div id="inAppGuide" class="inapp-guide hidden"></div>
     <div id="gsiButton"></div>
-    <p class="signin-note" id="gsiWhiteNote" style="margin-top:10px;font-size:12px">ログインで画面が真っ白になるときは、LINEなどのアプリの中ではなく、Safari（AndroidはChrome）で開き直してください。</p>
+    <p class="signin-note" id="gsiWhiteNote" style="margin-top:10px;font-size:12px">LINE WORKSなどのアプリの中の画面には対応していません。ログインできないときは、Safari（AndroidはChrome）で開いてください。</p>
     <div id="gsiPending" class="signin-note hidden" style="text-align:center;margin-top:8px">Googleログインを準備中です…</div>
     <!-- ★2026-07-27 断捨離: 「個別トークン」ログインを撤去（誰にも発行しておらず、押しても必ず
          失敗する導線だった）。Googleログインが読み込めない場合は、原因が分かる案内だけを出す。 -->
@@ -505,7 +505,7 @@
         <b>Googleログインを表示できませんでした。</b><br>
         ①通信状況を確認して、画面を読み込み直してください（更新ボタン）。<br>
         ②社内Wi-Fiや機内モードなど、通信が制限されていないかご確認ください。<br>
-        ③LINEなどのアプリから開いた場合は、Safari（AndroidはChrome）で開き直してください。<br>
+        ③LINE WORKSなどのアプリから開いた場合は、Safari（AndroidはChrome）で開き直してください。<br>
         ④それでも表示されない場合は管理者までご連絡ください。
       </div>
     </div>
@@ -1278,7 +1278,11 @@ var App = (function() {
     var box = $('inAppGuide'); if (!box) return;
     var nav = (typeof navigator !== 'undefined' && navigator) || {};
     var kind = detectLoginEnv(nav.userAgent, nav.standalone, nav.maxTouchPoints);
-    if (!kind) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    // ★案内の枠を出すときは、ボタンの下の常時の一文（#gsiWhiteNote）を隠す（レビュー 2026-09-13）。
+    //   出したままだと「〜の中の画面には対応していません」が1画面に2回並ぶ。枠が出ない環境（普通のブラウザ・
+    //   見分けられない iPhone の LINE WORKS）では、その一文だけが案内になるので必ず見せる。
+    var note = $('gsiWhiteNote');
+    if (!kind) { box.classList.add('hidden'); box.innerHTML = ''; if (note) note.classList.remove('hidden'); return; }
     var href = String((typeof location !== 'undefined' && location.href) || '');
     var tried = EXT_PARAM_RE.test(href);          // 付けて開き直したのに、まだLINEの中＝外へ出られなかった
     // ★［URLをコピー］＋URL欄。iOS は select() が効かないので setSelectionRange で全選択する。
@@ -1287,22 +1291,24 @@ var App = (function() {
     var urlBox = '<input type="text" class="inapp-url" readonly value="' + esc(withoutExternalParam(href)) + '"' +
                  ' onclick="this.focus();this.setSelectionRange(0,this.value.length)" aria-label="このアプリのURL">';
     var copyHow = '［URLをコピー］を押して（うまくいかなければ下のURL欄を長押しして）コピーし、';
+    // ★文言は短く（社長指示 2026-09-13）:「〜の中の画面には対応していません」＋開き直し方だけ。
+    //   「Googleの決まりで止められて」「画面が真っ白に」といった理由の説明は書かない。
+    var pasteHow = '［URLをコピー］を押して、アドレス欄に貼り付けると開けます。';
     var html;
     if (kind === 'line') {
       // ★配るリンクに最初から openExternalBrowser=1 が付いていても LINE の中で開くことがある。
       //   その人はボタンを見ていないので「ボタンで開けなかった」とは書かない。
       var btnOpen = tried ? '' :
         '<button type="button" class="btn-primary" onclick="App.openInBrowser()">ブラウザで開く</button>';
-      html = '<b>LINEの中の画面では、Googleでログインできません</b><br>' +
-        'Googleの決まりで止められていて、このまま進むと画面が真っ白になります。<br>' +
+      html = '<b>LINEの中の画面には対応していません</b><br>' +
         (tried
-          ? 'この画面はLINEの中で開いています。画面のメニューから「ブラウザで開く」を選ぶか、' + copyHow + 'Safari（AndroidはChrome）に貼り付けて開いてください。'
+          ? 'Safari（AndroidはChrome）で開き直してください。' + pasteHow
           : '下の［ブラウザで開く］を押して、Safari（AndroidはChrome）で開き直してください。') +
         '<div class="btns">' + btnOpen + btnCopy + '</div>' + urlBox;
     } else if (kind === 'inapp') {
-      html = '<b>このアプリの中の画面では、Googleでログインできません</b><br>' +
-        'Googleの決まりで止められていて、このまま進むと画面が真っ白になります。<br>' +
-        '画面のメニューから「ブラウザで開く」を選ぶか、' + copyHow + 'Safari（AndroidはChrome）に貼り付けて開いてください。' +
+      // LINE WORKS（Android）の中で開くとここに来る（LINE WORKS そのものは見分けられないので「など」と書く）
+      html = '<b>LINE WORKSなどのアプリの中の画面には対応していません</b><br>' +
+        'Safari（AndroidはChrome）で開き直してください。' + pasteHow +
         '<div class="btns">' + btnCopy + '</div>' + urlBox;
     } else {
       html = '<b>iPhoneでログインが戻ってこないときは</b><br>' +
@@ -1312,6 +1318,7 @@ var App = (function() {
     }
     box.innerHTML = html;
     box.classList.remove('hidden');
+    if (note) note.classList.add('hidden');   // 枠と同じことを下でくり返さない
   }
 
   /** ［ブラウザで開く］: openExternalBrowser=1 を付けて開き直す（押したときだけ・自動では飛ばさない） */
@@ -3879,6 +3886,17 @@ var App = (function() {
     var z = zipTownsHouseholds(ed.townsText, ed.householdsText);   // 町と世帯数を順対応でzip
     var towns = z.towns;
     var households = z.households;
+    // ★配布の担当がいるのに配布エリア（町）が空なら保存しない（2026-09-13・サーバと同じ決まり）。
+    //   空のまま保存すると、その日の配布担当が報告できず、配布禁止物件も「禁止なし」と表示されてしまう。
+    //   送迎・現場指導以外は配布として数える（サーバの正規化と同じ）。
+    var hasDist = members.some(function(m) { return m.role !== '送迎' && m.role !== '現場指導'; });
+    if (hasDist && towns.length === 0) {
+      alert('配布エリア（町名）を1つ以上入力してください。\n\n' +
+            '配布の担当がいる予定は、町が空のままでは保存できません' +
+            '（その日の配布担当が報告できなくなり、配布禁止物件も「禁止なし」と表示されてしまいます）。\n\n' +
+            '※送迎・現場指導だけの予定なら、町は空のままで構いません。');
+      return;
+    }
     var banLists = Object.keys(ed.banSel || {}).filter(function(n) { return ed.banSel[n]; });
     $('regListResult').innerHTML = '<div class="msg">保存中…</div>';
     api({
