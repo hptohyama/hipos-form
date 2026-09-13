@@ -359,6 +359,26 @@
   #undoToast .ut-btn { background: #8ab4f8; color: #202124; border: none; border-radius: 8px;
                        padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   #undoToast .ut-btn[disabled] { opacity: .5; cursor: default; }
+  /* ★iPhone（Face ID世代）で、下に固定したものが画面下端のホームバーに重ならないように（2026-09-13）。
+     viewport-fit=cover なので safe-area のぶんを足す。上書きは元の定義より後ろに置く（同じ強さなら後ろが勝つ）。
+     env() を読めない古いブラウザは、この行ごと無視して元の値のまま動く。
+     ★@supports (-webkit-touch-callout: none) ＝ iPhone/iPad の Safari 系だけに効かせる。
+       Android の Chrome 135 以降は safe-area の値がスクロール中に変わり、下のタブの高さが揺れるため
+       （今使えている Android の見た目を変えない）。 */
+  @supports (-webkit-touch-callout: none) {
+    main { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+    #bottomNav { padding-bottom: env(safe-area-inset-bottom, 0px); }
+    #undoToast { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+    .expiredbar { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
+  }
+  /* ★ログインの案内（LINEなどのアプリ内・iPhoneのホーム画面から開いたとき・2026-09-13） */
+  .inapp-guide { border: 1.5px solid #f0b400; background: #fffbe9; border-radius: 10px; padding: 12px;
+                 margin: 4px 0 14px; font-size: 13px; line-height: 1.6; text-align: left; }
+  .inapp-guide .btns { display: flex; gap: 8px; margin-top: 10px; }
+  .inapp-guide .btns button { padding: 10px 6px; font-size: 14px; }
+  /* ［URLをコピー］など青くないボタンにも枠を付ける（画面全体の button { border: none } で白地に文字だけになり、ボタンに見えなかった） */
+  .inapp-guide .btns button:not(.btn-primary) { border: 1px solid var(--c-border); background: #fff; color: var(--c-text); }
+  .inapp-guide .inapp-url { margin-top: 8px; font-size: 13px; padding: 8px 10px; background: #fff; }
   #undoToast .ut-x { background: transparent; color: #bdc1c6; border: none; font-size: 18px;
                      cursor: pointer; padding: 0 2px; line-height: 1; }
 
@@ -473,7 +493,10 @@
     <div class="login-logo"><img src="logo.png" alt="Hiポス" width="120" height="120"></div>
     <h2>サインイン</h2>
     <p class="signin-note">配布報告には本人確認が必要です。会社に登録済みのGoogleアカウントでサインインしてください。</p>
+    <!-- ★LINEなどのアプリの中・iPhoneのホーム画面から開いたときの案内（2026-09-13）。中身は renderLoginGuide が書く -->
+    <div id="inAppGuide" class="inapp-guide hidden"></div>
     <div id="gsiButton"></div>
+    <p class="signin-note" id="gsiWhiteNote" style="margin-top:10px;font-size:12px">ログインで画面が真っ白になるときは、LINEなどのアプリの中ではなく、Safari（AndroidはChrome）で開き直してください。</p>
     <div id="gsiPending" class="signin-note hidden" style="text-align:center;margin-top:8px">Googleログインを準備中です…</div>
     <!-- ★2026-07-27 断捨離: 「個別トークン」ログインを撤去（誰にも発行しておらず、押しても必ず
          失敗する導線だった）。Googleログインが読み込めない場合は、原因が分かる案内だけを出す。 -->
@@ -482,7 +505,8 @@
         <b>Googleログインを表示できませんでした。</b><br>
         ①通信状況を確認して、画面を読み込み直してください（更新ボタン）。<br>
         ②社内Wi-Fiや機内モードなど、通信が制限されていないかご確認ください。<br>
-        ③それでも表示されない場合は管理者までご連絡ください。
+        ③LINEなどのアプリから開いた場合は、Safari（AndroidはChrome）で開き直してください。<br>
+        ④それでも表示されない場合は管理者までご連絡ください。
       </div>
     </div>
   </div>
@@ -1214,6 +1238,98 @@ var App = (function() {
       navigator.clipboard.writeText(v).then(function() { alert('メールアドレスをコピーしました'); },
         function() { window.prompt('コピーしてください', v); });
     } else { window.prompt('コピーしてください', v); }
+  }
+
+  // ─── ログインの案内（2026-09-13 「iPhoneでLINEのリンクから開くと真っ白」の対策） ───
+  // ★LINEなどのアプリの中の画面では、Googleの決まりでログインできない（LINE公式FAQ・Google OAuth ポリシー）。
+  //   このアプリのログインは別窓方式なので、エラーも出ずに白い画面で止まる。止まる前に開き直し方を見せる。
+  // ★iPhoneのホーム画面アイコンから開くと、Googleの画面から戻ってこないことがある（Google公式: iOSはリダイレクト方式が必要）。
+  // ★判定を外しても害が無いように、案内を出すだけ。ログインボタンは止めず、自動で別の画面へは飛ばさない
+  //   （LINEの版によっては openExternalBrowser=1 が効かず、自動で飛ばすと同じ画面を読み込み続けるため）。
+
+  /** 開いている環境 → 'line'｜'inapp'（LINE以外のアプリ内）｜'ios-home'（iPhone/iPadのホーム画面から起動）｜''（案内不要） */
+  function detectLoginEnv(ua, standalone, maxTouchPoints) {
+    ua = String(ua || '');
+    if (/\bLine\/\d/.test(ua)) return 'line';                          // LINE のアプリ内ブラウザ（iPhone・Android）
+    if (/FBAN|FBAV|FB_IAB|Instagram/.test(ua)) return 'inapp';        // Facebook・Instagram
+    if (/Android/.test(ua) && /; wv\)/.test(ua)) return 'inapp';      // Android のアプリ内 WebView 全般
+    var ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && Number(maxTouchPoints) > 1);   // iPad はMac表記
+    if (standalone === true && ios) return 'ios-home';
+    return '';
+  }
+
+  var EXT_PARAM_RE = /[?&]openExternalBrowser=1(?:&|#|$)/;
+  /** URL に openExternalBrowser=1 を付ける（LINE公式: 付いたURLは外部ブラウザで開く）。既存の ?case= ?perf=1 と #… は残す */
+  function withExternalParam(href) {
+    var s = String(href || '');
+    if (EXT_PARAM_RE.test(s)) return s;
+    var at = s.indexOf('#');
+    var base = at >= 0 ? s.slice(0, at) : s, hash = at >= 0 ? s.slice(at) : '';
+    return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'openExternalBrowser=1' + hash;
+  }
+  /** URL から openExternalBrowser=1 を取り除く（Safari に貼る用。付いていても害は無いが見た目を短く） */
+  function withoutExternalParam(href) {
+    return String(href || '')
+      .replace(/([?&])openExternalBrowser=1(&|(?=#)|$)/, function(m, pre, post) { return post === '&' ? pre : ''; })
+      .replace(/\?(?=#|$)/, '');
+  }
+
+  function renderLoginGuide() {
+    var box = $('inAppGuide'); if (!box) return;
+    var nav = (typeof navigator !== 'undefined' && navigator) || {};
+    var kind = detectLoginEnv(nav.userAgent, nav.standalone, nav.maxTouchPoints);
+    if (!kind) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    var href = String((typeof location !== 'undefined' && location.href) || '');
+    var tried = EXT_PARAM_RE.test(href);          // 付けて開き直したのに、まだLINEの中＝外へ出られなかった
+    // ★［URLをコピー］＋URL欄。iOS は select() が効かないので setSelectionRange で全選択する。
+    //   コピーの機能が使えないアプリ内ブラウザもあるので、欄そのものも残す（長押しでもコピーできる）。
+    var btnCopy = '<button type="button" onclick="App.copyAppUrl()">URLをコピー</button>';
+    var urlBox = '<input type="text" class="inapp-url" readonly value="' + esc(withoutExternalParam(href)) + '"' +
+                 ' onclick="this.focus();this.setSelectionRange(0,this.value.length)" aria-label="このアプリのURL">';
+    var copyHow = '［URLをコピー］を押して（うまくいかなければ下のURL欄を長押しして）コピーし、';
+    var html;
+    if (kind === 'line') {
+      // ★配るリンクに最初から openExternalBrowser=1 が付いていても LINE の中で開くことがある。
+      //   その人はボタンを見ていないので「ボタンで開けなかった」とは書かない。
+      var btnOpen = tried ? '' :
+        '<button type="button" class="btn-primary" onclick="App.openInBrowser()">ブラウザで開く</button>';
+      html = '<b>LINEの中の画面では、Googleでログインできません</b><br>' +
+        'Googleの決まりで止められていて、このまま進むと画面が真っ白になります。<br>' +
+        (tried
+          ? 'この画面はLINEの中で開いています。画面のメニューから「ブラウザで開く」を選ぶか、' + copyHow + 'Safari（AndroidはChrome）に貼り付けて開いてください。'
+          : '下の［ブラウザで開く］を押して、Safari（AndroidはChrome）で開き直してください。') +
+        '<div class="btns">' + btnOpen + btnCopy + '</div>' + urlBox;
+    } else if (kind === 'inapp') {
+      html = '<b>このアプリの中の画面では、Googleでログインできません</b><br>' +
+        'Googleの決まりで止められていて、このまま進むと画面が真っ白になります。<br>' +
+        '画面のメニューから「ブラウザで開く」を選ぶか、' + copyHow + 'Safari（AndroidはChrome）に貼り付けて開いてください。' +
+        '<div class="btns">' + btnCopy + '</div>' + urlBox;
+    } else {
+      html = '<b>iPhoneでログインが戻ってこないときは</b><br>' +
+        'ホーム画面のアイコンから開くと、Googleの画面から戻ってこないことがあります。' +
+        'そのときは、' + copyHow + 'Safariに貼り付けて開いてください。' +
+        '<div class="btns">' + btnCopy + '</div>' + urlBox;
+    }
+    box.innerHTML = html;
+    box.classList.remove('hidden');
+  }
+
+  /** ［ブラウザで開く］: openExternalBrowser=1 を付けて開き直す（押したときだけ・自動では飛ばさない） */
+  function openInBrowser() { location.href = withExternalParam(location.href); }
+
+  /** ［URLをコピー］: openExternalBrowser を外したURLをコピーする（コピーの機能が使えなければ、選べる形で出す） */
+  function copyAppUrl() {
+    var v = withoutExternalParam(location.href);
+    var ask = 'このURLをコピーして、Safari（AndroidはChrome）に貼り付けて開いてください';
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(v).then(
+          function() { alert('URLをコピーしました。Safari（AndroidはChrome）のアドレス欄に貼り付けて開いてください。'); },
+          function() { window.prompt(ask, v); });
+        return;
+      }
+    } catch (e) { /* 下の選べる形へ */ }
+    window.prompt(ask, v);
   }
 
   // ─── 未登録者のスタッフ登録（申請→管理者承認） ───
@@ -5636,6 +5752,7 @@ var App = (function() {
     });
     resetWorkFields();                          // 勤務実績の初期値（休憩1h・勤務8h）
     setInterval(refreshShiftDisplays, 60000);  // JST判定を1分ごとに再評価（8日0時・19時跨ぎで表示が自動切替）
+    renderLoginGuide();   // ★LINEなどのアプリ内・iPhoneのホーム画面から開いたときの案内（ログイン画面にだけ見える）
     if (!tryRestoreSession()) {
       if (hasValidClientId()) {
         // Googleログインを主導線として初期化（読み込めない時だけトークンにフォールバック）
@@ -5663,7 +5780,7 @@ var App = (function() {
     loadPendingRegs: loadPendingRegs, approveReg: approveReg, rejectReg: rejectReg,
     changeStaffPerm: changeStaffPerm,
     submitRegister: submitRegister,
-    gotoBanTab: gotoBanTab, loadBanAdmin: loadBanAdmin, toggleAvoid: toggleAvoid, toggleMislisted: toggleMislisted,
+    gotoBanTab: gotoBanTab, loadBanAdmin: loadBanAdmin, toggleAvoid: toggleAvoid, toggleMislisted: toggleMislisted, openInBrowser: openInBrowser, copyAppUrl: copyAppUrl,
     toggleRegBan: toggleRegBan, updateRegHh: updateRegHh,
     loadPendingAmends: loadPendingAmends, approveAmend: approveAmend, rejectAmend: rejectAmend,
     loadOvertime: loadOvertime, saveOvertime: saveOvertime, clearOvertime: clearOvertime, otMonth: otMonth,
