@@ -228,6 +228,17 @@
   .bchk-btns button { flex: 1; padding: 10px 4px; border: 1px solid var(--c-border); background: #fff; font-size: 13px; border-radius: 8px; cursor: pointer; }
   .bchk-btns button.on-avoid { background: var(--c-ok-bg); color: var(--c-ok); border-color: var(--c-ok); font-weight: 700; }
   .bchk-btns button.on-na { background: #e8eaed; color: #3c4043; border-color: #9aa0a6; font-weight: 700; }
+  /* 誤表記（2026-09-13 社長要望）: 別の都道府県など、配布エリアと関係ない住所が出たとき用。
+     ★置き方B（社長選択）: 主役の「回避したらタップ」は以前と同じ横幅いっぱい、誤表記はリスト名の行の右端に小さく。
+     ★button.bchk-mis に直接付ける（画面全体の input,select,textarea,button { width:100% } を必ず打ち消す）。 */
+  button.bchk-mis { flex: 0 0 auto; width: auto; padding: 4px 10px; font-size: 11px; line-height: 1.2; cursor: pointer;
+    color: var(--c-sub); background: transparent; border: 1px dashed var(--c-border); border-radius: 12px; font-weight: 400; }
+  .bchk-sub.has-mis { display: flex; align-items: center; gap: 6px; }
+  .bchk-sub.has-mis .bchk-mis { margin-left: auto; }
+  .bchk-misundo { text-align: right; margin-top: 8px; }
+  .bchk-item.mis { background: #f1f3f4; border-color: #c7cacd; }
+  .bchk-item.mis .bchk-addr { color: var(--c-sub); }
+  .bchk-misby { font-size: 12px; color: #5f6368; font-weight: 700; margin-top: 4px; }
   .bchk-note { font-size: 12px; color: #8a6d00; margin-top: 3px; }
   .bscope { display: flex; gap: 8px; margin: 10px 0; }
   .bscope button { flex: 1; padding: 8px 4px; border: 1px solid var(--c-border); background: #fff; font-size: 13px; border-radius: 8px; cursor: pointer; }
@@ -930,7 +941,7 @@
   <div class="view hidden" id="banView">
     <div class="card">
       <h2>📍 配布禁止</h2>
-      <div class="case-info">本日の担当案件に対応する<b>配布禁止エリア</b>です。まず<b>マップ</b>で場所を確認し、回避したら物件ごとに<b>「回避した」をタップ</b>してください。<br>このリストは<b>同じ案件の担当者全員で共有</b>されます（誰か1人がタップすれば全員に反映されます・自動更新）。</div>
+      <div class="case-info">本日の担当案件に対応する<b>配布禁止エリア</b>です。まず<b>マップ</b>で場所を確認し、回避したら物件ごとに<b>「回避した」をタップ</b>してください。<br>このリストは<b>同じ案件の担当者全員で共有</b>されます（誰か1人がタップすれば全員に反映されます・自動更新）。<br><span style="font-size:12px">町名が同じだけで<b>別の都道府県など、配布エリアと関係のない住所</b>が出ているときは、小さな「誤表記」を押してください。</span></div>
     </div>
 
     <!-- 今日の配布禁止マップ（新しいタブで開く） -->
@@ -1673,9 +1684,10 @@ var App = (function() {
         '</div>';
       return;
     }
+    var mis = (summary && summary.mislisted) || 0;   // ★誤表記として報告された件数（2026-09-13）
     $('homeBanSummary').innerHTML =
       '<div class="homeban-sum">🚫 <b>本日の配布禁止：' + total + '件</b>' +
-        '<span class="homeban-ok">（すべて回避済み）</span>' +
+        '<span class="homeban-ok">（' + (mis ? 'すべて確認済み・うち誤表記 ' + mis + '件' : 'すべて回避済み') + '）</span>' +
       '</div>' +
       '<div class="homeban-go">→「' + esc(tabName) + '」タブで確認できます ›</div>';
   }
@@ -1754,25 +1766,47 @@ var App = (function() {
     }
     box.innerHTML = cases.map(function(c, ci) {
       var items = c.bans.map(function(b, bi) {
-        var on = (b.state || '') === '回避した';
+        var st = b.state || '';
+        var on = (st === '回避した');
+        var mis = (st === '誤表記');
         var who = on ? ('<div class="bchk-by">✅ ' + esc(b.byName || '担当者') +
                         (b.atHm ? ' ' + esc(b.atHm) : '') + ' に回避済み</div>') : '';
-        return '<div class="bchk-item' + (on ? ' done' : '') + '">' +
+        // ★誤表記（2026-09-13 社長要望）: 町名が同じだけの別の都道府県などの住所が紛れ込んだとき用。
+        //   回避とは記録を分け、誰が・いつ判断したかを全員に見せる。
+        if (mis) {
+          who = '<div class="bchk-misby">🏷 ' + esc(b.byName || '担当者') + (b.atHm ? ' ' + esc(b.atHm) : '') +
+                ' に「誤表記（配布エリア外の住所）」として報告済み</div>';
+        }
+        var tap = '(\'' + scope + '\',' + ci + ',' + bi + ')';
+        // ★置き方B（2026-09-13 社長選択）: 主役の「回避したらタップ」は以前と同じ横幅いっぱい。
+        //   誤表記はリスト名の行の右端に小さく（主役ボタンから離して押し間違いを減らす）。回避済みの物件には出さない。
+        var chip = (on || mis) ? '' :
+          '<button type="button" class="bchk-mis" onclick="App.toggleMislisted' + tap + '">誤表記</button>';
+        var actions = mis
+          // 誤表記にした物件は「回避した」を出さない（取り消してから押し直す＝取り違えを防ぐ）。取り消しは右端に小さく
+          ? '<div class="bchk-misundo"><button type="button" class="bchk-mis" onclick="App.toggleMislisted' + tap + '">誤表記を取り消す</button></div>'
+          : '<div class="bchk-btns"><button type="button" class="bchk-one ' + (on ? 'on-avoid' : '') + '" onclick="App.toggleAvoid' + tap + '">' +
+              (on ? '☑ 回避した（取り消すにはタップ）' : '☐ 回避したらタップ') + '</button></div>';
+        return '<div class="bchk-item' + (on ? ' done' : (mis ? ' mis' : '')) + '">' +
           '<div class="bchk-addr">' + (b.caution ? '<span class="caution">⚠️要注意 </span>' : '🚫 ') + esc(b.raw) + '</div>' +
-          '<div class="bchk-sub">' + (b.building ? esc(b.building) + ' ・ ' : '') + esc(b.list || '') +
-            (b.mapUrl ? '<a href="' + esc(safeUrl(b.mapUrl)) + '" target="_blank" rel="noopener">🗾 地図</a>' : '') + '</div>' +
+          '<div class="bchk-sub' + (chip ? ' has-mis' : '') + '"><span>' + (b.building ? esc(b.building) + ' ・ ' : '') + esc(b.list || '') +
+            (b.mapUrl ? '<a href="' + esc(safeUrl(b.mapUrl)) + '" target="_blank" rel="noopener">🗾 地図</a>' : '') + '</span>' +
+            chip + '</div>' +
           (b.note ? '<div class="bchk-note">' + esc(b.note) + '</div>' : '') + who +
-          '<div class="bchk-btns">' +
-            '<button type="button" class="bchk-one ' + (on ? 'on-avoid' : '') + '" onclick="App.toggleAvoid(\'' + scope + '\',' + ci + ',' + bi + ')">' +
-              (on ? '☑ 回避した（取り消すにはタップ）' : '☐ 回避したらタップ') + '</button>' +
-          '</div></div>';
+          actions + '</div>';
       }).join('');
-      var total = c.bans.length, done = 0;
-      c.bans.forEach(function(b) { if ((b.state || '') === '回避した') done++; });
+      var total = c.bans.length, avoided = 0, mislisted = 0;
+      c.bans.forEach(function(b) {
+        if ((b.state || '') === '回避した') avoided++;
+        else if ((b.state || '') === '誤表記') mislisted++;
+      });
+      var done = avoided + mislisted;              // ★確認済み＝回避した＋誤表記
       var allDone = (total > 0 && done === total);
       var banner = allDone
-        ? '<div class="bchk-alldone">✅ この案件の配布禁止 ' + total + '件はすべて回避済みです</div>'
-        : '<div class="bchk-progress">回避 ' + done + ' / ' + total + ' 件（未チェック ' + (total - done) + ' 件）</div>';
+        ? '<div class="bchk-alldone">✅ この案件の配布禁止 ' + total + '件はすべて' +
+            (mislisted ? '確認済みです（回避 ' + avoided + '件・誤表記 ' + mislisted + '件）' : '回避済みです') + '</div>'
+        : '<div class="bchk-progress">回避 ' + avoided + (mislisted ? '・誤表記 ' + mislisted : '') +
+            ' / ' + total + ' 件（未チェック ' + (total - done) + ' 件）</div>';
       // 管理者の画面では「誰が配るのか」と「自分の担当か」が分かるようにする（2026-07-27）
       var who2 = c.staffNames ? '<div class="bchk-staff">担当: ' + esc(c.staffNames) + '</div>' : '';
       var mine = c.mine ? '<span class="bchk-mine">自分の担当</span>' : '';
@@ -1796,21 +1830,51 @@ var App = (function() {
   }
 
   // チェックのトグル（★共有・同じボタン再押下で解除）→ 即サーバへ転記
-  function toggleAvoid(scope, ci, bi) {
+  var BAN_BUSY_MSG = 'この物件は記録を送っている途中です。少し待ってから、もう一度押してください。';
+  // チェックの単位（案件×配布日×住所）で「送信中か」を見るためのキー
+  function banPendingKey(c, b) {
+    return c.caseNo + '\u0001' + (c.dateIso || c.distDate || '') + '\u0001' + b.raw;   // 区切りは通常入力されない制御文字
+  }
+
+  function toggleAvoid(scope, ci, bi) { banToggleState(scope, ci, bi, '回避した'); }
+
+  // ★誤表記のトグル（2026-09-13 社長要望）。町名が同じだけの別の都道府県などの住所が
+  //   紛れ込んだときに押す。「回避した」とは記録を分ける。
+  //   ★以前廃止した「該当なし」（配布エリア内だがルートに入らない）の抜け道にならないよう、
+  //     付けるときだけ確認を1回挟む（取り消すときは聞かない）。
+  function toggleMislisted(scope, ci, bi) {
+    var c = (state.banToday[scope] || [])[ci]; if (!c) return;
+    var b = c.bans[bi]; if (!b) return;
+    // ★送信中の物件なら、確認を出す前に知らせる（OKまで押したのに黙って無視される、を防ぐ）
+    if (state.banPending[banPendingKey(c, b)]) { alert(BAN_BUSY_MSG); return; }
+    if (b.state !== '誤表記' && !confirm(
+        'この住所を「誤表記」として報告しますか？\n\n' +
+        '　' + b.raw + '\n\n' +
+        '誤表記＝町名が同じだけで、別の都道府県など配布エリアと関係のない住所が出ている場合です。\n\n' +
+        '※配布エリア内の住所なら、誤表記ではなく「回避した」を押してください。')) return;
+    banToggleState(scope, ci, bi, '誤表記');
+  }
+
+  // 回避した／誤表記 の共通処理。同じ状態をもう一度押すと解除（未チェックへ）。
+  function banToggleState(scope, ci, bi, label) {
     var cases = state.banToday[scope] || [];
     var c = cases[ci]; if (!c) return;
     var b = c.bans[bi]; if (!b) return;
     var caseNo = c.caseNo, raw = b.raw;
     var dateIso = c.dateIso || c.distDate || '';       // ★チェックの単位は 案件×配布日×住所
-    var pkey = caseNo + '\u0001' + dateIso + '\u0001' + raw;   // 区切りは通常入力されない制御文字
-    if (state.banPending[pkey]) return;                // 送信中の連打は無視（応答の追い越しを防ぐ）
-    var isOn = (b.state === '回避した');
-    var newState = isOn ? '' : 'AVOIDED';               // 再押下＝解除（未チェックへ）
+    var pkey = banPendingKey(c, b);
+    if (state.banPending[pkey]) {
+      // 同じボタンの連打は黙って無視（応答の追い越しを防ぐ）。別のボタンなら、無視したことを知らせる。
+      if (state.banPending[pkey].label !== label) alert(BAN_BUSY_MSG);
+      return;
+    }
+    var isOn = (b.state === label);
+    var newState = isOn ? '' : (label === '誤表記' ? 'MISLISTED' : 'AVOIDED');   // 再押下＝解除
     var prev = { state: b.state, byName: b.byName, atHm: b.atHm };
     // 送信中はこの物件だけ自動更新の上書きから守る（楽観的更新を保持）
     // ※引き直しに要る情報は「値」に持たせる（キーを文字列分割しない＝取り違えを起こさない）
-    state.banPending[pkey] = { caseNo: caseNo, dateIso: dateIso, raw: raw,
-                               state: isOn ? '' : '回避した',
+    state.banPending[pkey] = { caseNo: caseNo, dateIso: dateIso, raw: raw, label: label,
+                               state: isOn ? '' : label,
                                byName: isOn ? '' : ((state.staff && state.staff.name) || '自分'),
                                atHm: isOn ? '' : nowHm() };
     b.state = state.banPending[pkey].state;            // 楽観的更新
@@ -1826,12 +1890,28 @@ var App = (function() {
       renderBanTodayInto(wrapId, scope);
       if (msg) alert(msg);
     }
-    api({ action: 'toggleAvoidance', caseNo: caseNo, raw: raw, town: b.town, list: b.list,
+    // ★誤表記は別の入口（setMislisted）に送る。誤表記を知らない古いGASに届いても
+    //   「不明なaction」で断られるだけで、仲間の「回避した」を解除（削除）してしまわない。
+    api({ action: (label === '誤表記' ? 'setMislisted' : 'toggleAvoidance'),
+          caseNo: caseNo, raw: raw, town: b.town, list: b.list,
           dateIso: dateIso, distDate: dateIso, state: newState }).then(function(res) {
       if (!res || !res.ok) {
         apply(prev, (res && res.code === 'E_NOT_ASSIGNED')
           ? 'この案件・この日はあなたの配布割当にありません。画面を更新してからお試しください。'
           : '記録に失敗しました。もう一度お試しください。');
+        return;
+      }
+      // ★サーバが頼んだのと違う状態を返したら、黙って食い違わせない。
+      //   ・誰かが先に「回避した」を付けていた → サーバは誤表記で上書きせず「回避した」を返す
+      //   ・その他（想定外）→ 画面をサーバの記録に合わせて知らせる
+      var got = res.state || '';
+      if (got !== (isOn ? '' : label)) {
+        var who = (res.byName ? res.byName + 'さん' : 'ほかの担当者') + (res.atHm ? '（' + res.atHm + '）' : '');
+        apply({ state: got, byName: res.byName || '', atHm: res.atHm || '' },
+              got === '回避した'
+                ? 'この住所は、すでに ' + who + ' が「回避した」として記録しています。\n' +
+                  (isOn ? '回避済みのままにしました。' : '誤表記にはせず、回避済みのままにしました。')
+                : '記録できませんでした。アプリを開き直してから、もう一度お試しください。');
         return;
       }
       apply({ state: res.state || '', byName: res.byName || '', atHm: res.atHm || '' });   // サーバ確定値
@@ -1944,13 +2024,14 @@ var App = (function() {
     if (!cases.length) { box.innerHTML = '<div class="empty">対象の案件はありません</div>'; return; }
     box.innerHTML = cases.map(function(c) {
       var cls = c.allDone ? 'bcase done' : 'bcase';
-      var mark = c.allDone ? '<span class="bcase-ok">✅ 全て回避済み</span>'
+      var mis = c.mislisted || 0;   // ★誤表記（2026-09-13）。c.done は「回避した＋誤表記」の確認済み件数
+      var mark = c.allDone ? '<span class="bcase-ok">✅ ' + (mis ? '全て確認済み' : '全て回避済み') + '</span>'
                            : '<span class="bcase-ng">未チェック ' + (c.total - c.done) + '件</span>';
       return '<div class="' + cls + (c.isToday ? ' tday' : '') + '">' +
         '<div class="bcase-h"><b>' + esc(c.storeClean || c.caseNo) + '</b>' +
           (c.isToday ? '<span class="bcase-today">本日</span>' : '<span class="bcase-day">' + esc(formatMd(c.distDate)) + '</span>') + '</div>' +
         '<div class="bcase-sub">担当: ' + esc(c.staffNames || '—') + '</div>' +
-        '<div class="bcase-sub">回避 ' + c.done + ' / ' + c.total + ' 件　' + mark + '</div>' +
+        '<div class="bcase-sub">回避 ' + (c.done - mis) + (mis ? '・誤表記 ' + mis : '') + ' / ' + c.total + ' 件　' + mark + '</div>' +
         '</div>';
     }).join('');
   }
@@ -5582,7 +5663,7 @@ var App = (function() {
     loadPendingRegs: loadPendingRegs, approveReg: approveReg, rejectReg: rejectReg,
     changeStaffPerm: changeStaffPerm,
     submitRegister: submitRegister,
-    gotoBanTab: gotoBanTab, loadBanAdmin: loadBanAdmin, toggleAvoid: toggleAvoid,
+    gotoBanTab: gotoBanTab, loadBanAdmin: loadBanAdmin, toggleAvoid: toggleAvoid, toggleMislisted: toggleMislisted,
     toggleRegBan: toggleRegBan, updateRegHh: updateRegHh,
     loadPendingAmends: loadPendingAmends, approveAmend: approveAmend, rejectAmend: rejectAmend,
     loadOvertime: loadOvertime, saveOvertime: saveOvertime, clearOvertime: clearOvertime, otMonth: otMonth,
