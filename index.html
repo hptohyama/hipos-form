@@ -1306,8 +1306,9 @@ var App = (function() {
           : '下の［ブラウザで開く］を押して、Safari（AndroidはChrome）で開き直してください。') +
         '<div class="btns">' + btnOpen + btnCopy + '</div>' + urlBox;
     } else if (kind === 'inapp') {
-      // LINE WORKS（Android）の中で開くとここに来る（LINE WORKS そのものは見分けられないので「など」と書く）
-      html = '<b>LINE WORKSなどのアプリの中の画面には対応していません</b><br>' +
+      // LINE WORKS（Android）の中で開くとここに来る（LINE WORKS そのものは見分けられないので、Facebook・Instagram などもここに来る）
+      // ★見出しはスマホで1行に収める（社長指示 2026-09-13）。20文字で幅320pxに31px余ることを実測。長くしないこと
+      html = '<b>LINE WORKSには対応していません</b><br>' +
         'Safari（AndroidはChrome）で開き直してください。' + pasteHow +
         '<div class="btns">' + btnCopy + '</div>' + urlBox;
     } else {
