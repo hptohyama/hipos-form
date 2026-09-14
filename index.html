@@ -484,6 +484,21 @@
 .csw2-name{font-size:11px;color:#495057;text-align:center;line-height:1.2}
 .csw2.sel{border-color:#1c7ed6;background:#e7f5ff}
 .csw2.sel .csw2-name{font-weight:700;color:#1c7ed6}
+/* その他の予定：開始日〜終了日を横に並べる（2026-09-14） */
+.oe-dates{display:flex;align-items:center;gap:8px;margin-top:6px}
+.oe-dates input{flex:1;min-width:0;width:auto}
+.oe-dates span{flex:0 0 auto;color:var(--c-sub,#868e96)}
+/* 予定登録のサブタブが3つになったので、文字を少し小さくして「その他の予定」を1行に収める */
+#registerView .subtab{font-size:13px;padding:10px 4px;line-height:1.3}
+/* 色の名前は1行（「ブルーベリー」が1文字だけ次の行に落ちないように） */
+#oeColors .csw2{padding:10px 2px}
+#oeColors .csw2-name{white-space:nowrap}
+@media (max-width: 360px) {
+  .oe-dates{flex-direction:column;align-items:stretch;gap:4px}   /* 狭い画面では日付を縦に（横並びだと日付が切れる） */
+  .oe-dates input{width:100%}
+  .oe-dates span{text-align:center}
+  #oeColors.cpal{grid-template-columns:repeat(3,1fr)}
+}
 /* シフトのカレンダーを大きく押しやすく（スマホUX） */
 .sgrid-dow, .sgrid{gap:6px}
 .sgrid-dow span{font-size:12px;padding:4px 0}
@@ -788,6 +803,7 @@
     <div class="subtabs">
       <button type="button" class="subtab on" id="regSubNew" onclick="App.regSubTab('new')">新規登録</button>
       <button type="button" class="subtab" id="regSubManage" onclick="App.regSubTab('manage')">登録済みの変更・取消</button>
+      <button type="button" class="subtab" id="regSubOther" onclick="App.regSubTab('other')">その他の予定</button>
     </div>
 
     <div id="regNewPane">
@@ -874,6 +890,35 @@
         <div id="regList"><div class="empty">読み込み中…</div></div>
         <button type="button" class="btn-ghost" id="regListReload" onclick="App.loadRegistrations()" style="margin-top:10px">↻ 一覧を更新</button>
       </div>
+    </div>
+
+    <!-- ★その他の予定（有給・社用車の使用不可・外部チラシ納品など）＝拠点カレンダーへ終日の予定を直接追加（2026-09-14 社長要望）。
+         シートには記録しない。直す・消すは Googleカレンダーで（追加した直後だけ［元に戻す］で消せる）。 -->
+    <div id="regOtherPane" style="display:none">
+      <div class="card">
+        <h2>その他の予定を追加</h2>
+        <div class="case-info">有給・社用車の使用不可・外部チラシ納品など、案件以外の予定を<b>拠点のカレンダーに終日の予定</b>として追加します。<b>その拠点のスタッフ全員に見えます。</b><br>直すとき・消すときは Googleカレンダーで行ってください（追加した直後だけ［元に戻す］で消せます）。</div>
+      </div>
+      <div class="card">
+        <label for="oeBase">拠点</label>
+        <select id="oeBase" style="margin-top:6px"></select>
+        <label for="oeTitle" style="margin-top:12px">予定のタイトル（必須）</label>
+        <input type="text" id="oeTitle" maxlength="100" autocomplete="off" placeholder="例：岡元寿樹(有給)　社用車(フ)使用不可" style="margin-top:6px">
+        <label for="oeDesc" style="margin-top:12px">説明（任意）</label>
+        <textarea id="oeDesc" rows="3" maxlength="2000" placeholder="例：車検のため終日使えません" style="margin-top:6px"></textarea>
+        <label style="margin-top:12px">日付（終日）</label>
+        <div class="oe-dates">
+          <input type="date" id="oeStart" aria-label="開始日">
+          <span>〜</span>
+          <input type="date" id="oeEnd" aria-label="終了日">
+        </div>
+        <div class="footer-note">1日だけのときは、終了日は空欄のままで大丈夫です。</div>
+        <label style="margin-top:12px">色</label>
+        <div id="oeColors" class="cpal"></div>
+        <div class="footer-note" id="oeColorNote">選ばなければ、拠点のカレンダーの色になります。</div>
+      </div>
+      <div id="oeResult"></div>
+      <button type="button" class="btn-primary" id="oeSubmit" onclick="App.submitOtherEvent()">カレンダーに追加</button>
     </div>
   </div>
 
@@ -3632,18 +3677,99 @@ var App = (function() {
   }
   function regToggleShiftAll() { state.regShiftAll = !state.regShiftAll; renderRegStaff(); }
 
-  // 予定登録の2画面切替（新規登録 / 登録済みの変更・取消）
+  // 予定登録の3画面切替（新規登録 / 登録済みの変更・取消 / その他の予定）
   function regSubTab(which) {
-    var isNew = (which !== 'manage');
-    $('regNewPane').style.display = isNew ? '' : 'none';
-    $('regManagePane').style.display = isNew ? 'none' : '';
-    $('regSubNew').classList.toggle('on', isNew);
-    $('regSubManage').classList.toggle('on', !isNew);
-    if (!isNew) { state.regEdit = null; loadRegistrations(); }
+    var mode = (which === 'manage' || which === 'other') ? which : 'new';
+    $('regNewPane').style.display = mode === 'new' ? '' : 'none';
+    $('regManagePane').style.display = mode === 'manage' ? '' : 'none';
+    $('regOtherPane').style.display = mode === 'other' ? '' : 'none';
+    $('regSubNew').classList.toggle('on', mode === 'new');
+    $('regSubManage').classList.toggle('on', mode === 'manage');
+    $('regSubOther').classList.toggle('on', mode === 'other');
+    if (mode === 'manage') { state.regEdit = null; loadRegistrations(); }
+    if (mode === 'other') initOtherEvent();
   }
   function toggleRegHelp() {
     var el = $('regManageHelp');
     el.style.display = el.style.display === 'none' ? '' : 'none';
+  }
+
+  // ─── その他の予定（有給・社用車の使用不可など）を拠点カレンダーへ直接追加（管理者・2026-09-14 社長要望） ───
+  //   シートには記録しない。色は Googleカレンダーの11色（選ばなければカレンダーの色）。
+  function initOtherEvent() {
+    if (!state.oeReady) {   // 初めて開いたときだけ作る（2回目以降は選んだ拠点・日付をそのまま残す）
+      var want = (state.regBase && REG_BASES.indexOf(state.regBase) >= 0) ? state.regBase : REG_BASES[0];
+      $('oeBase').innerHTML = REG_BASES.map(function(b) {
+        return '<option value="' + esc(b) + '"' + (b === want ? ' selected' : '') + '>' + esc(b) + '</option>';
+      }).join('');
+      $('oeStart').value = state.oeStartDefault = todayIso();
+      state.oeColor = '';
+      state.oeReady = true;
+    } else if ($('oeStart').value === state.oeStartDefault && state.oeStartDefault !== todayIso()) {
+      $('oeStart').value = state.oeStartDefault = todayIso();   // 開いたまま日をまたいだ＝触っていなければ今日に合わせる
+    }
+    renderOtherColors();
+  }
+  function renderOtherColors() {
+    var pal = state.colorPalette || [];
+    var cur = state.oeColor || '';
+    $('oeColors').innerHTML = pal.map(function(c) {
+      var on = (c.id === cur);
+      return '<button type="button" class="csw2' + (on ? ' sel' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '"' +
+             ' onclick="App.pickOtherColor(\'' + esc(c.id) + '\')">' +
+             '<span class="csw2-dot" style="background:' + esc(c.hex) + '"></span>' +
+             '<span class="csw2-name">' + esc(c.name) + '</span></button>';
+    }).join('');
+    var chosen = pal.filter(function(c) { return c.id === cur; })[0];
+    $('oeColorNote').textContent = chosen
+      ? '「' + chosen.name + '」で追加します（もう一度押すと、カレンダーの色に戻ります）。'
+      : '選ばなければ、拠点のカレンダーの色になります。';
+  }
+  function pickOtherColor(id) {
+    state.oeColor = (state.oeColor === String(id)) ? '' : String(id || '');
+    renderOtherColors();
+  }
+  // 通信が途中で切れたとき：サーバで追加まで済んでいることがある（もう一度押すと同じ予定が2つできる）
+  var OE_MAYBE_ADDED = '<div class="msg msg-warn">追加されている場合があります。<b>Googleカレンダーで確かめてから</b>、' +
+                       'もう一度押してください（2回押すと同じ予定が2つできます）。</div>';
+  function submitOtherEvent() {
+    var box = $('oeResult');
+    if (state.submitting) { box.innerHTML = '<div class="msg msg-warn">ほかの処理が終わるまで、少しお待ちください。</div>'; return; }
+    var payload = { action: 'addOtherEvent', base: $('oeBase').value, title: $('oeTitle').value.trim(),
+                    description: $('oeDesc').value, startDate: $('oeStart').value, endDate: $('oeEnd').value,
+                    colorId: state.oeColor || '' };
+    if (!payload.title) { box.innerHTML = '<div class="msg msg-warn">予定のタイトルを入力してください。</div>'; return; }
+    if (!payload.startDate) { box.innerHTML = '<div class="msg msg-warn">開始日を選んでください。</div>'; return; }
+    if (payload.endDate && payload.endDate < payload.startDate) {
+      box.innerHTML = '<div class="msg msg-warn">終了日は開始日と同じか、それより後の日にしてください。</div>'; return;
+    }
+    var btn = $('oeSubmit');
+    state.submitting = true; btn.disabled = true; btn.textContent = '追加しています…';
+    box.innerHTML = '';
+    var sent = { base: payload.base, title: payload.title, description: payload.description,
+                 startDate: payload.startDate, endDate: payload.endDate, colorId: payload.colorId };
+    api(payload).then(function(res) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'カレンダーに追加';
+      if (res && res.ok) {
+        box.innerHTML = '<div class="msg msg-ok">' + esc(res.message || '追加しました。') + '</div>';
+        $('oeTitle').value = ''; $('oeDesc').value = ''; $('oeEnd').value = '';   // 拠点・開始日・色は続けて入れやすいよう残す
+        if (res.undo) showUndoToast(res.undo, function() { afterOtherUndo(sent); });
+      } else {
+        box.innerHTML = errHtml(res || {}, 'エラー') + ((res && res.code === 'E_SERVER_BUSY') ? OE_MAYBE_ADDED : '');
+      }
+    }).catch(function(e) {
+      state.submitting = false; btn.disabled = false; btn.textContent = 'カレンダーに追加';
+      box.innerHTML = '<div class="msg msg-err">' + esc('接続できません: ' + e.message) + '</div>' + OE_MAYBE_ADDED;
+    });
+  }
+  // ［元に戻す］が効いたら、入力を戻して直せるようにする（戻せなかったら「追加しました」の表示を残す）
+  function afterOtherUndo(sent) {
+    var r = state.lastUndoResult;
+    if (!r || !r.ok) return;
+    $('oeBase').value = sent.base; $('oeTitle').value = sent.title; $('oeDesc').value = sent.description;
+    $('oeStart').value = sent.startDate; $('oeEnd').value = sent.endDate;
+    state.oeColor = sent.colorId || ''; renderOtherColors();
+    $('oeResult').innerHTML = '<div class="msg">追加した予定を取り消しました。入力を戻したので、直してから追加し直せます。</div>';
   }
 
   // ─── 登録済み予定の取消・役割変更（管理者・§7.106） ───
@@ -4970,6 +5096,7 @@ var App = (function() {
     api({ action: 'undoApproval', kind: t.kind, op: t.op, id: t.id }).then(function(res) {
       state.submitting = false;
       hideUndoToast();
+      state.lastUndoResult = res;   // 呼び出し元が「戻せたか」で表示を変えられるように（その他の予定・2026-09-14）
       alert(res.message || res.code || (res.ok ? '元に戻しました。' : '元に戻せませんでした。'));
       if (typeof refresh === 'function') refresh();
     }).catch(function(e) {
@@ -5898,6 +6025,7 @@ var App = (function() {
     regEditSetRole: regEditSetRole, regEditRemoveMember: regEditRemoveMember, regEditAddMember: regEditAddMember,
     regEditToggleBan: regEditToggleBan,
     regSubTab: regSubTab, toggleRegHelp: toggleRegHelp,
+    submitOtherEvent: submitOtherEvent, pickOtherColor: pickOtherColor,
     regSetBase: regSetBase, regOnSearch: regOnSearch, regClearFilters: regClearFilters, regToggleRecent: regToggleRecent,
     regToggle: regToggle, regSetRole: regSetRole, regRemove: regRemove, regToggleShiftAll: regToggleShiftAll,
     loadStaff: loadStaff,
