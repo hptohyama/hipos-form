@@ -4307,14 +4307,17 @@ var App = (function() {
       var kind = r.target ? '既存スタッフに紐づけて登録（集計を引き継ぎ）' : '新規スタッフとして登録';
       var matchHint = (!r.target && r.nameMatches && r.nameMatches.length)
         ? '<div class="footer-note" style="color:var(--c-warn)">⚠ 同じ氏名の既存スタッフがいます。心当たりがあれば却下し、本人に一覧から選び直してもらうと集計を引き継げます。</div>' : '';
-      var permOpts = ['配布員', '管理者', '管理者（配布者）'].map(function(p) {
-        return '<option value="' + esc(p) + '">' + esc(p) + '</option>';
-      }).join('');
+      // ★最初は空欄＝必ず選ぶ（2026-09-14）。「配布員」が最初から選ばれていると、管理者を承認するときに
+      //   変え忘れて P 番号で登録され、ID は後から直せない。
+      var permOpts = '<option value="">選んでください</option>' +
+        ['配布員', '管理者', '管理者（配布者）'].map(function(p) {
+          return '<option value="' + esc(p) + '">' + esc(p) + '</option>';
+        }).join('');
       // 権限は「新規追加」のときだけ適用（既存に紐づける場合は元の権限を維持）。
       // 既存紐づけでは選択欄を出さず、その旨だけ表示して誤解を防ぐ。
       var permBlock = r.target
         ? '<div class="footer-note" style="margin-top:8px">権限: 既存スタッフの現在の設定を維持します</div>'
-        : '<label style="margin-top:8px">権限<span class="footer-note">（新規スタッフに適用）</span></label>' +
+        : '<label style="margin-top:8px">権限<span class="footer-note">（必ず選ぶ・新規スタッフに適用）</span></label>' +
           '<select id="prPerm_' + esc(r.reqId) + '">' + permOpts + '</select>';
       return '<div class="assign" style="display:block;margin-bottom:8px">' +
         '<div class="store">' + esc(r.name) + ' <span class="badge-inline badge-todo">' + esc(r.homeArea || '拠点未設定') + '</span></div>' +
@@ -4333,6 +4336,10 @@ var App = (function() {
     if (state.submitting) return;
     // 扱い（新規/既存）は申請時に確定済み。管理者は承認するだけ（サーバは申請の target を使う）。権限だけ指定可。
     var permSel = $('prPerm_' + reqId);
+    if (permSel && !permSel.value && !(opts && opts.targetStaffId)) {
+      alert('権限を選んでください（配布員／管理者／管理者（配布者））');
+      return;
+    }
     var payload = { action: 'approveRegistration', reqId: reqId };
     if (permSel && permSel.value) payload.perm = permSel.value;
     // ★同名の確認に答えたとき（2026-08-08・宿題I）
@@ -4699,9 +4706,15 @@ var App = (function() {
   }
 
   // ロスターだけ再読込（承認直後の反映用・申請一覧は別途 loadPendingRegs で更新）
+  // ★予定登録・シフト管理の担当者候補（state.staffList）も同じ応答で新しくする（2026-09-14 新人対応④）。
+  //   以前はログインし直すまで、承認した新人が候補に出なかった。形はログイン時（handleCases）と同じ。
   function loadStaffRosterOnly() {
     api({ action: 'listStaff' }).then(function(res) {
-      if (res.ok) renderRoster(res.staff || []);
+      if (!res.ok) return;
+      renderRoster(res.staff || []);
+      state.staffList = (res.staff || []).map(function(s) {
+        return { staffId: s.staffId, name: s.name, homeArea: s.homeArea || '' };
+      });
     }).catch(function() {});
   }
 
@@ -5557,15 +5570,24 @@ var App = (function() {
   }
 
   // ─── シフト管理（管理者・スタッフのシフトを代理登録） ───
+  /**
+   * シフト管理の担当者の選択肢に、まだ無い人だけを足す（候補＝state.staffList・在籍のみ）。
+   * ★以前は最初の1回しか作らず、承認した新人がログインし直すまで出なかった（2026-09-14 新人対応④）。
+   *   足すだけなので、選んでいる人はそのまま。
+   */
+  function fillSaStaff(sel) {
+    var have = {};
+    for (var i = 0; i < sel.options.length; i++) have[sel.options[i].value] = true;
+    (state.staffList || []).forEach(function(s) {
+      if (have[s.staffId]) return;
+      var o = document.createElement('option');
+      o.value = s.staffId; o.textContent = s.name + '（' + s.staffId + '）';
+      sel.appendChild(o);
+    });
+  }
   function loadShiftAdmin() {
     var sel = $('saStaff');
-    if (sel.options.length <= 1) {   // スタッフ候補（在籍・管理者のみ handleCases で返る）
-      (state.staffList || []).forEach(function(s) {
-        var o = document.createElement('option');
-        o.value = s.staffId; o.textContent = s.name + '（' + s.staffId + '）';
-        sel.appendChild(o);
-      });
-    }
+    fillSaStaff(sel);   // 開くたびに、まだ無い人（承認した直後の新人など）だけ足す
     sel.onchange = onSaStaffChange;
     if (state.saForm) { renderSaCal(); }   // 既に選択済みなら再描画
   }
