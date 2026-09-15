@@ -330,7 +330,7 @@
   .regfilter { margin: 4px 0 10px; }
   .regsearch { width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--c-border); border-radius: 8px; font-size: 14px; margin-bottom: 8px; }
   .regfrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
-  .regpill { border: 1px solid var(--c-border); background: #fff; color: var(--c-sub); border-radius: 14px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .regpill { width: auto; border: 1px solid var(--c-border); background: #fff; color: var(--c-sub); border-radius: 14px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .regpill.on { background: var(--c-primary, #1a73e8); border-color: var(--c-primary, #1a73e8); color: #fff; }
   .regpill .cnt { font-weight: 600; opacity: .8; margin-left: 3px; }
   .regsort { margin-left: auto; }
@@ -488,6 +488,77 @@
 .oe-dates{display:flex;align-items:center;gap:8px;margin-top:6px}
 .oe-dates input{flex:1;min-width:0;width:auto}
 .oe-dates span{flex:0 0 auto;color:var(--c-sub,#868e96)}
+/* その他の予定：上の帯（月送り・＋予定）／入力欄／月のカレンダー／一覧／下から出る詳細（2026-09-14） */
+.oe-toolbar{display:flex;align-items:center;gap:6px}
+button.oe-nav{flex:0 0 auto;width:auto;padding:8px 12px;font-size:14px;border:1px solid var(--c-border);background:#fff;color:var(--c-primary);border-radius:8px}
+.oe-month{flex:1;min-width:0;text-align:center;font-size:18px;font-weight:800;white-space:nowrap}
+button.oe-today{flex:0 0 auto;width:auto;padding:8px 10px;font-size:13px;border:1px solid var(--c-border);background:#fff;color:var(--c-sub,#868e96);border-radius:8px}
+button.oe-add{flex:0 0 auto;width:auto;padding:9px 14px;font-size:15px;font-weight:800;color:#fff;border-radius:10px;
+  background:linear-gradient(135deg,#34b27b,#1e9e6a);box-shadow:0 2px 6px rgba(30,158,106,.35);white-space:nowrap}
+button.oe-add.on{background:#e6f4ea;color:#137333;box-shadow:none;border:1px solid #9bd3ae}
+/* 320px ほどの狭い画面では「2026年9月」が［▶］に隠れていた → ボタンと文字を少し小さくして1行に収める */
+@media (max-width:360px){
+  .oe-toolbar{gap:4px}
+  button.oe-nav{padding:8px 8px}
+  .oe-month{font-size:15px}
+  button.oe-today{padding:8px 6px;font-size:12px}
+  button.oe-add{padding:9px 10px;font-size:14px}
+}
+.oe-editbar{margin-top:10px;padding:9px 11px;border-radius:8px;background:#fff4e5;border:1px solid #f0b400;font-size:13px;color:#7a4b00}
+#oeBase:disabled{background:#f1f3f5;color:var(--c-sub,#868e96)}
+.oe-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--c-border);border-left:1px solid var(--c-border);margin-top:8px}
+.oe-dow{font-size:11px;font-weight:700;text-align:center;padding:4px 0;background:#f8f9fa;color:var(--c-sub,#868e96);
+  border-right:1px solid var(--c-border);border-bottom:1px solid var(--c-border)}
+.oe-dow.sat{color:#1a73e8}
+.oe-dow.sun{color:#d93025}
+.oe-cell{min-width:0;min-height:64px;padding:2px;display:flex;flex-direction:column;gap:2px;
+  border-right:1px solid var(--c-border);border-bottom:1px solid var(--c-border)}
+.oe-cell.out{background:#fafafa}
+.oe-cell.out .oe-dnum{color:#c0c4c8}
+.oe-dnum{font-size:11px;font-weight:700;text-align:center;line-height:18px;height:18px}
+.oe-cell.today .oe-dnum{background:#1a73e8;color:#fff;border-radius:9px;width:18px;margin:0 auto}
+button.oe-chip{width:100%;padding:1px 3px;font-size:10px;line-height:14px;font-weight:600;border-radius:4px;text-align:left;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button.oe-chip.cont{border-top-left-radius:0;border-bottom-left-radius:0;opacity:.85}
+.oe-loading{font-size:12px;color:var(--c-sub,#868e96);text-align:center;margin-top:6px}
+@media (min-width: 600px) {
+  .oe-cell{min-height:92px}
+  .oe-dnum{font-size:12px}
+  button.oe-chip{font-size:12px;line-height:18px;padding:1px 5px}
+}
+.oe-li{display:flex;align-items:center;gap:6px;margin-top:8px;padding:4px 8px 4px 0;background:#fff;
+  border:1px solid var(--c-border);border-radius:10px}
+.oe-li.oe-editing{border-color:#f0b400;background:#fffaf0}
+button.oe-li-body{flex:1;min-width:0;width:auto;display:flex;align-items:center;gap:8px;text-align:left;padding:8px 4px 8px 10px;
+  background:transparent;border-radius:10px;font-weight:400;color:var(--c-text)}
+button.oe-li-body:active{background:#f1f3f4}
+.oe-li-acts{flex:0 0 auto;display:flex;flex-direction:column;gap:6px}
+.oe-li-acts .rolebtn{width:auto;padding:7px 12px;font-size:13px;font-weight:700}
+.oe-li-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.oe-li-title{font-size:15px;font-weight:700;overflow-wrap:anywhere}
+.oe-li-when{font-size:12px;color:var(--c-sub,#868e96)}
+.oe-row{display:flex;align-items:center;gap:8px}
+.oe-dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.oe-dot.big{width:20px;height:20px}
+.oe-now{background:#e8f0fe;color:#1a73e8}
+.oe-sheet{position:fixed;left:0;right:0;top:0;bottom:0;z-index:95;display:flex;align-items:flex-end;justify-content:center}
+.oe-sheet-bg{position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(0,0,0,.4)}
+.oe-sheet-box{position:relative;width:100%;max-width:560px;max-height:80vh;overflow:auto;background:#fff;border-radius:16px 16px 0 0;
+  padding:18px 16px calc(18px + env(safe-area-inset-bottom, 0px));box-shadow:0 -4px 16px rgba(0,0,0,.18)}
+.oe-sheet-title{font-size:18px;overflow-wrap:anywhere}
+.oe-sheet-meta{font-size:14px;margin-top:8px;color:var(--c-text)}
+.oe-sheet-desc{font-size:14px;margin-top:10px;padding:10px;background:#f8f9fa;border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere}
+.oe-sheet-actions{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+button.oe-sheet-del{border:1px solid var(--c-err);background:#fff;color:var(--c-err);padding:12px}
+/* 表示の切替［カレンダー｜一覧］（登録済みの変更・取消／その他の予定・2026-09-14 社長要望） */
+.viewtog{display:flex;margin-top:10px;border:1px solid var(--c-border);border-radius:10px;overflow:hidden}
+.viewtog button{flex:1;width:auto;padding:9px 6px;font-size:14px;font-weight:700;background:#fff;color:var(--c-sub,#868e96);border-radius:0}
+.viewtog button + button{border-left:1px solid var(--c-border)}
+.viewtog button.on{background:var(--c-primary,#1a73e8);color:#fff}
+/* 登録済みの予定の詳細（カレンダーで押したとき） */
+.reg-sheet-list{margin:6px 0 0;padding-left:20px}
+.reg-sheet-list li{margin-top:3px}
+.reg-sheet-towns{font-size:13px;margin-top:4px;overflow-wrap:anywhere}
 /* 予定登録のサブタブが3つになったので、文字を少し小さくして「その他の予定」を1行に収める */
 #registerView .subtab{font-size:13px;padding:10px 4px;line-height:1.3}
 /* 色の名前は1行（「ブルーベリー」が1文字だけ次の行に落ちないように） */
@@ -879,7 +950,18 @@
         <div id="regManageHelp" class="helpbox" style="display:none">
           <div><b>編集</b> … 新規登録と同じ画面で、案件名・予定町・連絡事項・担当（役割）をまとめて直して<b>保存</b>。担当の追加／外す／役割変更・差し替えも全部この編集画面の中でできます。</div>
           <div style="margin-top:4px"><b>取消</b> … その予定ごと取り消し（担当全員を外す）。</div>
+          <div style="margin-top:4px"><b>カレンダー／一覧</b> … 上のボタンで切り替え。カレンダーで予定を押すと詳細が出て、そこから編集・取消ができます。</div>
           <div style="margin-top:6px;color:var(--c-sub)">保存・取消は配布予定カレンダー・報告フォームに自動反映（提出済みの報告・集計は残ります）。<br>日にちを変えるときは取消→登録し直し。</div>
+        </div>
+        <div class="viewtog" id="regViewBar" style="display:none" role="group" aria-label="表示の切替">
+          <button type="button" id="regViewCal" onclick="App.regSetView('cal')">📅 カレンダー</button>
+          <button type="button" id="regViewList" onclick="App.regSetView('list')">☰ 一覧</button>
+        </div>
+        <div class="oe-toolbar" id="regMonthBar" style="display:none;margin-top:10px">
+          <button type="button" class="oe-nav" onclick="App.regMonth(-1)" aria-label="前の月">◀</button>
+          <div class="oe-month" id="regMonthLabel"></div>
+          <button type="button" class="oe-nav" onclick="App.regMonth(1)" aria-label="次の月">▶</button>
+          <button type="button" class="oe-today" onclick="App.regMonth(0)">今月</button>
         </div>
         <div id="regFilterBar" class="regfilter" style="display:none">
           <input type="text" id="regSearch" class="regsearch" placeholder="🔍 店名・案件番号・町名・担当者で検索" oninput="App.regOnSearch()" autocomplete="off">
@@ -887,25 +969,58 @@
           <div class="regcount" id="regCountLine"></div>
         </div>
         <div id="regListResult"></div>
+        <div id="regCal" style="display:none"></div>
         <div id="regList"><div class="empty">読み込み中…</div></div>
         <button type="button" class="btn-ghost" id="regListReload" onclick="App.loadRegistrations()" style="margin-top:10px">↻ 一覧を更新</button>
       </div>
+
+      <!-- カレンダーで予定を押したときの詳細（下から出る）。［編集］は一覧に切り替えて、その予定の編集欄を開く（2026-09-14 社長決定） -->
+      <div class="oe-sheet" id="regSheet" style="display:none" role="dialog" aria-modal="true" aria-label="予定の詳細">
+        <div class="oe-sheet-bg" onclick="App.regCloseSheet()"></div>
+        <div class="oe-sheet-box">
+          <div id="regSheetBody"></div>
+          <div class="oe-sheet-actions">
+            <button type="button" class="btn-primary" onclick="App.regEditFromSheet()">✏️ この予定を編集</button>
+            <button type="button" class="oe-sheet-del" onclick="App.regDeleteFromSheet()">🗑 この予定を取消</button>
+            <button type="button" class="btn-ghost" onclick="App.regCloseSheet()">閉じる</button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- ★その他の予定（有給・社用車の使用不可・外部チラシ納品など）＝拠点カレンダーへ終日の予定を直接追加（2026-09-14 社長要望）。
-         シートには記録しない。直す・消すは Googleカレンダーで（追加した直後だけ［元に戻す］で消せる）。 -->
+    <!-- ★その他の予定（有給・社用車の使用不可・外部チラシ納品など）＝拠点カレンダーの終日の予定（2026-09-14 社長要望）。
+         シートには記録しない。操作はアプリだけ（社長決定 A＝管理者も Googleカレンダーは閲覧のみ）。
+         ［＋ 予定］で入力欄を開く／月のカレンダーと一覧で見る（月送り）／予定を押すと［直す］［消す］。 -->
     <div id="regOtherPane" style="display:none">
-      <div class="card">
-        <h2>その他の予定を追加</h2>
-        <div class="case-info">有給・社用車の使用不可・外部チラシ納品など、案件以外の予定を<b>拠点のカレンダーに終日の予定</b>として追加します。<b>その拠点のスタッフ全員に見えます。</b><br>直すとき・消すときは Googleカレンダーで行ってください（追加した直後だけ［元に戻す］で消せます）。</div>
+      <div class="card oe-top">
+        <div class="oe-toolbar">
+          <button type="button" class="oe-nav" onclick="App.oeMonth(-1)" aria-label="前の月">◀</button>
+          <div class="oe-month" id="oeMonthLabel"></div>
+          <button type="button" class="oe-nav" onclick="App.oeMonth(1)" aria-label="次の月">▶</button>
+          <button type="button" class="oe-today" onclick="App.oeMonth(0)">今月</button>
+          <button type="button" class="oe-add" id="oeAddBtn" onclick="App.openOtherForm()">＋ 予定</button>
+        </div>
+        <div class="case-info" style="margin-top:10px">有給・社用車の使用不可・外部チラシ納品など、案件以外の予定を<b>拠点のカレンダーに終日</b>で入れます。<b>その拠点のスタッフ全員に見えます。</b>予定を押すと、直す・消すができます。</div>
+        <div class="viewtog" role="group" aria-label="表示の切替">
+          <button type="button" id="oeViewCal" onclick="App.oeSetView('cal')">📅 カレンダー</button>
+          <button type="button" id="oeViewList" onclick="App.oeSetView('list')">☰ 一覧</button>
+        </div>
+        <div class="regfrow" id="oeBasePills" style="margin-top:10px"></div>
       </div>
-      <div class="card">
-        <label for="oeBase">拠点</label>
+
+      <div class="card" id="oeFormCard" style="display:none">
+        <div class="reghead">
+          <h2 id="oeHeading">予定を追加</h2>
+          <button type="button" class="btn-ghost btn-small" onclick="App.closeOtherForm()">閉じる</button>
+        </div>
+        <div class="oe-editbar" id="oeEditBar" style="display:none"></div>
+        <label for="oeBase" style="margin-top:12px">拠点</label>
         <select id="oeBase" style="margin-top:6px"></select>
+        <div class="footer-note" id="oeBaseNote" style="display:none">直すときは拠点を変えられません。別の拠点にするときは、消してから追加し直してください。</div>
         <label for="oeTitle" style="margin-top:12px">予定のタイトル（必須）</label>
-        <input type="text" id="oeTitle" maxlength="100" autocomplete="off" placeholder="例：岡元寿樹(有給)　社用車(フ)使用不可" style="margin-top:6px">
+        <input type="text" id="oeTitle" maxlength="100" autocomplete="off" style="margin-top:6px">
         <label for="oeDesc" style="margin-top:12px">説明（任意）</label>
-        <textarea id="oeDesc" rows="3" maxlength="2000" placeholder="例：車検のため終日使えません" style="margin-top:6px"></textarea>
+        <textarea id="oeDesc" rows="3" maxlength="2000" style="margin-top:6px"></textarea>
         <label style="margin-top:12px">日付（終日）</label>
         <div class="oe-dates">
           <input type="date" id="oeStart" aria-label="開始日">
@@ -916,9 +1031,32 @@
         <label style="margin-top:12px">色</label>
         <div id="oeColors" class="cpal"></div>
         <div class="footer-note" id="oeColorNote">選ばなければ、拠点のカレンダーの色になります。</div>
+        <div id="oeResult"></div>
+        <button type="button" class="btn-primary" id="oeSubmit" onclick="App.submitOtherEvent()" style="margin-top:12px">カレンダーに追加</button>
       </div>
-      <div id="oeResult"></div>
-      <button type="button" class="btn-primary" id="oeSubmit" onclick="App.submitOtherEvent()">カレンダーに追加</button>
+
+      <div id="oeNotice"></div>
+
+      <div class="card" id="oeCalCard">
+        <div id="oeCal"><div class="empty">読み込み中…</div></div>
+      </div>
+
+      <div class="card" id="oeListCard">
+        <h2 id="oeListTitle">予定の一覧</h2>
+        <div id="oeList"></div>
+      </div>
+
+      <div class="oe-sheet" id="oeSheet" style="display:none" role="dialog" aria-modal="true" aria-label="予定の詳細">
+        <div class="oe-sheet-bg" onclick="App.closeOtherSheet()"></div>
+        <div class="oe-sheet-box">
+          <div id="oeSheetBody"></div>
+          <div class="oe-sheet-actions">
+            <button type="button" class="btn-primary" onclick="App.editOtherFromSheet()">✏️ この予定を直す</button>
+            <button type="button" class="oe-sheet-del" onclick="App.deleteOtherFromSheet()">🗑 この予定を消す</button>
+            <button type="button" class="btn-ghost" onclick="App.closeOtherSheet()">閉じる</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -3687,28 +3825,75 @@ var App = (function() {
     $('regSubManage').classList.toggle('on', mode === 'manage');
     $('regSubOther').classList.toggle('on', mode === 'other');
     if (mode === 'manage') { state.regEdit = null; loadRegistrations(); }
-    if (mode === 'other') initOtherEvent();
+    if (mode === 'other') initOtherEvent(); else closeOtherSheet();   // ほかの画面へ移ったら、開いていた詳細は閉じる
+    if (mode !== 'manage') regCloseSheet();
   }
   function toggleRegHelp() {
     var el = $('regManageHelp');
     el.style.display = el.style.display === 'none' ? '' : 'none';
   }
 
-  // ─── その他の予定（有給・社用車の使用不可など）を拠点カレンダーへ直接追加（管理者・2026-09-14 社長要望） ───
-  //   シートには記録しない。色は Googleカレンダーの11色（選ばなければカレンダーの色）。
+  // ─── その他の予定（有給・社用車の使用不可など）＝拠点カレンダーの終日の予定（管理者・2026-09-14 社長要望） ───
+  //   シートには記録しない。操作はアプリだけ。
+  //   ［＋ 予定］で入力欄を開く／月のカレンダーと一覧で見る（月送り）／予定を押すと下から詳細が出て［直す］［消す］。
+  //   色は Googleカレンダーの11色（選ばなければカレンダーの色）。
+  var OE_WEEK = ['日', '月', '火', '水', '木', '金', '土'];
+  var OE_BUSY = '<div class="msg msg-warn">ほかの処理が終わるまで、少しお待ちください。</div>';
+  var OE_NO_COLOR = '#9aa0a6';   // 色を選ばなかった予定（カレンダーの色）を画面で見せる色
+  // 通信が途中で切れたとき：サーバで追加まで済んでいることがある（もう一度押すと同じ予定が2つできる）
+  var OE_MAYBE_ADDED = '<div class="msg msg-warn">追加されている場合があります。<b>下のカレンダーに出ていないか確かめてから</b>、' +
+                       'もう一度押してください（2回押すと同じ予定が2つできます）。</div>';
+
+  function oePad(n) { return ('0' + n).slice(-2); }
+  function oeIso(d) { return d.getFullYear() + '-' + oePad(d.getMonth() + 1) + '-' + oePad(d.getDate()); }
+  function oeAddDays(iso, n) { return oeIso(new Date(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10) + n)); }
+  /** 月のカレンダーに並べる日（月曜はじまり・その月を含む週だけ＝5〜6週） */
+  function oeGridDays(ym) {
+    var y = +ym.slice(0, 4), m = +ym.slice(5, 7);
+    var first = new Date(y, m - 1, 1), last = new Date(y, m, 0);
+    var start = new Date(y, m - 1, 1 - ((first.getDay() + 6) % 7));
+    var end = new Date(y, m - 1, last.getDate() + (6 - ((last.getDay() + 6) % 7)));
+    var days = [];
+    for (var d = start; d <= end; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) days.push(oeIso(d));
+    return days;
+  }
+  /** 月のカレンダーの曜日の見出し（月曜はじまり・土は青・日は赤）。その他の予定と登録済みの予定で共通 */
+  function calHeadHtml() {
+    return ['月', '火', '水', '木', '金', '土', '日'].map(function(w, k) {
+      return '<div class="oe-dow' + (k === 5 ? ' sat' : (k === 6 ? ' sun' : '')) + '">' + w + '</div>';
+    }).join('');
+  }
+  // 表示の切替［カレンダー｜一覧］（2026-09-14 社長決定＝最後に選んだほうをこの端末に覚える・初めてはカレンダー）
+  function viewPref(key) { return lsGet('hipos_view_' + key) === 'list' ? 'list' : 'cal'; }
+  function saveViewPref(key, v) { lsSet('hipos_view_' + key, v === 'list' ? 'list' : 'cal'); }
+  function paintViewToggle(prefix, v) {
+    [['Cal', 'cal'], ['List', 'list']].forEach(function(p) {
+      var b = $(prefix + 'View' + p[0]);
+      if (!b) return;
+      b.classList.toggle('on', v === p[1]);
+      b.setAttribute('aria-pressed', v === p[1] ? 'true' : 'false');
+    });
+  }
+
   function initOtherEvent() {
-    if (!state.oeReady) {   // 初めて開いたときだけ作る（2回目以降は選んだ拠点・日付をそのまま残す）
+    if (!state.oeReady) {   // 初めて開いたときだけ作る（2回目以降は選んだ拠点・日付・月をそのまま残す）
       var want = (state.regBase && REG_BASES.indexOf(state.regBase) >= 0) ? state.regBase : REG_BASES[0];
       $('oeBase').innerHTML = REG_BASES.map(function(b) {
         return '<option value="' + esc(b) + '"' + (b === want ? ' selected' : '') + '>' + esc(b) + '</option>';
       }).join('');
       $('oeStart').value = state.oeStartDefault = todayIso();
+      state.oeMonth = todayIso().slice(0, 7);
       state.oeColor = '';
+      state.oeEdit = null;
+      state.oeFormOpen = false;
+      state.oeFilter = '';
+      state.oeEvents = [];
       state.oeReady = true;
-    } else if ($('oeStart').value === state.oeStartDefault && state.oeStartDefault !== todayIso()) {
+    } else if (!state.oeEdit && $('oeStart').value === state.oeStartDefault && state.oeStartDefault !== todayIso()) {
       $('oeStart').value = state.oeStartDefault = todayIso();   // 開いたまま日をまたいだ＝触っていなければ今日に合わせる
     }
     renderOtherColors();
+    loadOtherEvents();   // 開くたびに最新の予定
   }
   function renderOtherColors() {
     var pal = state.colorPalette || [];
@@ -3722,61 +3907,335 @@ var App = (function() {
     }).join('');
     var chosen = pal.filter(function(c) { return c.id === cur; })[0];
     $('oeColorNote').textContent = chosen
-      ? '「' + chosen.name + '」で追加します（もう一度押すと、カレンダーの色に戻ります）。'
+      ? '「' + chosen.name + '」にします（もう一度押すと、カレンダーの色に戻ります）。'
       : '選ばなければ、拠点のカレンダーの色になります。';
   }
   function pickOtherColor(id) {
     state.oeColor = (state.oeColor === String(id)) ? '' : String(id || '');
     renderOtherColors();
   }
-  // 通信が途中で切れたとき：サーバで追加まで済んでいることがある（もう一度押すと同じ予定が2つできる）
-  var OE_MAYBE_ADDED = '<div class="msg msg-warn">追加されている場合があります。<b>Googleカレンダーで確かめてから</b>、' +
-                       'もう一度押してください（2回押すと同じ予定が2つできます）。</div>';
+
+  /** 月を送る（-1=前の月・+1=次の月・0=今月） */
+  function oeMonth(delta) {
+    var ym = state.oeMonth || todayIso().slice(0, 7);
+    if (!delta) {
+      ym = todayIso().slice(0, 7);
+    } else {
+      var d = new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + delta, 1);
+      ym = d.getFullYear() + '-' + oePad(d.getMonth() + 1);
+    }
+    state.oeMonth = ym;
+    closeOtherSheet();
+    $('oeNotice').innerHTML = '';
+    loadOtherEvents();
+  }
+
+  /** 'YYYY-MM-DD' → 「9月14日（月）」（今年でなければ年も付ける） */
+  function oeDateLabel(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+    if (!m) return String(iso || '');
+    var d = new Date(+m[1], +m[2] - 1, +m[3]);
+    var y = (String(new Date().getFullYear()) === m[1]) ? '' : m[1] + '年';
+    return y + (+m[2]) + '月' + (+m[3]) + '日（' + OE_WEEK[d.getDay()] + '）';
+  }
+  /** 期間の見せ方（1日なら日付だけ・期間なら「〜」と日数） */
+  function oeWhenLabel(ev) {
+    var s = ev.startDate, e = ev.endDate || ev.startDate;
+    if (s === e) return oeDateLabel(s);
+    var days = Math.round((Date.UTC(+e.slice(0, 4), +e.slice(5, 7) - 1, +e.slice(8, 10)) -
+                           Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10))) / 86400000) + 1;
+    return oeDateLabel(s) + ' 〜 ' + oeDateLabel(e) + '（' + days + '日間）';
+  }
+  function oeColorOf(ev) {
+    return (state.colorPalette || []).filter(function(c) { return c.id === ev.colorId; })[0] || null;
+  }
+
+  function loadOtherEvents() {
+    closeOtherSheet();   // ★読み直すと並びが変わる＝開いたままの詳細が別の予定を指す（直す・消すの取り違え）ので閉じる
+    var ym = state.oeMonth || todayIso().slice(0, 7);
+    var days = oeGridDays(ym);
+    $('oeMonthLabel').textContent = (+ym.slice(0, 4)) + '年' + (+ym.slice(5, 7)) + '月';
+    var seq = state.oeListSeq = (state.oeListSeq || 0) + 1;   // 遅れて届いた古い月の予定で上書きしない
+    state.oeEvents = []; state.oeErrors = [];
+    renderOtherEvents(true);   // 読み込み中でも、その月のカレンダーの枠はすぐ出す
+    api({ action: 'listOtherEvents', from: days[0], to: oeAddDays(days[days.length - 1], 1) }).then(function(res) {
+      if (seq !== state.oeListSeq) return;
+      if (!res || !res.ok) {
+        renderOtherEvents(false);
+        $('oeNotice').innerHTML = errHtml(res || {}, '予定を読み込めませんでした');
+        return;
+      }
+      state.oeEvents = res.events || [];
+      state.oeErrors = res.errors || [];
+      renderOtherEvents(false);
+    }).catch(function(e) {
+      if (seq !== state.oeListSeq) return;
+      renderOtherEvents(false);
+      $('oeNotice').innerHTML = '<div class="msg msg-err">' + esc('予定を読み込めませんでした: ' + e.message) + '</div>';
+    });
+  }
+
+  function renderOtherEvents(loading) {
+    oeApplyView();
+    var ym = state.oeMonth || todayIso().slice(0, 7);
+    var days = oeGridDays(ym);
+    var monthStart = ym + '-01', monthEnd = oeIso(new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0));
+    var f = state.oeFilter || '';
+    var today = todayIso();
+    var all = (state.oeEvents || []).map(function(ev, i) { return { ev: ev, i: i }; });
+    var shown = all.filter(function(x) { return !f || x.ev.base === f; });
+    var inMonth = all.filter(function(x) { return x.ev.startDate <= monthEnd && (x.ev.endDate || x.ev.startDate) >= monthStart; });
+
+    // 拠点で絞るボタン（件数はこの月の予定）
+    var counts = {};
+    inMonth.forEach(function(x) { counts[x.ev.base] = (counts[x.ev.base] || 0) + 1; });
+    var pill = function(key, label, n) {
+      return '<button type="button" class="regpill' + (f === key ? ' on' : '') + '" onclick="App.oeSetFilter(\'' + esc(key) + '\')">' +
+             esc(label) + '<span class="cnt">' + n + '</span></button>';
+    };
+    $('oeBasePills').innerHTML = pill('', 'すべて', inMonth.length) +
+      REG_BASES.map(function(b) { return pill(b, b, counts[b] || 0); }).join('');
+
+    // 月のカレンダー（予定は色つきの帯。押すと詳細）
+    var head = calHeadHtml();
+    var cells = days.map(function(day) {
+      var chips = shown.filter(function(x) { return x.ev.startDate <= day && day <= (x.ev.endDate || x.ev.startDate); })
+        .map(function(x) {
+          var c = oeColorOf(x.ev);
+          var fg = (x.ev.colorId === '5') ? '#3c4043' : '#fff';   // バナナ（黄色）だけ文字を黒に
+          return '<button type="button" class="oe-chip' + (x.ev.startDate < day ? ' cont' : '') + '"' +
+                 ' style="background:' + esc(c ? c.hex : OE_NO_COLOR) + ';color:' + fg + '"' +
+                 ' onclick="App.openOtherSheet(' + x.i + ')">' + esc(x.ev.title) + '</button>';
+        }).join('');
+      return '<div class="oe-cell' + (day.slice(0, 7) !== ym ? ' out' : '') + (day === today ? ' today' : '') + '">' +
+             '<div class="oe-dnum">' + (+day.slice(8, 10)) + '</div>' + chips + '</div>';
+    }).join('');
+    var warn = (state.oeErrors || []).map(function(x) {
+      return '<div class="msg msg-warn">' + esc(x.base + '：' + x.message) + '</div>';
+    }).join('');
+    $('oeCal').innerHTML = warn + (loading ? '<div class="oe-loading">読み込み中…</div>' : '') +
+      '<div class="oe-grid">' + head + cells + '</div>';
+
+    // この月の予定の一覧（押すと詳細）
+    var rows = inMonth.filter(function(x) { return !f || x.ev.base === f; });
+    $('oeListTitle').textContent = (+ym.slice(5, 7)) + '月の予定' + (f ? '（' + f + '）' : '') + (loading ? '' : '　' + rows.length + '件');
+    if (loading) { $('oeList').innerHTML = '<div class="empty">読み込み中…</div>'; return; }
+    if (!rows.length) {
+      $('oeList').innerHTML = '<div class="empty">この月の予定はありません。上の［＋ 予定］から追加できます。</div>';
+      return;
+    }
+    var editing = state.oeEdit ? state.oeEdit.eventId : '';
+    $('oeList').innerHTML = rows.map(function(x) {
+      var ev = x.ev, c = oeColorOf(ev);
+      var now = ev.startDate <= today && today <= (ev.endDate || ev.startDate);
+      // 行を押すと詳細（説明も見られる）／右の［直す］［消す］でその場で操作（一覧表示・2026-09-14 社長要望）
+      return '<div class="oe-li' + (editing && editing === ev.eventId ? ' oe-editing' : '') + '">' +
+        '<button type="button" class="oe-li-body" onclick="App.openOtherSheet(' + x.i + ')">' +
+          '<span class="oe-dot" style="background:' + esc(c ? c.hex : OE_NO_COLOR) + '"></span>' +
+          '<span class="oe-li-main">' +
+            '<span class="oe-li-title">' + esc(ev.title) + '</span>' +
+            '<span class="oe-li-when"><span class="badge-inline" style="background:' + esc(BASE_COLORS[ev.base] || '#868e96') + ';color:#fff">' + esc(ev.base) + '</span> ' +
+              (now ? '<span class="badge-inline oe-now">今日</span> ' : '') + esc(oeWhenLabel(ev)) + '</span>' +
+          '</span>' +
+        '</button>' +
+        '<div class="oe-li-acts">' +
+          '<button type="button" class="rolebtn" onclick="App.oeEditAt(' + x.i + ')">直す</button>' +
+          '<button type="button" class="rolebtn regbtn-del" onclick="App.oeDeleteAt(' + x.i + ')">消す</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+  function oeSetFilter(b) { state.oeFilter = String(b || ''); renderOtherEvents(false); }
+  function oeView() { return state.oeView || (state.oeView = viewPref('oe')); }
+  /** カレンダーと一覧はどちらも描いておき、選んでいるほうだけ見せる（切り替えても読み直さない） */
+  function oeApplyView() {
+    var v = oeView();
+    paintViewToggle('oe', v);
+    $('oeCalCard').style.display = v === 'cal' ? '' : 'none';
+    $('oeListCard').style.display = v === 'list' ? '' : 'none';
+  }
+  function oeSetView(v) {
+    state.oeView = (v === 'list') ? 'list' : 'cal';
+    saveViewPref('oe', state.oeView);
+    closeOtherSheet();
+    oeApplyView();
+  }
+  // 一覧の行の［直す］［消す］
+  function oeEditAt(i) { editOtherEvent((state.oeEvents || [])[i]); }
+  function oeDeleteAt(i) { deleteOtherEvent((state.oeEvents || [])[i]); }
+
+  // ─ 予定を押したときの詳細（下から出る）
+  function openOtherSheet(i) {
+    var ev = (state.oeEvents || [])[i];
+    if (!ev) return;
+    state.oeSheet = i;
+    var c = oeColorOf(ev);
+    $('oeSheetBody').innerHTML =
+      '<div class="oe-row"><span class="oe-dot big" style="background:' + esc(c ? c.hex : OE_NO_COLOR) + '"></span>' +
+      '<b class="oe-sheet-title">' + esc(ev.title) + '</b></div>' +
+      '<div class="oe-sheet-meta"><span class="badge-inline" style="background:' + esc(BASE_COLORS[ev.base] || '#868e96') + ';color:#fff">' +
+      esc(ev.base) + '</span>　' + esc(oeWhenLabel(ev)) + '・終日</div>' +
+      '<div class="oe-sheet-meta">色：' + esc(c ? c.name : 'カレンダーの色') + '</div>' +
+      (ev.description ? '<div class="oe-sheet-desc">' + esc(ev.description) + '</div>' : '');
+    $('oeSheet').style.display = '';
+  }
+  function closeOtherSheet() {
+    var s = $('oeSheet');
+    if (s) s.style.display = 'none';
+    state.oeSheet = null;
+  }
+  function editOtherFromSheet() {
+    var ev = (state.oeEvents || [])[state.oeSheet];
+    closeOtherSheet();
+    if (ev) editOtherEvent(ev);
+  }
+  function deleteOtherFromSheet() {
+    var ev = (state.oeEvents || [])[state.oeSheet];
+    if (ev) deleteOtherEvent(ev);
+  }
+
+  // ─ 入力欄（追加／直す）
+  /** 入力欄を「追加」と「直す」で切り替える（ev を渡すと直す・null で追加） */
+  function setOtherEditMode(ev) {
+    state.oeEdit = ev ? { base: ev.base, eventId: ev.eventId, title: ev.title } : null;
+    var on = !!ev;
+    $('oeHeading').textContent = on ? '予定を直す' : '予定を追加';
+    $('oeEditBar').style.display = on ? '' : 'none';
+    $('oeEditBar').innerHTML = on ? '✏️「' + esc(ev.title) + '」（' + esc(ev.base) + '）を直しています。' : '';
+    $('oeBase').disabled = on;
+    $('oeBaseNote').style.display = on ? '' : 'none';
+    $('oeSubmit').textContent = on ? 'この内容で保存' : 'カレンダーに追加';
+  }
+  function showOtherForm(on) {
+    state.oeFormOpen = !!on;
+    $('oeFormCard').style.display = on ? '' : 'none';
+    $('oeAddBtn').classList.toggle('on', !!on);
+  }
+  function clearOtherInputs() {
+    $('oeTitle').value = ''; $('oeDesc').value = ''; $('oeEnd').value = '';
+    $('oeStart').value = state.oeStartDefault = todayIso();
+  }
+  /** ［＋ 予定］：入力欄を開く（開いていれば閉じる）。直している途中なら「追加」に切り替える */
+  function openOtherForm() {
+    if (state.oeFormOpen && !state.oeEdit) { closeOtherForm(); return; }
+    if (state.oeEdit) { clearOtherInputs(); state.oeColor = ''; renderOtherColors(); }
+    setOtherEditMode(null);
+    $('oeResult').innerHTML = '';
+    showOtherForm(true);
+    renderOtherEvents(false);
+    $('oeFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function closeOtherForm() {
+    var wasEdit = !!state.oeEdit;
+    setOtherEditMode(null);
+    if (wasEdit) { clearOtherInputs(); state.oeColor = ''; renderOtherColors(); }   // 直すのをやめたら入力も空に
+    $('oeResult').innerHTML = '';
+    showOtherForm(false);
+    if (wasEdit) renderOtherEvents(false);
+  }
+  function editOtherEvent(ev) {
+    if (!ev) return;
+    if (state.submitting) { $('oeNotice').innerHTML = OE_BUSY; return; }
+    setOtherEditMode(ev);
+    $('oeBase').value = ev.base;
+    $('oeTitle').value = ev.title;
+    $('oeDesc').value = ev.description || '';
+    $('oeStart').value = ev.startDate;
+    $('oeEnd').value = (ev.endDate && ev.endDate !== ev.startDate) ? ev.endDate : '';
+    state.oeColor = ev.colorId || '';
+    renderOtherColors();
+    $('oeResult').innerHTML = '';
+    $('oeNotice').innerHTML = '';
+    showOtherForm(true);
+    renderOtherEvents(false);   // 一覧で直している予定に印を付ける
+    $('oeFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   function submitOtherEvent() {
     var box = $('oeResult');
-    if (state.submitting) { box.innerHTML = '<div class="msg msg-warn">ほかの処理が終わるまで、少しお待ちください。</div>'; return; }
-    var payload = { action: 'addOtherEvent', base: $('oeBase').value, title: $('oeTitle').value.trim(),
+    if (state.submitting) { box.innerHTML = OE_BUSY; return; }
+    var edit = state.oeEdit;
+    var payload = { action: edit ? 'updateOtherEvent' : 'addOtherEvent',
+                    base: edit ? edit.base : $('oeBase').value, title: $('oeTitle').value.trim(),
                     description: $('oeDesc').value, startDate: $('oeStart').value, endDate: $('oeEnd').value,
                     colorId: state.oeColor || '' };
+    if (edit) payload.eventId = edit.eventId;
     if (!payload.title) { box.innerHTML = '<div class="msg msg-warn">予定のタイトルを入力してください。</div>'; return; }
     if (!payload.startDate) { box.innerHTML = '<div class="msg msg-warn">開始日を選んでください。</div>'; return; }
     if (payload.endDate && payload.endDate < payload.startDate) {
       box.innerHTML = '<div class="msg msg-warn">終了日は開始日と同じか、それより後の日にしてください。</div>'; return;
     }
-    var btn = $('oeSubmit');
-    state.submitting = true; btn.disabled = true; btn.textContent = '追加しています…';
+    var btn = $('oeSubmit'), idle = btn.textContent;
+    state.submitting = true; btn.disabled = true; btn.textContent = edit ? '保存しています…' : '追加しています…';
     box.innerHTML = '';
     var sent = { base: payload.base, title: payload.title, description: payload.description,
                  startDate: payload.startDate, endDate: payload.endDate, colorId: payload.colorId };
     api(payload).then(function(res) {
-      state.submitting = false; btn.disabled = false; btn.textContent = 'カレンダーに追加';
+      state.submitting = false; btn.disabled = false; btn.textContent = idle;
       if (res && res.ok) {
-        box.innerHTML = '<div class="msg msg-ok">' + esc(res.message || '追加しました。') + '</div>';
+        if (edit) setOtherEditMode(null);
         $('oeTitle').value = ''; $('oeDesc').value = ''; $('oeEnd').value = '';   // 拠点・開始日・色は続けて入れやすいよう残す
-        if (res.undo) showUndoToast(res.undo, function() { afterOtherUndo(sent); });
+        showOtherForm(false);
+        $('oeNotice').innerHTML = '<div class="msg msg-ok">' + esc(res.message || (edit ? '直しました。' : '追加しました。')) + '</div>';
+        state.oeMonth = sent.startDate.slice(0, 7);   // 入れた予定の月のカレンダーを出す
+        if (!edit && res.undo) showUndoToast(res.undo, function() { afterOtherUndo(sent); });
+        loadOtherEvents();
       } else {
-        box.innerHTML = errHtml(res || {}, 'エラー') + ((res && res.code === 'E_SERVER_BUSY') ? OE_MAYBE_ADDED : '');
+        box.innerHTML = errHtml(res || {}, 'エラー') + ((!edit && res && res.code === 'E_SERVER_BUSY') ? OE_MAYBE_ADDED : '');
+        if (res && res.code === 'E_NOT_FOUND') loadOtherEvents();
       }
     }).catch(function(e) {
-      state.submitting = false; btn.disabled = false; btn.textContent = 'カレンダーに追加';
-      box.innerHTML = '<div class="msg msg-err">' + esc('接続できません: ' + e.message) + '</div>' + OE_MAYBE_ADDED;
+      state.submitting = false; btn.disabled = false; btn.textContent = idle;
+      box.innerHTML = '<div class="msg msg-err">' + esc('接続できません: ' + e.message) + '</div>' + (edit ? '' : OE_MAYBE_ADDED);
     });
   }
-  // ［元に戻す］が効いたら、入力を戻して直せるようにする（戻せなかったら「追加しました」の表示を残す）
+  // ［元に戻す］が効いたら、入力欄を開いて入力を戻す（直してから追加し直せる）。戻せなかったら表示はそのまま
   function afterOtherUndo(sent) {
     var r = state.lastUndoResult;
     if (!r || !r.ok) return;
+    setOtherEditMode(null);
     $('oeBase').value = sent.base; $('oeTitle').value = sent.title; $('oeDesc').value = sent.description;
     $('oeStart').value = sent.startDate; $('oeEnd').value = sent.endDate;
     state.oeColor = sent.colorId || ''; renderOtherColors();
+    showOtherForm(true);
+    $('oeNotice').innerHTML = '';
     $('oeResult').innerHTML = '<div class="msg">追加した予定を取り消しました。入力を戻したので、直してから追加し直せます。</div>';
+    loadOtherEvents();
+  }
+  function deleteOtherEvent(ev) {
+    if (!ev) return;
+    var box = $('oeNotice');
+    if (state.submitting) { box.innerHTML = OE_BUSY; return; }
+    if (!confirm('「' + ev.title + '」（' + ev.base + '・' + oeWhenLabel(ev) + '）を消します。\n' +
+                 'スタッフのカレンダーからも消えます。よろしいですか？')) return;
+    state.submitting = true;
+    closeOtherSheet();
+    box.innerHTML = '<div class="msg">消しています…</div>';
+    api({ action: 'deleteOtherEvent', base: ev.base, eventId: ev.eventId }).then(function(res) {
+      state.submitting = false;
+      if (res && res.ok) {
+        box.innerHTML = '<div class="msg msg-ok">' + esc(res.message || '消しました。') + '</div>';
+        if (state.oeEdit && state.oeEdit.eventId === ev.eventId) closeOtherForm();   // 直していた予定なら入力欄も閉じる
+      } else {
+        box.innerHTML = errHtml(res || {}, 'エラー');
+      }
+      loadOtherEvents();
+    }).catch(function(e) {
+      state.submitting = false;
+      box.innerHTML = '<div class="msg msg-err">' + esc('接続できません。消せたかどうかは、カレンダーを読み直して確かめてください: ' + e.message) + '</div>';
+    });
   }
 
   // ─── 登録済み予定の取消・役割変更（管理者・§7.106） ───
   function loadRegistrations() {
+    regCloseSheet();                        // 並びが変わるので、開いていた詳細は閉じる
+    state.regLoading = true;
+    $('regCal').style.display = 'none';     // 読み込み中・エラーの文は一覧の枠に出す（どちらの表示でも見える）
+    $('regList').style.display = '';
     $('regList').innerHTML = '<div class="empty">読み込み中…</div>';
     $('regListResult').innerHTML = '';
     api({ action: 'listMyRegistrations' }).then(function(res) {
+      state.regLoading = false;
       if (!res.ok) { $('regList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
       state.registrations = res.registrations || [];
       // ★編集中に一覧を取り直したときは、開いている編集フォームを「予定そのもの(srcEventId)」で
@@ -3794,6 +4253,7 @@ var App = (function() {
       }
       renderRegistrations();
     }).catch(function(e) {
+      state.regLoading = false;
       $('regList').innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
     });
   }
@@ -3820,19 +4280,36 @@ var App = (function() {
     return terms.every(function(t) { return hay.indexOf(t) !== -1; });
   }
 
+  function regView() { return state.regView || (state.regView = viewPref('reg')); }
+  function regRoleSuffix(s) { var rl = s.roleLabel || '配布'; return rl === '配布' ? '' : '（' + esc(rl) + '）'; }
+
   function renderRegistrations() {
     regFilterInit();
     var all = state.registrations || [];
+    // ★編集している間は必ず一覧（編集欄は一覧のカードの中にある）
+    var view = state.regEdit ? 'list' : regView();
+    var calOn = !!all.length && view === 'cal';
     var bar = $('regFilterBar'); if (bar) bar.style.display = all.length ? '' : 'none';
+    $('regViewBar').style.display = all.length ? '' : 'none';
+    $('regMonthBar').style.display = calOn ? '' : 'none';
+    paintViewToggle('reg', view);
+    $('regCal').style.display = calOn ? '' : 'none';
+    $('regList').style.display = calOn ? 'none' : '';
     if (!all.length) { $('regList').innerHTML = '<div class="empty">登録済みの予定はありません</div>'; return; }
     var f = state.regFilter;
 
     // 検索＋表示範囲で絞った母集団（拠点ピルの件数はここから数える＝画面の数字が食い違わない）
+    //   一覧＝今日以降＋過去7日（切替で過去もすべて）／カレンダー＝表示している月
     var recentOn = f.recent !== false;
     var recentFrom = regRecentFrom();
+    var ym = state.regMonth || todayIso().slice(0, 7);
+    var monthStart = ym + '-01', monthEnd = oeIso(new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0));
     var byQ = all.map(function(r, i) { return { r: r, i: i }; })
       .filter(function(x) { return regMatchQ(x.r, f.q); })
-      .filter(function(x) { return !recentOn || String(x.r.distDate || '') >= recentFrom; });
+      .filter(function(x) {
+        var d = String(x.r.distDate || '');
+        return calOn ? (d >= monthStart && d <= monthEnd) : (!recentOn || d >= recentFrom);
+      });
 
     // 拠点ピル（並び順＝関西→東戸塚→稲毛→五香→その他／件数付き。稲毛と五香は別拠点）
     var order = ['関西', '東戸塚', '稲毛', '五香'], counts = {};
@@ -3858,6 +4335,14 @@ var App = (function() {
       if (da === db) return a.i - b.i;
       return da > db ? -1 : 1;
     });
+    var clearBtn = (f.q || f.base) ? '　<button type="button" class="reglink" onclick="App.regClearFilters()">条件をクリア</button>' : '';
+
+    if (calOn) {
+      $('regMonthLabel').textContent = (+ym.slice(0, 4)) + '年' + (+ym.slice(5, 7)) + '月';
+      $('regCountLine').innerHTML = (+ym.slice(5, 7)) + '月の予定　' + items.length + '件' + clearBtn;
+      $('regCal').innerHTML = regCalHtml(ym, items);
+      return;
+    }
 
     var filtered = (f.q || f.base || recentOn);
     var rangeBtn = recentOn
@@ -3865,26 +4350,23 @@ var App = (function() {
       : '　<button type="button" class="reglink" onclick="App.regToggleRecent()">直近だけに戻す</button>';
     $('regCountLine').innerHTML = items.length + '件を表示' +
       (recentOn ? '（今日以降＋過去7日）' : '') +
-      (filtered ? '（全' + all.length + '件中）' : '') + rangeBtn +
-      ((f.q || f.base) ? '　<button type="button" class="reglink" onclick="App.regClearFilters()">条件をクリア</button>' : '');
+      (filtered ? '（全' + all.length + '件中）' : '') + rangeBtn + clearBtn;
     if (!items.length) {
-      $('regList').innerHTML = '<div class="empty">条件に合う予定がありません' + rangeBtn +
-        ((f.q || f.base) ? '　<button type="button" class="reglink" onclick="App.regClearFilters()">条件をクリア</button>' : '') + '</div>';
+      $('regList').innerHTML = '<div class="empty">条件に合う予定がありません' + rangeBtn + clearBtn + '</div>';
       return;
     }
 
     var ed = state.regEdit;
-    var roleSuffix = function(s) { var rl = s.roleLabel || '配布'; return rl === '配布' ? '' : '（' + esc(rl) + '）'; };
     $('regList').innerHTML = items.map(function(x) {
       var r = x.r, i = x.i;
       var townsNote = (r.towns && r.towns.length) ? '（' + r.towns.length + '町）' : '';
       var names = (r.staff || []).map(function(s) {
-        return esc(s.name) + roleSuffix(s) + (s.reported ? ' <span class="badge-inline badge-done">報告済</span>' : '');
+        return esc(s.name) + regRoleSuffix(s) + (s.reported ? ' <span class="badge-inline badge-done">報告済</span>' : '');
       }).join('、');
       var editForm = (ed && ed.i === i) ? regEditFormHtml(i) : '';
       var baseLabel = regBaseLabel(r);
       var badge = '<span class="base-badge" style="background:' + regBaseColor(baseLabel) + '">' + esc(baseLabel) + '</span>';
-      return '<div class="regitem">' +
+      return '<div class="regitem" id="regItem' + i + '">' +
                '<div class="reghead-row">' +
                  '<div><b>' + esc(r.distDate) + '</b>　' + esc(r.storeClean) +
                    '<span style="color:var(--c-sub)"> ' + esc(r.caseNo) + townsNote + '</span></div>' +
@@ -3897,6 +4379,88 @@ var App = (function() {
                '</div>' + editForm +
              '</div>';
     }).join('');
+  }
+
+  /** 登録済みの予定を月のカレンダーに並べる（1日に何件あっても全部並べる＝社長決定。押すと詳細） */
+  function regCalHtml(ym, items) {
+    var today = todayIso();
+    var byDay = {};
+    items.forEach(function(x) { var d = String(x.r.distDate || ''); (byDay[d] = byDay[d] || []).push(x); });
+    var order = ['関西', '東戸塚', '稲毛', '五香'];
+    var rank = function(x) { var k = order.indexOf(regBaseLabel(x.r)); return k < 0 ? 99 : k; };
+    var cells = oeGridDays(ym).map(function(day) {
+      var inMonth = day.slice(0, 7) === ym;
+      var list = (inMonth ? (byDay[day] || []) : []).slice().sort(function(a, b) { return rank(a) - rank(b) || a.i - b.i; });
+      var chips = list.map(function(x) {
+        return '<button type="button" class="oe-chip" style="background:' + esc(regBaseColor(regBaseLabel(x.r))) + ';color:#fff"' +
+               ' onclick="App.regOpenSheet(' + x.i + ')">' + esc(x.r.storeClean || x.r.caseNo || '（案件名なし）') + '</button>';
+      }).join('');
+      return '<div class="oe-cell' + (inMonth ? '' : ' out') + (day === today ? ' today' : '') + '">' +
+             '<div class="oe-dnum">' + (+day.slice(8, 10)) + '</div>' + chips + '</div>';
+    }).join('');
+    return '<div class="oe-grid">' + calHeadHtml() + cells + '</div>';
+  }
+
+  function regSetView(v) {
+    v = (v === 'list') ? 'list' : 'cal';
+    if (v === 'cal' && state.regEdit) {
+      if (!confirm('編集中の内容は、まだ保存されていません。\n編集をやめて、カレンダーに切り替えますか？')) return;
+      state.regEdit = null;
+    }
+    state.regView = v;
+    saveViewPref('reg', v);
+    regCloseSheet();
+    if (state.regLoading || !state.registrations) { paintViewToggle('reg', v); return; }   // 読み込みが終わったら、この表示で出す
+    renderRegistrations();
+  }
+  /** 月を送る（-1=前の月・+1=次の月・0=今月）。予定は全部読み込み済みなので、読み直さずに描き直す */
+  function regMonth(delta) {
+    var cur = state.regMonth || todayIso().slice(0, 7);
+    state.regMonth = delta ? oeIso(new Date(+cur.slice(0, 4), +cur.slice(5, 7) - 1 + delta, 1)).slice(0, 7) : todayIso().slice(0, 7);
+    regCloseSheet();
+    renderRegistrations();
+  }
+  // ─ カレンダーで予定を押したときの詳細（下から出る）
+  function regOpenSheet(i) {
+    var r = (state.registrations || [])[i];
+    if (!r) return;
+    state.regSheet = i;
+    var b = regBaseLabel(r);
+    var staff = (r.staff || []).map(function(s) {
+      return '<li>' + esc(s.name) + regRoleSuffix(s) + (s.reported ? ' <span class="badge-inline badge-done">報告済</span>' : '') + '</li>';
+    }).join('');
+    var towns = r.towns || [];
+    $('regSheetBody').innerHTML =
+      '<b class="oe-sheet-title">' + esc(r.storeClean || '（案件名なし）') + '</b>' +
+      '<div class="oe-sheet-meta"><span class="base-badge" style="background:' + esc(regBaseColor(b)) + '">' + esc(b) + '</span>　' +
+        esc(oeDateLabel(r.distDate)) + (r.caseNo ? '　<span style="color:var(--c-sub)">' + esc(r.caseNo) + '</span>' : '') + '</div>' +
+      '<div class="oe-sheet-meta"><b>担当</b>' + (staff ? '<ul class="reg-sheet-list">' + staff + '</ul>' : '　—') + '</div>' +
+      '<div class="oe-sheet-meta"><b>配布エリア</b>' +
+        (towns.length ? '（' + towns.length + '町）<div class="reg-sheet-towns">' + esc(towns.join('・')) + '</div>' : '　—') + '</div>';
+    $('regSheet').style.display = '';
+  }
+  function regCloseSheet() {
+    var el = $('regSheet');
+    if (el) el.style.display = 'none';
+    state.regSheet = null;
+  }
+  /** 詳細の［編集］：一覧に切り替えて、その予定の編集欄を開く（2026-09-14 社長決定＝編集画面は今のもの1つだけ） */
+  function regEditFromSheet() {
+    var i = state.regSheet;
+    regCloseSheet();
+    var r = (state.registrations || [])[i];
+    if (!r) return;
+    regFilterInit();
+    if (String(r.distDate || '') < regRecentFrom()) state.regFilter.recent = false;   // 直近より前の予定も一覧に出す
+    state.regView = 'list';   // この端末に覚えるのは、ボタンで選んだときだけ
+    regStartEdit(i);
+    var card = $('regItem' + i);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function regDeleteFromSheet() {
+    var i = state.regSheet;
+    regCloseSheet();
+    deleteRegistration(i);
   }
 
   function regSetBase(b) { regFilterInit(); state.regFilter.base = (state.regFilter.base === b ? '' : b); renderRegistrations(); }
@@ -6026,7 +6590,14 @@ var App = (function() {
     regEditToggleBan: regEditToggleBan,
     regSubTab: regSubTab, toggleRegHelp: toggleRegHelp,
     submitOtherEvent: submitOtherEvent, pickOtherColor: pickOtherColor,
+    loadOtherEvents: loadOtherEvents, oeMonth: oeMonth, oeSetFilter: oeSetFilter,
+    openOtherForm: openOtherForm, closeOtherForm: closeOtherForm,
+    openOtherSheet: openOtherSheet, closeOtherSheet: closeOtherSheet,
+    oeSetView: oeSetView, oeEditAt: oeEditAt, oeDeleteAt: oeDeleteAt,
+    editOtherFromSheet: editOtherFromSheet, deleteOtherFromSheet: deleteOtherFromSheet,
     regSetBase: regSetBase, regOnSearch: regOnSearch, regClearFilters: regClearFilters, regToggleRecent: regToggleRecent,
+    regSetView: regSetView, regMonth: regMonth, regOpenSheet: regOpenSheet, regCloseSheet: regCloseSheet,
+    regEditFromSheet: regEditFromSheet, regDeleteFromSheet: regDeleteFromSheet,
     regToggle: regToggle, regSetRole: regSetRole, regRemove: regRemove, regToggleShiftAll: regToggleShiftAll,
     loadStaff: loadStaff,
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
