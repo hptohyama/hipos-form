@@ -609,7 +609,8 @@ button.oe-sheet-del{border:1px solid var(--c-err);background:#fff;color:var(--c-
 button.spdel{flex:0 0 auto;width:auto;padding:6px 10px;font-size:12px;font-weight:700;border:1px solid var(--c-err);background:#fff;color:var(--c-err);border-radius:8px}
 .spgrid{display:grid;grid-template-columns:1fr;gap:0 10px}   /* 狭い画面では日付の欄を縦に並べる（4つ横並びは崩れる） */
 @media (min-width:430px){.spgrid{grid-template-columns:1fr 1fr}}
-.spgrid > div{min-width:0}
+/* 説明文が2行に折り返しても、同じ行の入力欄の高さをそろえる（説明文は入力欄のすぐ上に付けたまま・2026-09-16 社長指摘） */
+.spgrid > div{min-width:0;display:flex;flex-direction:column;justify-content:flex-end}
 .spgrid input{width:100%}
 .spnow{font-size:14px;line-height:1.8;overflow-wrap:anywhere}
 .spline + .spline{border-top:1px dashed var(--c-border);margin-top:6px;padding-top:6px}
