@@ -400,9 +400,18 @@
   .cyc { border-radius: 12px; border: 1.5px solid; margin-bottom: 12px; background: #fff; overflow: hidden; }
   .cyc1 { border-color: #1a73e8; }
   .cyc2 { border-color: #e8710a; }
+  /* 枠は最大6つ（管理者が決めた日程の数だけ出る）。3つ目からも同じ作りで色だけ変える */
+  .cyc3 { border-color: #188038; }
+  .cyc4 { border-color: #8430ce; }
+  .cyc5 { border-color: #0097a7; }
+  .cyc6 { border-color: #a8198f; }
   .cyc-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; }
   .cyc1 .cyc-head { background: #e8f0fe; color: #174ea6; }
   .cyc2 .cyc-head { background: #fdefe0; color: #8a4504; }
+  .cyc3 .cyc-head { background: #e6f4ea; color: #0d652d; }
+  .cyc4 .cyc-head { background: #f3e8fd; color: #5b1a9e; }
+  .cyc5 .cyc-head { background: #e0f6f8; color: #00606b; }
+  .cyc6 .cyc-head { background: #fce8f4; color: #7a1169; }
   .cyc-head .nm { font-size: 18px; font-weight: 700; }
   .cyc-body { padding: 12px 14px; }
   .cyc-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; margin: 5px 0; gap: 8px; }
@@ -411,8 +420,16 @@
   .cyc-btn { width: 100%; margin-top: 12px; padding: 15px; font-size: 16px; border-radius: 8px; border: none; color: #fff; font-weight: 700; }
   .cyc1 .cyc-btn { background: #1a73e8; }
   .cyc2 .cyc-btn { background: #e8710a; }
+  .cyc3 .cyc-btn { background: #188038; }
+  .cyc4 .cyc-btn { background: #8430ce; }
+  .cyc5 .cyc-btn { background: #0097a7; }
+  .cyc6 .cyc-btn { background: #a8198f; }
   .cyc1 .cyc-btn.ghost { background: #fff; color: #1a73e8; border: 1.5px solid #1a73e8; }
   .cyc2 .cyc-btn.ghost { background: #fff; color: #e8710a; border: 1.5px solid #e8710a; }
+  .cyc3 .cyc-btn.ghost { background: #fff; color: #188038; border: 1.5px solid #188038; }
+  .cyc4 .cyc-btn.ghost { background: #fff; color: #8430ce; border: 1.5px solid #8430ce; }
+  .cyc5 .cyc-btn.ghost { background: #fff; color: #0097a7; border: 1.5px solid #0097a7; }
+  .cyc6 .cyc-btn.ghost { background: #fff; color: #a8198f; border: 1.5px solid #a8198f; }
   .cyc .cyc-btn:disabled { background: #f1f3f4; color: #9aa0a6; border: none; }
   .badge-big { font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 999px; white-space: nowrap; }
   .bb-todo { background: #fce8e6; color: #c5221f; }
@@ -439,13 +456,22 @@
            -webkit-tap-highlight-color: transparent; }
   .sday2.sel1 { background: #1a73e8; border-color: #1a73e8; color: #fff; }
   .sday2.sel2 { background: #e8710a; border-color: #e8710a; color: #fff; }
+  .sday2.sel3 { background: #188038; border-color: #188038; color: #fff; }
+  .sday2.sel4 { background: #8430ce; border-color: #8430ce; color: #fff; }
+  .sday2.sel5 { background: #0097a7; border-color: #0097a7; color: #fff; }
+  .sday2.sel6 { background: #a8198f; border-color: #a8198f; color: #fff; }
   .swk { display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; }
-  .swk.w1 { color: #1a73e8; } .swk.w2 { color: #e8710a; }
+  .swk.w1 { color: #1a73e8; } .swk.w2 { color: #e8710a; } .swk.w3 { color: #188038; }
+  .swk.w4 { color: #8430ce; } .swk.w5 { color: #0097a7; } .swk.w6 { color: #a8198f; }
   .swk.over { color: #fff; background: #c5221f; border-radius: 6px; }   /* 週6日以上=上限超過 */
   .sday2.empty { border: none; background: transparent; cursor: default; pointer-events: none; }   /* 月グリッドの余白 */
   .ssum { margin-top: 10px; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 700; text-align: center; }
   .ssum.s1 { background: #e8f0fe; color: #174ea6; }
   .ssum.s2 { background: #fdefe0; color: #8a4504; }
+  .ssum.s3 { background: #e6f4ea; color: #0d652d; }
+  .ssum.s4 { background: #f3e8fd; color: #5b1a9e; }
+  .ssum.s5 { background: #e0f6f8; color: #00606b; }
+  .ssum.s6 { background: #fce8f4; color: #7a1169; }
   /* 管理者用シフト管理（月カレンダー・スタッフをプルダウンで選んで登録） */
   .sa-head { display: flex; align-items: center; justify-content: space-between; margin: 6px 0 8px; }
   .sa-title { font-size: 17px; font-weight: 700; color: var(--c-text); }
@@ -576,6 +602,25 @@ button.oe-sheet-del{border:1px solid var(--c-err);background:#fff;color:var(--c-
 .sday2{aspect-ratio:auto;min-height:50px;font-size:17px;border-radius:12px;border-width:1.5px}
 .sday2:active{transform:scale(.93)}
 .swk{font-size:16px}
+/* シフトの日程（管理者が「いつまでに・どの期間の」シフトを出してもらうかを決める・2026-09-16） */
+.spslot{border:1px solid var(--c-border);border-radius:10px;padding:10px 12px;margin-top:10px}
+.sphead{display:flex;align-items:center;gap:8px}
+.sphead .spno{flex:1;min-width:0;font-size:16px;font-weight:800}
+button.spdel{flex:0 0 auto;width:auto;padding:6px 10px;font-size:12px;font-weight:700;border:1px solid var(--c-err);background:#fff;color:var(--c-err);border-radius:8px}
+.spgrid{display:grid;grid-template-columns:1fr;gap:0 10px}   /* 狭い画面では日付の欄を縦に並べる（4つ横並びは崩れる） */
+@media (min-width:430px){.spgrid{grid-template-columns:1fr 1fr}}
+.spgrid > div{min-width:0}
+.spgrid input{width:100%}
+.spnow{font-size:14px;line-height:1.8;overflow-wrap:anywhere}
+.spline + .spline{border-top:1px dashed var(--c-border);margin-top:6px;padding-top:6px}
+/* サーバからの注意書き（黄色）＝保存はできている。赤いエラーとは別ものに見せる。
+   文が長い（日付が2組入る）ので、狭い画面でもはみ出さないように必ず折り返す */
+.spwarn{overflow-wrap:anywhere}
+/* 月の見出しは「2026年9月にお願いする分（10月分）」と長い。
+   ほかの月送り（.oe-month）は nowrap・18px なのでスマホ幅からはみ出す → ここだけ折り返せるようにする */
+#spMonthLabel{font-size:14px;font-weight:800;line-height:1.4;white-space:normal}
+button.spadd{width:auto;padding:9px 14px;font-size:13px;margin-top:10px}
+button.spadd:disabled{color:var(--c-sub,#868e96);cursor:default}
 </style>
 </head>
 <body>
@@ -1092,6 +1137,12 @@ button.oe-sheet-del{border:1px solid var(--c-err);background:#fff;color:var(--c-
 
   <!-- ═══ シフト管理（管理者・スタッフのシフトを代理登録） ═══ -->
   <div class="view hidden" id="shiftAdminView">
+    <div class="subtabs" id="saSubBar" style="display:none">
+      <button type="button" class="subtab on" id="saSubDays" onclick="App.saSubTab('days')">出勤日の登録</button>
+      <button type="button" class="subtab" id="saSubPlan" onclick="App.saSubTab('plan')">シフトの日程</button>
+    </div>
+
+    <div id="saDaysPane">
     <div class="card">
       <h2>シフト管理（管理者）</h2>
       <div class="case-info">スタッフを選び、出勤日をカレンダーで<b>タップして登録</b>します（もう一度タップで取消）。勤務時間は <b>10:00〜19:00</b> 固定。そのスタッフの拠点のカレンダー（例：関西ポス:配布予定）に自動反映されます。</div>
@@ -1112,6 +1163,43 @@ button.oe-sheet-del{border:1px solid var(--c-err);background:#fff;color:var(--c-
       <div id="saResult"></div>
       <button type="button" class="btn-primary" id="saSave" style="margin-top:12px" onclick="App.saSave()">この月の内容で保存</button>
       <div class="footer-note">保存すると、選んだ日はカレンダーに10:00〜19:00で登録され、外した日は取消されます。月ごとに保存してください。</div>
+    </div>
+    </div><!-- /saDaysPane -->
+
+    <!-- ═══ シフトの日程（管理者・スタッフの提出の締切と期間を決める・2026-09-16） ═══ -->
+    <div id="saPlanPane" style="display:none">
+      <div class="card">
+        <h2>シフトの日程</h2>
+        <div class="case-info">スタッフに<b>いつまでに・どの期間の</b>シフトを出してもらうかを決めます。<br>
+          ここで決めた日程は、そのまま<b>スタッフのシフト画面</b>に出ます。</div>
+        <label style="margin-top:12px">拠点</label>
+        <div class="regfrow" id="spBasePills"><span class="empty" style="padding:6px 0">読み込み中…</span></div>
+        <div class="oe-toolbar" style="margin-top:10px">
+          <button type="button" class="oe-nav" onclick="App.spMonth(-1)" aria-label="前の月">◀</button>
+          <div class="oe-month" id="spMonthLabel">—</div>
+          <button type="button" class="oe-nav" onclick="App.spMonth(1)" aria-label="次の月">▶</button>
+          <button type="button" class="oe-today" onclick="App.spMonth(0)">今月</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>いまの日程</h2>
+        <div id="spNow"><div class="empty">読み込み中…</div></div>
+        <button type="button" class="btn-ghost" id="spReload" onclick="App.loadShiftPlan()" style="margin-top:10px">↻ 読み込み直す</button>
+      </div>
+
+      <div class="card" id="spEditCard" style="display:none">
+        <h2>日程を入れる</h2>
+        <div class="case-info">枠は1つ〜6つまで作れます（関西は月2回など）。<b>4つの日付</b>を入れてください。<br>
+          日付の決まりはこのあと<b>保存のときに確かめます</b>。おかしいところがあれば、赤い文で何を直せばよいかをお知らせします。</div>
+        <button type="button" class="btn-ghost" id="spFillAuto" onclick="App.spFillFromAuto()" style="margin-top:10px">自動の日程を下敷きにする</button>
+        <div id="spSlots"></div>
+        <button type="button" class="btn-ghost spadd" id="spAddSlot" onclick="App.spAddSlot()">＋ 枠を追加</button>
+        <div id="spResult"></div>
+        <button type="button" class="btn-primary" id="spSave" onclick="App.spSave()" style="margin-top:12px">保存する</button>
+        <button type="button" class="btn-ghost" id="spReset" onclick="App.spResetToAuto()" style="margin-top:8px">自動の日程に戻す</button>
+        <div class="footer-note">日程を入れ替えたら、スタッフには「シフトの画面を一度読み込み直してください」とお伝えください。</div>
+      </div>
     </div>
   </div>
 
@@ -1277,9 +1365,12 @@ var App = (function() {
     gpsFiles: [], gpsMax: 50, gpsMin: 4, gpsUploading: false,
     gpsAddTarget: null,   // 履歴からGPS追加する対象 reportUuid
     restoringDetail: false, // 修正プリフィル中フラグ（caseTowns応答の誤上書き防止）
-    shiftData: null,        // myShiftCycles の応答（サイクル2枠＋提出状態）
+    shiftData: null,        // myShiftCycles の応答（サーバが決めた日程1〜6枠＋提出状態）
+    shiftLoadError: '',     // 日程を読み込めなかった理由（空でなければカードを描かず、読み込み直す案内を出す）
     shiftForm: null,        // 編集中フォーム {no, key, cycle, days:{date:kubun}, note}
     saForm: null,           // 管理者シフト管理 {staffId, name, base, configured, viewY, viewM, selected:{}, today, dirty}
+    saSub: 'days',          // シフト管理のサブタブ（'days'=出勤日の登録 / 'plan'=シフトの日程）
+    spForm: null,           // シフトの日程 {base, ym, loading, saving, data(サーバの応答), slots:[{slot,…}], seq}
     perf: null,             // ★読み込み速度の実測（{waitMs, serverMs, netMs, timing, at}）
     tab: 'home'
   };
@@ -5506,30 +5597,43 @@ var App = (function() {
     return Date.parse(iso);
   }
 
-  // ── サイクル日付の自動計算（サーバShift.gsと同一ロジックのミラー） ──
+  // ── 日程（提出の締切・勤務の期間）は**サーバが返したものだけ**を使う ──
+  //   ★2026-09-16: 以前はここに jsCycles / jsMonthly という「サーバと同じ日付計算の写し」があった。
+  //     管理者が日程を入れ替えても画面だけ古い日付のまま描いてしまい、提出した瞬間に
+  //     「期間外の日付が含まれています」と断られる（理由はスタッフにも管理者にも分からない）。
+  //     日程を決めるのはサーバ1か所だけ。画面は受け取った日付をそのまま出す。
   function isoAddDays(iso, n) {
     var p = iso.split('-');
     var d = new Date(+p[0], +p[1] - 1, +p[2] + n);
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   }
-  function jsCycles(y, m) {
-    var pad = function(n) { return (n < 10 ? '0' : '') + n; };
-    var first = new Date(y, m - 1, 1).getDay();
-    var sun = function(n) { return y + '-' + pad(m) + '-' + pad(1 + ((7 - first) % 7) + (n - 1) * 7); };
-    var d1 = sun(3), d2 = sun(4);                       // 期日①=第3日曜/②=第4日曜
-    var p1s = isoAddDays(d1, 15), p1e = isoAddDays(p1s, 13);   // 期間①: 月曜開始・日曜終了14日
-    var p2s = isoAddDays(p1e, 1), p2e = isoAddDays(p2s, 13);   // 期間②: ①終了+1日〜
-    return { opensOn: y + '-' + pad(m) + '-08',
-      cycles: [
-        { no: 1, key: y + '-' + pad(m) + '-1', label: '①前半', deadlineDate: d1, periodStart: p1s, periodEnd: p1e },
-        { no: 2, key: y + '-' + pad(m) + '-2', label: '②後半', deadlineDate: d2, periodStart: p2s, periodEnd: p2e }
-      ] };
+  /** 2つの日（'YYYY-MM-DD'）の差の日数 */
+  function isoDiffDays(fromIso, toIso) {
+    var a = String(fromIso).split('-'), b = String(toIso).split('-');
+    return Math.round((new Date(+b[0], +b[1] - 1, +b[2]) - new Date(+a[0], +a[1] - 1, +a[2])) / 86400000);
   }
-  function jsCycleState(c, now, submitted, opensOn) {
-    var beforeOpen = now.date < opensOn;
-    var past = (now.date + ' ' + now.time) >= (c.deadlineDate + ' 19:00');   // 19:00ちょうどで超過へ
-    var p1 = c.deadlineDate.split('-'), p2 = now.date.split('-');
-    var dl = Math.round((new Date(+p1[0], +p1[1] - 1, +p1[2]) - new Date(+p2[0], +p2[1] - 1, +p2[2])) / 86400000);
+  /** 締切＝サーバが返した 'YYYY-MM-DD HH:MM'。画面で時刻を決め打ちしない */
+  function shiftDeadlineOf(c) { return String((c && c.deadline) || ''); }
+  function shiftDeadlineHm(c) { return shiftDeadlineOf(c).slice(11, 16); }        // 例 19:00
+  function shiftDeadlineJp(c) {                                                   // 例 19時 / 18時30分
+    var hm = shiftDeadlineHm(c);
+    if (!hm) return '';
+    var mi = Number(hm.slice(3, 5));
+    return Number(hm.slice(0, 2)) + '時' + (mi ? mi + '分' : '');
+  }
+  /** 枠の色（①青 ②橙 ③緑 ④紫 ⑤藍 ⑥桃）。枠は1〜6個・番号に飛びがあり得る */
+  function cycTone(no) { var n = Number(no); return (n >= 1 && n <= 6) ? n : 1; }
+
+  /**
+   * 枠の状態（提出できるか・締切まであとどれくらいか）。
+   * 締切は**サーバが返した文字列**と今（日本時間）を比べるだけ。19時と決め打ちしない。
+   */
+  function shiftCycleState(c, now, submitted, opensOn) {
+    var nowStr = now.date + ' ' + now.time;
+    var dlStr = shiftDeadlineOf(c);
+    var beforeOpen = !!(opensOn && now.date < opensOn);
+    var past = nowStr >= dlStr;                                   // 締切ちょうどで超過へ
+    var dl = isoDiffDays(now.date, c.deadlineDate);
     var canSubmit = beforeOpen ? false : (past ? (!submitted && now.date <= c.periodEnd) : true);
     var warn = 'none';
     if (!submitted && !beforeOpen) {
@@ -5540,8 +5644,9 @@ var App = (function() {
     var countdown;
     if (beforeOpen) countdown = '受付前';
     else if (past) countdown = '締切超過';
-    else if (dl === 0) {   // 当日は残り時間○分まで
-      var mins = 19 * 60 - (Number(now.time.slice(0, 2)) * 60 + Number(now.time.slice(3, 5)));
+    else if (dl === 0) {   // 当日は残り時間○分まで（締切の時刻もサーバのもの）
+      var mins = (Number(dlStr.slice(11, 13)) * 60 + Number(dlStr.slice(14, 16)))
+               - (Number(now.time.slice(0, 2)) * 60 + Number(now.time.slice(3, 5)));
       var h = Math.floor(mins / 60);
       countdown = h > 0 ? '残り' + h + '時間' + (mins % 60) + '分' : '残り' + (mins % 60) + '分';
     } else countdown = '残り' + dl + '日';
@@ -5549,16 +5654,6 @@ var App = (function() {
              canSubmit: canSubmit, warn: warn, daysLeft: dl, countdown: countdown };
   }
 
-  // 関東(月1回)のローカルミラー: アナウンス月M → 締切M/19・期間=翌月1日〜末日・受付M/1（サーバ monthlyPlan と一致）
-  function jsMonthly(y, m) {
-    var pad = function(n) { return (n < 10 ? '0' : '') + n; };
-    var ny = (m === 12) ? y + 1 : y, nm = (m === 12) ? 1 : m + 1;
-    var last = new Date(ny, nm, 0).getDate();
-    return { opensOn: y + '-' + pad(m) + '-01',
-      cycles: [{ no: 1, key: y + '-' + pad(m) + '-M', label: nm + '月シフト',
-        deadlineDate: y + '-' + pad(m) + '-19',
-        periodStart: ny + '-' + pad(nm) + '-01', periodEnd: ny + '-' + pad(nm) + '-' + pad(last) }] };
-  }
   // iso日付が属する週(月曜始まり)の月曜のiso
   function isoMondayOf(iso) {
     var p = iso.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]);
@@ -5587,34 +5682,46 @@ var App = (function() {
     return shiftWeekOverflow(sel, max);
   }
 
-  // ── 表示用ビュー = ローカルJST判定 × サーバの提出データ（サーバは提出時に再検証する） ──
+  // ── 表示用ビュー = サーバが返した日程・提出状態 × 今（日本時間）だけで作る ──
+  /**
+   * サーバ（myShiftCycles）が返した枠を確かめて返す。
+   * ★足りない項目が1つでもあれば **null**＝1枚も描かない。
+   *   中途半端に描くと、日付の分からないカードから提出して断られるだけになる。
+   */
+  function shiftCyclesFromServer(res) {
+    var list = (res && res.ok !== false && res.cycles) || null;
+    if (!list || !list.length) return null;
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      if (!c || !c.key || !c.deadlineDate || !shiftDeadlineOf(c) || !c.periodStart || !c.periodEnd) return null;
+    }
+    return list;
+  }
+
   function buildShiftView() {
     var res = state.shiftData;
     var now = jstNow();
-    var ym = now.date.split('-');
-    var mode = (res && res.mode) || 'cycle';   // 拠点で 月2回サイクル / 月1回 を切替（サーバ由来）
-    var loc = (mode === 'monthly') ? jsMonthly(+ym[0], +ym[1]) : jsCycles(+ym[0], +ym[1]);
-    var byKey = {};
-    ((res && res.cycles) || []).forEach(function(c) { byKey[c.key] = c; });
-    var mismatch = false;
-    var cycles = loc.cycles.map(function(c) {
-      var sv = byKey[c.key];
-      if (!sv) mismatch = true;   // 月替わり等でサーバ応答が古い → 再取得が必要
-      var submitted = !!(sv && sv.submitted);
+    var list = shiftCyclesFromServer(res);
+    if (!list) { state.shiftView = null; return null; }   // 日程が取れていない＝カードを描かない
+    var opensOn = String(res.opensOn || '');
+    var cycles = list.map(function(c) {
       return {
-        no: c.no, key: c.key, label: c.label,
-        deadlineDate: c.deadlineDate, periodStart: c.periodStart, periodEnd: c.periodEnd,
-        submitted: submitted, submittedAt: sv ? sv.submittedAt : '',
-        note: sv ? sv.note : '', days: (sv && sv.days) || {},
-        prevPattern: sv ? sv.prevPattern : null,
-        state: jsCycleState(c, now, submitted, loc.opensOn)
+        no: Number(c.no) || 1, key: c.key, label: String(c.label || ''),
+        deadlineDate: c.deadlineDate, deadline: shiftDeadlineOf(c),
+        periodStart: c.periodStart, periodEnd: c.periodEnd,
+        submitted: !!c.submitted, submittedAt: c.submittedAt || '',
+        note: c.note || '', days: c.days || {}, prevPattern: c.prevPattern || null,
+        state: shiftCycleState(c, now, !!c.submitted, opensOn)
       };
     });
+    // 月が替わるとサーバの日程は古くなる（案内は今日の月のもの）。取り直しの合図だけ立てる。
+    var y = Number(res.year) || 0, m = Number(res.month) || 0;
+    var mismatch = !!(y && m) && (y + '-' + ('0' + m).slice(-2)) !== now.date.slice(0, 7);
     state.shiftView = {
-      year: +ym[0], month: +ym[1], opensOn: loc.opensOn, now: now,
-      mode: mode, maxPerWeek: (res && res.maxPerWeek) || 5,
-      base: res ? (res.base || '') : '', baseConfigured: !!(res && res.baseConfigured),
-      cycles: cycles, mismatch: mismatch, otherDays: (res && res.otherDays) || []
+      year: y, month: m, opensOn: opensOn, now: now,
+      mode: res.mode || 'cycle', maxPerWeek: res.maxPerWeek || 5,
+      base: res.base || '', baseConfigured: !!res.baseConfigured,
+      cycles: cycles, mismatch: mismatch, otherDays: res.otherDays || []
     };
     return state.shiftView;
   }
@@ -5944,17 +6051,33 @@ var App = (function() {
 
   function loadShifts() {
     showShiftList();
-    $('shiftCards').innerHTML = '<div class="empty">読み込み中…</div>';
+    state.shiftLoadError = '';
+    state.shiftView = null;   // 読み込んでいる間は古いカードを出さない（古い日付のまま開かせない）
+    renderShiftList();        // → 「読み込み中…」
     api({ action: 'myShiftCycles' }).then(function(res) {
-      if (!res.ok) { $('shiftCards').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
-      state.shiftData = res;
-      buildShiftView();
-      renderShiftList();
-      renderShiftAlerts();
+      shiftApplyLoad(res.ok ? res : null, res.ok ? '' : (res.message || res.code));
     }).catch(function(e) {
-      $('shiftCards').innerHTML = '<div class="empty">接続できません: ' + esc(e.message) + '</div>';
+      shiftApplyLoad(null, '接続できません: ' + e.message);
     });
     loadMyShiftChanges();   // シフト変更の申請（別のactionで取る＝ログインの往復は増やさない）
+  }
+
+  /**
+   * 読み込みの結果を画面に反映する。
+   * ★読めなかったときは古い日程を残さない（古い日付のまま送ると、送った瞬間に断られるため）。
+   */
+  function shiftApplyLoad(res, errMsg) {
+    if (!res) {
+      state.shiftData = null; state.shiftView = null;   // ★古い日程を残さない（送った瞬間に断られるため）
+      state.shiftLoadError = errMsg || '読み込めませんでした。';
+    } else {
+      state.shiftData = res;
+      state.shiftLoadError = '';
+      buildShiftView();
+      if (!state.shiftView) state.shiftLoadError = 'シフトの日程を受け取れませんでした。';
+    }
+    renderShiftList();
+    renderShiftAlerts();
   }
 
   // ログイン直後・月替わり時のバックグラウンド取得（ホーム警告＋ナビ赤丸の材料）
@@ -5962,7 +6085,9 @@ var App = (function() {
     api({ action: 'myShiftCycles' }).then(function(res) {
       if (!res.ok) return;
       state.shiftData = res;
+      state.shiftLoadError = '';
       buildShiftView();
+      if (!state.shiftView) state.shiftLoadError = 'シフトの日程を受け取れませんでした。';
       renderShiftAlerts();
       if (state.tab === 'shift' && !state.shiftForm) renderShiftList();
     }).catch(function(e) { /* 警告表示だけなので失敗は無害 */ });
@@ -5972,6 +6097,11 @@ var App = (function() {
   function refreshShiftDisplays() {
     if (!state.shiftData) return;
     var v = buildShiftView();
+    if (!v) {   // 日程を受け取れていない＝描かずに案内だけ出す
+      renderShiftAlerts();
+      if (state.tab === 'shift' && !state.shiftForm) renderShiftList();
+      return;
+    }
     if (v.mismatch) {   // 月が替わった → サーバから提出状態を取り直す（5分に1回まで）
       // 旧月サイクルのフォームを開いたまま凍結させない。開いていたら一覧へ戻す。
       if (state.tab === 'shift' && state.shiftForm) {
@@ -6006,23 +6136,27 @@ var App = (function() {
 
   function warnHtml(c) {
     var d = fmtMdw(c.deadlineDate);
+    var hh = shiftDeadlineJp(c);   // 締切の時刻もサーバのもの（19時と決め打ちしない）
     if (c.state.warn === 'overdue') {
-      return '<div class="warnbox warn-r">🚨 ' + esc(c.label) + 'の提出締切（' + esc(d) + ' 19時）を過ぎています。' +
+      return '<div class="warnbox warn-r">🚨 ' + esc(c.label) + 'の提出締切（' + esc(d) + ' ' + esc(hh) + '）を過ぎています。' +
              '<b>至急ご提出ください。</b>遅れる場合は管理者へご連絡を。</div>';
     }
     if (c.state.warn === 'urgent') {
-      return '<div class="warnbox warn-r">🚨 ' + esc(c.label) + 'が未提出です。<b>本日19時締切（' +
+      return '<div class="warnbox warn-r">🚨 ' + esc(c.label) + 'が未提出です。<b>本日' + esc(hh) + '締切（' +
              esc(c.state.countdown) + '）</b>です！</div>';
     }
     if (c.state.warn === 'warning') {
       return '<div class="warnbox warn-y">⚠ ' + esc(c.label) + 'が未提出です。' + esc(d) +
-             ' 19時までにご提出ください（' + esc(c.state.countdown) + '）。</div>';
+             ' ' + esc(hh) + 'までにご提出ください（' + esc(c.state.countdown) + '）。</div>';
     }
     return '';
   }
 
   function renderShiftAlerts() {
     var v = state.shiftView;
+    // ★日程を読めていないときは、いま出ている未提出の警告・下ナビの赤丸に一切触らない。
+    //   （読み込みに1回失敗しただけで催促が消えると、締切間際に提出忘れが起きる）
+    //   日程が読めていないときにカードを描かないのは renderShiftList / renderShiftNoPlan 側の仕事。
     if (!v) return;
     var html = '';
     (v.cycles || []).forEach(function(c) { html += warnHtml(c); });
@@ -6033,18 +6167,37 @@ var App = (function() {
     if (dot) dot.classList.toggle('hidden', !html);
   }
 
+  /**
+   * サーバから日程が取れていないとき。★古い日付でカードを描かない。
+   * （古い日付のまま送ると、送った瞬間に「期間外の日付です」と断られてしまう）
+   */
+  function renderShiftNoPlan() {
+    var err = state.shiftLoadError || '';
+    var intro = $('shiftIntro');
+    if (intro) intro.innerHTML = err ? 'シフトの日程を読み込めませんでした。' : 'シフトの日程を読み込んでいます…';
+    var un = $('shiftUnset'); if (un) un.classList.add('hidden');
+    var box = $('shiftCards');
+    if (!box) return;
+    box.innerHTML = err
+      ? '<div class="empty">' + esc(err) + '<br>日程が分からないため、提出のカードは出していません。<br>' +
+        'この画面を読み込み直してください。</div>' +
+        '<button type="button" class="btn-ghost" style="margin-top:10px" onclick="location.reload()">読み込み直す</button>'
+      : '<div class="empty">読み込み中…</div>';
+  }
+
   function renderShiftList() {
     var v = state.shiftView;
-    if (!v) return;
+    if (!v) { renderShiftNoPlan(); return; }
+    var labels = (v.cycles || []).map(function(c) { return c.label; }).join('・');
     var introMsg = (v.mode === 'monthly')
-      ? '翌月ぶんのシフト提出です（毎月19日19時締切・1週間に最大' + v.maxPerWeek + '日まで）。'
-      : '<b>①前半・②後半それぞれ</b>提出してください（1週間に最大' + v.maxPerWeek + '日まで）。';
-    $('shiftIntro').innerHTML = v.year + '年' + v.month + '月のアナウンスです。<br>' + introMsg +
+      ? '翌月ぶんのシフト提出です（提出期日は下のカードのとおり・1週間に最大' + v.maxPerWeek + '日まで）。'
+      : '<b>' + esc(labels) + ' それぞれ</b>提出してください（1週間に最大' + v.maxPerWeek + '日まで）。';
+    $('shiftIntro').innerHTML = v.year + '年' + v.month + '月にお願いする分のご案内です。<br>' + introMsg +
       (v.base ? '<br>拠点: <b>' + esc(v.base) + '</b>' : '');
     $('shiftUnset').classList.toggle('hidden', !!v.baseConfigured);
 
     $('shiftCards').innerHTML = (v.cycles || []).map(function(c) {
-      var n = c.no, st = c.state;
+      var n = cycTone(c.no), st = c.state;   // n=色（1〜6）・開くときの番号は c.no（並び順で振り直さない）
       var pdays = periodDatesOf(c).length;
       var badge;
       if (st.beforeOpen) badge = '<span class="badge-big bb-wait">受付前</span>';
@@ -6058,8 +6211,8 @@ var App = (function() {
         btn = '<button type="button" class="cyc-btn" disabled>' + esc(fmtMdw(v.opensOn)) + ' 受付開始</button>';
       } else if (st.canSubmit && v.baseConfigured) {
         btn = st.submitted
-          ? '<button type="button" class="cyc-btn ghost" onclick="App.openShiftForm(' + n + ')">修正する（締切まで可）</button>'
-          : '<button type="button" class="cyc-btn" onclick="App.openShiftForm(' + n + ')">このサイクルを提出する</button>';
+          ? '<button type="button" class="cyc-btn ghost" onclick="App.openShiftForm(' + c.no + ')">修正する（締切まで可）</button>'
+          : '<button type="button" class="cyc-btn" onclick="App.openShiftForm(' + c.no + ')">この期間を提出する</button>';
       } else if (!v.baseConfigured) {
         btn = '<button type="button" class="cyc-btn" disabled>拠点未設定のため提出不可</button>';
       } else {
@@ -6070,7 +6223,7 @@ var App = (function() {
       return '<div class="cyc cyc' + n + '">' +
         '<div class="cyc-head"><span class="nm">' + esc(c.label) + '</span>' + badge + '</div>' +
         '<div class="cyc-body">' +
-        '<div class="cyc-row"><span class="k">提出期日</span><span class="v">' + esc(fmtMdw(c.deadlineDate)) + ' 19:00' + chip + '</span></div>' +
+        '<div class="cyc-row"><span class="k">提出期日</span><span class="v">' + esc(fmtMdw(c.deadlineDate)) + ' ' + esc(shiftDeadlineHm(c)) + chip + '</span></div>' +
         '<div class="cyc-row"><span class="k">勤務期間</span><span class="v">' + esc(fmtMdw(c.periodStart)) + '〜' + esc(fmtMdw(c.periodEnd)) + '<br><span style="font-weight:400;color:var(--c-sub);font-size:12px">' + pdays + '日間</span></span></div>' +
         (st.submitted && c.submittedAt ? '<div class="cyc-row"><span class="k">提出日時</span><span class="v">' + esc(String(c.submittedAt).replace('T', ' ').slice(0, 16)) + '</span></div>' : '') +
         warnHtml(c) + btn +
@@ -6147,11 +6300,11 @@ var App = (function() {
   function renderShiftFormHead() {
     var f = state.shiftForm, c = f.cycle;
     $('shiftFormHead').innerHTML =
-      '<div class="cyc cyc' + f.no + '"><div class="cyc-head"><span class="nm">' + esc(c.label) + ' の提出</span>' +
+      '<div class="cyc cyc' + cycTone(f.no) + '"><div class="cyc-head"><span class="nm">' + esc(c.label) + ' の提出</span>' +
       (c.state.past ? '<span class="badge-big bb-over">締切超過</span>'
                     : '<span class="cd-chip' + (c.state.daysLeft <= 1 ? ' hot' : '') + '">' + esc(c.state.countdown) + '</span>') +
       '</div><div class="cyc-body">' +
-      '<div class="cyc-row"><span class="k">提出期日</span><span class="v">' + esc(fmtMdw(c.deadlineDate)) + ' 19:00</span></div>' +
+      '<div class="cyc-row"><span class="k">提出期日</span><span class="v">' + esc(fmtMdw(c.deadlineDate)) + ' ' + esc(shiftDeadlineHm(c)) + '</span></div>' +
       '<div class="cyc-row"><span class="k">勤務期間</span><span class="v">' + esc(fmtMdw(c.periodStart)) + '〜' + esc(fmtMdw(c.periodEnd)) + '</span></div>' +
       (c.state.warn === 'overdue' ? '<div class="warnbox warn-r">締切を過ぎています。入力後すぐ提出してください。</div>' : '') +
       '</div></div>';
@@ -6171,7 +6324,7 @@ var App = (function() {
   function renderShiftGrid() {
     var f = state.shiftForm, c = f.cycle;
     var dates = periodDatesOf(c);   // サイクル=14日 / 月間=その月の日数
-    var selCls = f.no === 1 ? 'sel1' : 'sel2';
+    var selCls = 'sel' + cycTone(f.no);   // 枠の色（①青 ②橙 ③緑 ④紫 ⑤藍 ⑥桃）
     var maxPerWeek = (state.shiftView && state.shiftView.maxPerWeek) || 5;
     var inPeriod = {}; dates.forEach(function(d) { inPeriod[d] = true; });
     var last = dates[dates.length - 1];
@@ -6190,14 +6343,14 @@ var App = (function() {
         cells += '<div class="sday2' + (sel ? ' ' + selCls : '') +
                  '" onclick="App.toggleShiftDay(\'' + iso + '\')">' + esc(String(Number(p[2]))) + '</div>';   // 日にちのみ
       }
-      html += cells + '<div class="swk w' + f.no + (weekSel > maxPerWeek ? ' over' : '') + '">' + (weekSel ? String(weekSel) : '') + '</div>';
+      html += cells + '<div class="swk w' + cycTone(f.no) + (weekSel > maxPerWeek ? ' over' : '') + '">' + (weekSel ? String(weekSel) : '') + '</div>';
       cur = isoAddDays(cur, 7);
     }
     // カレンダー上の月見出し（例「8月」／月をまたぐと「8月・9月」）
     $('shiftMonthLabel').textContent = months.map(function(m) { return m + '月'; }).join('・');
     $('shiftGrid2').innerHTML = html;
     var sum = $('shiftSum');
-    sum.className = 'ssum s' + f.no;
+    sum.className = 'ssum s' + cycTone(f.no);
     sum.textContent = '出勤できる日: ' + total + '日（1週間に最大' + maxPerWeek + '日まで）';
     // 週5日上限: 6日以上の週があれば警告＋提出ボタン無効（サーバも同判定で二重防御）
     var over = formWeekOverflow(f);
@@ -6251,6 +6404,13 @@ var App = (function() {
         $('shiftDone').innerHTML = '<div class="msg msg-ok">✅ ' + esc(res.message) + '<br>カレンダーにも自動反映されました。</div>';
         loadShifts();
         window.scrollTo(0, 0);
+      } else if (res.code === 'E_SHIFT_PLAN_CHANGED') {
+        // 出している間に管理者が日程を入れ替えた。古い日付のまま送り直しても断られるので、読み込み直してもらう。
+        btn.disabled = true;
+        $('shiftFormResult').innerHTML =
+          '<div class="msg msg-err">' + esc(res.message || '日程が変わりました。画面を読み込み直してください。') +
+          '<br>新しい日程で出し直していただく必要があります。</div>' +
+          '<button type="button" class="btn-ghost" style="margin-top:10px" onclick="location.reload()">読み込み直す</button>';
       } else {
         $('shiftFormResult').innerHTML = errHtml(res, 'エラー');
       }
@@ -6280,6 +6440,9 @@ var App = (function() {
     var sel = $('saStaff');
     fillSaStaff(sel);   // 開くたびに、まだ無い人（承認した直後の新人など）だけ足す
     sel.onchange = onSaStaffChange;
+    // ★「シフトの日程」は管理者だけ。管理者でなければ切替そのものを出さず、出勤日の登録に固定する。
+    $('saSubBar').style.display = state.isAdmin ? '' : 'none';
+    if (!state.isAdmin) saSubTab('days');
     if (state.saForm) { renderSaCal(); }   // 既に選択済みなら再描画
   }
 
@@ -6429,6 +6592,353 @@ var App = (function() {
       state.submitting = false; btn.disabled = false; btn.textContent = 'この月の内容で保存';
       $('saResult').innerHTML = '<div class="msg msg-err">' + esc('接続できません: ' + e.message) + '</div>';
     });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  シフトの日程（管理者）
+  //  「いつまでに・どの期間の」シフトを出してもらうかを拠点×月ごとに決める。
+  //
+  //  ★この画面は日付の決まりを**1つも持たない**。
+  //    受付開始と期日の前後、期間の長さ、重なりなどの検算はすべてサーバ（shiftPlanSave）が行い、
+  //    画面はサーバが返した errors をそのまま出すだけにする。
+  //    （画面にもう一組の決まりを写すと、サーバだけ直したときに画面が嘘をつく）
+  //  ★サーバは2種類の言い分を返す。取り違えないこと。
+  //    ・errors   ＝入力の不備。保存していない。→ 赤（msg-err）
+  //    ・warnings ＝保存はできているが、気をつけてほしいこと（前後の月の日程と重なっている等）。
+  //                 → 黄色（msg-warn）。文面はサーバのものをそのまま出す（画面で作り直さない）。
+  //  ★枠番号（slot）はサーバから来たものをそのまま送り返す。並び順で振り直さない。
+  // ══════════════════════════════════════════════════════════════════════
+
+  /** シフト管理のサブタブ（出勤日の登録 ｜ シフトの日程） */
+  function saSubTab(which) {
+    if (which === 'plan' && !state.isAdmin) return;   // ★管理者以外にはシフトの日程を出さない
+    var plan = (which === 'plan');
+    $('saDaysPane').style.display = plan ? 'none' : '';
+    $('saPlanPane').style.display = plan ? '' : 'none';
+    $('saSubDays').classList.toggle('on', !plan);
+    $('saSubPlan').classList.toggle('on', plan);
+    state.saSub = plan ? 'plan' : 'days';
+    if (plan && !state.spForm) loadShiftPlan();
+  }
+
+  /** 「2026-09」→「2026年9月にお願いする分（10月分）」（「アナウンス月」という言葉は画面に出さない） */
+  function spYmLabel(ym) {
+    var y = Number(String(ym).slice(0, 4)), m = Number(String(ym).slice(5, 7));
+    if (!y || !m) return '—';
+    var nm = (m === 12) ? 1 : m + 1;
+    return y + '年' + m + '月にお願いする分（' + nm + '月分）';
+  }
+  /** 「2026-09-20」→「9月20日」（読みやすさのため。日付でなければ「—」） */
+  function spDay(iso) {
+    var s = String(iso == null ? '' : iso);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '—';
+    return (+s.slice(5, 7)) + '月' + (+s.slice(8, 10)) + '日';
+  }
+  function spResult(cls, text) { $('spResult').innerHTML = '<div class="msg ' + cls + '">' + esc(text) + '</div>'; }
+
+  /** その拠点×その月の日程をサーバから読む（base・ym を省くとサーバが既定を決める） */
+  function loadShiftPlan(base, ym) {
+    if (!state.isAdmin) return;
+    var prev = state.spForm || {};
+    var b = base || prev.base || '';
+    var y = ym || prev.ym || '';
+    state.spForm = { base: b, ym: y, loading: true, saving: false, data: null, slots: [], seq: (prev.seq || 0) + 1 };
+    var seq = state.spForm.seq;
+    $('spNow').innerHTML = '<div class="empty">読み込み中…</div>';
+    $('spEditCard').style.display = 'none';
+    $('spResult').innerHTML = '';
+    $('spMonthLabel').textContent = y ? spYmLabel(y) : '—';
+    var p = { action: 'shiftPlanList' };
+    if (b) p.base = b;
+    if (y) p.ym = y;
+    api(p).then(function(res) {
+      var cur = state.spForm;
+      if (!cur || cur.seq !== seq) return;   // 拠点・月を切り替えたあとに届いた古い応答は捨てる
+      cur.loading = false;
+      if (!res || !res.ok) { $('spNow').innerHTML = errHtml(res, 'いまの日程を読み込めませんでした'); return; }
+      spApply(res);
+    }).catch(function(e) {
+      var cur = state.spForm;
+      if (!cur || cur.seq !== seq) return;
+      cur.loading = false;
+      $('spNow').innerHTML = '<div class="msg msg-err">' + esc('接続できません。読み込み直してください。（' + e.message + '）') + '</div>';
+    });
+  }
+
+  /**
+   * サーバの応答（shiftPlanList / shiftPlanSave）を控えに写して描き直す。
+   * ★保存の応答には、拠点の一覧・枠の丸数字・枠の上限が**入っていない**。
+   *   そのまま差し替えると、保存した瞬間に拠点のボタンが消え、枠の見出しが「①」から「第1回」に化ける。
+   *   入っていない項目は、読み込んだときのものを引き継ぐ。
+   */
+  function spApply(res) {
+    var f = state.spForm;
+    var prev = f.data || {};
+    f.base = res.base || f.base;
+    f.ym = res.ym || f.ym;
+    var slots = (res.slots || []).map(spSlotOf);
+    // 拠点ごとの件数は、いま保存した拠点の分だけ数え直す（ほかの拠点は読み込んだときのまま）
+    var all = (res.all || prev.all || []).map(function(a) {
+      return (a.base === f.base) ? { base: a.base, slotCount: slots.length } : a;
+    });
+    f.data = {
+      base: f.base, ym: f.ym,
+      bases: res.bases || prev.bases || [],
+      all: all,
+      maxSlots: res.maxSlots || prev.maxSlots || 6,
+      labels: (res.labels && res.labels.length) ? res.labels : (prev.labels || []),
+      // ★注意書き（warnings）は、いま届いた応答のものだけを持つ（前のものを引き継がない）。
+      //   引き継ぐと、日程を直して重なりが無くなったあとも古い注意が出たままになる。
+      slots: slots, valid: res.valid, errors: res.errors || [], warnings: res.warnings || [],
+      plan: res.plan || {}, auto: res.auto || prev.auto || {},
+      submitted: res.submitted || {}, submittedOld: res.submittedOld || {}
+    };
+    f.slots = slots.map(spSlotOf);
+    spPaint();
+  }
+  function spSlotOf(s) {
+    return { slot: s.slot, opensOn: s.opensOn || '', deadlineDate: s.deadlineDate || '',
+             periodStart: s.periodStart || '', periodEnd: s.periodEnd || '' };
+  }
+
+  function spPaint() {
+    var f = state.spForm, res = f.data || {};
+    $('spMonthLabel').textContent = spYmLabel(f.ym);
+    var counts = {};
+    (res.all || []).forEach(function(a) { counts[a.base] = a.slotCount; });
+    $('spBasePills').innerHTML = (res.bases || []).map(function(b) {
+      var n = counts[b] || 0;
+      return '<button type="button" class="regpill' + (b === f.base ? ' on' : '') + '" onclick="App.spSetBase(' + jsStr(b) + ')">' +
+             esc(b) + (n ? '<span class="cnt">' + n + '</span>' : '') + '</button>';
+    }).join('');
+    spPaintNow();
+    spPaintSlots();
+    $('spEditCard').style.display = '';
+  }
+
+  /** 「いまの日程」＝実際にスタッフの画面に出ている日程 */
+  function spPaintNow() {
+    var f = state.spForm, res = f.data || {};
+    var plan = res.plan || {}, cycles = plan.cycles || [];
+    var custom = (plan.mode === 'custom');
+    var h = '<div class="msg ' + (custom ? 'msg-ok' : 'msg-warn') + '">' +
+            esc(custom ? '✅ ここで入れた日程で動いています。'
+                       : '⚠ この月は日程を入れていません。いまは自動で決まる日程で動いています。') + '</div>';
+    // ★受付開始は枠ごとに分かれない（いちばん早い日がその月の全部の枠に効く）。入力欄の説明と同じ言い方にそろえる。
+    h += '<div class="spnow"><div class="spline">スタッフが出せるようになる日　<b>' + esc(spDay(plan.opensOn)) +
+         '</b><br>この日から、下の枠が全部まとめて出せるようになります（枠ごとには分かれません）。</div>';
+    cycles.forEach(function(c) {
+      var t = String(c.deadline || '').slice(11);   // 締切の時刻はサーバのものをそのまま出す
+      h += '<div class="spline"><b>' + esc(c.label || '') + '</b>　提出期日 <b>' + esc(spDay(c.deadlineDate)) +
+           (t ? ' ' + esc(t) : '') + '</b><br>　シフトを出してもらう期間　<b>' +
+           esc(spDay(c.periodStart)) + '〜' + esc(spDay(c.periodEnd)) + '</b></div>';
+    });
+    if (!cycles.length) h += '<div class="spline">（日程がありません）</div>';
+    h += '</div>';
+    if ((res.errors || []).length) h += '<div class="msg msg-err">' + esc('⚠ ' + res.errors.join('\n')) + '</div>';
+    h += spWarnHtml(res);   // ★保存はできているが気をつけてほしいこと（黄色）。赤い不備とは別に出す。
+    h += spSubmittedHtml(res);
+    $('spNow').innerHTML = h;
+  }
+
+  /**
+   * サーバからの注意書き（warnings）を黄色で出す。
+   * ★これは「保存できなかった」話ではない。保存はできていて、気をつけてほしいことがあるだけなので、
+   *   赤いエラーとは別ものに見せる。文面はサーバのものをそのまま出し、画面では作り直さない。
+   *   何も無ければ枠ごと出さない（空の黄色い帯を残さない）。
+   */
+  function spWarnHtml(res) {
+    var list = (res && res.warnings) || [];
+    if (!list.length) return '';
+    return list.map(function(w) {
+      return '<div class="msg msg-warn spwarn">' + esc('⚠ ' + w) + '</div>';
+    }).join('');
+  }
+
+  /** 提出した人／旧日程で提出した人（★出し直しのお願いは必ず出す） */
+  function spSubmittedHtml(res) {
+    var sub = res.submitted || {};
+    var names = sub.names || [];
+    var h = '<div class="case-info" style="margin-top:10px">いまの日程で提出した人　<b>' + (sub.count || 0) + '名</b>' +
+            (names.length ? '<br>' + esc(names.join('・')) + (sub.count > names.length ? '・ほか' : '') : '') + '</div>';
+    h += spOldHtml(res);
+    return h;
+  }
+  function spOldHtml(res) {
+    var old = (res && res.submittedOld) || {};
+    if (!(old.count > 0)) return '';
+    var names = old.names || [];
+    return '<div class="msg msg-warn">' + esc('⚠ ' + old.count + '名が旧日程で提出済みです。出し直しをお願いしてください（' +
+           names.join('・') + (old.count > names.length ? '・ほか' : '') + '）。') + '</div>';
+  }
+
+  function spPaintSlots() {
+    var f = state.spForm;
+    if (!f) return;
+    var labels = (f.data && f.data.labels) || [];
+    var max = (f.data && f.data.maxSlots) || 6;
+    if (!f.slots.length) {
+      $('spSlots').innerHTML = '<div class="empty">まだ日程を入れていません。［自動の日程を下敷きにする］か［＋ 枠を追加］から始めてください。</div>';
+    } else {
+      $('spSlots').innerHTML = f.slots.map(function(s, i) {
+        return '<div class="spslot">' +
+          '<div class="sphead"><div class="spno">' + esc(labels[s.slot - 1] || ('第' + s.slot + '回')) + '</div>' +
+          '<button type="button" class="spdel" onclick="App.spRemoveSlot(' + i + ')">この枠を消す</button></div>' +
+          '<div class="spgrid">' +
+          // ★受付開始は枠ごとには効かない。全部の枠のうち「いちばん早い日」がその月の受付開始になる。
+          spField(i, 'opensOn', '受付開始（いちばん早い日から、その月の全部の枠が出せるようになります）', s.opensOn) +
+          spField(i, 'deadlineDate', '提出期日（この日までに出してもらう）', s.deadlineDate) +
+          spField(i, 'periodStart', '期間開始（シフトを出してもらう最初の日）', s.periodStart) +
+          spField(i, 'periodEnd', '期間終了（最後の日）', s.periodEnd) +
+          '</div></div>';
+      }).join('');
+    }
+    var add = $('spAddSlot');
+    add.disabled = (f.slots.length >= max) || !!f.saving;
+    add.textContent = (f.slots.length >= max) ? '枠は最大' + max + 'つまでです' : '＋ 枠を追加';
+  }
+  function spField(i, key, label, val) {
+    var id = 'spIn' + i + '-' + key;
+    return '<div><label for="' + id + '">' + esc(label) + '</label>' +
+           '<input type="date" id="' + id + '" value="' + esc(val || '') + '"></div>';
+  }
+
+  /**
+   * 入力欄の中身を控えに写す。
+   * ★枠の追加・削除・保存の前に必ず呼ぶ。忘れると、描き直した瞬間に書きかけの日付が消える。
+   */
+  function spSyncFromDom() {
+    var f = state.spForm;
+    if (!f) return;
+    f.slots.forEach(function(s, i) {
+      ['opensOn', 'deadlineDate', 'periodStart', 'periodEnd'].forEach(function(k) {
+        var el = $('spIn' + i + '-' + k);
+        if (el) s[k] = String(el.value || '').trim();
+      });
+    });
+  }
+
+  /** 入力欄が、サーバから読んだ日程と違うか（保存していない書きかけがあるか） */
+  function spDirty() {
+    var f = state.spForm;
+    if (!f || !f.data) return false;
+    spSyncFromDom();
+    return JSON.stringify(f.slots) !== JSON.stringify((f.data.slots || []).map(spSlotOf));
+  }
+
+  function spAddSlot() {
+    var f = state.spForm;
+    if (!f || !f.data || f.saving) return;
+    var max = f.data.maxSlots || 6;
+    if (f.slots.length >= max) return;
+    spSyncFromDom();
+    var used = {};
+    f.slots.forEach(function(s) { used[s.slot] = true; });
+    var n = 1;
+    while (used[n] && n <= max) n++;   // 空いている枠番号のうち、いちばん小さいもの
+    f.slots.push({ slot: n, opensOn: '', deadlineDate: '', periodStart: '', periodEnd: '' });
+    f.slots.sort(function(a, b) { return a.slot - b.slot; });
+    spPaintSlots();
+  }
+  function spRemoveSlot(i) {
+    var f = state.spForm;
+    if (!f || f.saving) return;
+    spSyncFromDom();
+    f.slots.splice(i, 1);
+    spPaintSlots();
+  }
+
+  /** ［自動の日程を下敷きにする］自動で決まる日程を入力欄に写す（まだ保存はしない） */
+  function spFillFromAuto() {
+    var f = state.spForm;
+    if (!f || !f.data || f.saving) return;
+    var auto = f.data.auto || {};
+    var cycles = auto.cycles || [];
+    if (!cycles.length) { spResult('msg-warn', '自動の日程が取れませんでした。読み込み直してください。'); return; }
+    spSyncFromDom();
+    if (f.slots.length && !confirm('いま入力している日程を、自動の日程で置き換えます。よろしいですか？')) return;
+    f.slots = cycles.map(function(c, i) {
+      return { slot: (c.no == null ? i + 1 : Number(c.no)), opensOn: auto.opensOn || '',
+               deadlineDate: c.deadlineDate || '', periodStart: c.periodStart || '', periodEnd: c.periodEnd || '' };
+    });
+    spPaintSlots();
+    spResult('msg-ok', '自動の日程を写しました。直したうえで［保存する］を押してください。（まだ保存していません）');
+  }
+
+  /** 保存中はどのボタンも押せなくする（二度押し・ほかの処理との取り違えを防ぐ） */
+  function spBusy(on, btnId, label) {
+    var f = state.spForm;
+    if (f) f.saving = !!on;
+    state.submitting = !!on;
+    ['spSave', 'spReset', 'spFillAuto', 'spReload'].forEach(function(id) { var b = $(id); if (b) b.disabled = !!on; });
+    var btn = $(btnId);
+    if (btn) { if (on) btn.innerHTML = '<span class="spin"></span>' + esc(label); else btn.textContent = label; }
+    spPaintSlots();   // ［＋ 枠を追加］の押せる・押せないもここで決め直す
+  }
+
+  /** 保存を送る（slots が空＝自動の日程に戻す） */
+  function spSend(slots, btnId, doneLabel) {
+    var f = state.spForm;
+    spBusy(true, btnId, (btnId === 'spReset') ? '戻しています…' : '保存中…');
+    api({ action: 'shiftPlanSave', base: f.base, ym: f.ym, slots: slots }).then(function(res) {
+      spBusy(false, btnId, doneLabel);
+      if (!res || !res.ok) {
+        // ★不備はサーバの言い分をそのまま赤で出す。入力欄はそのまま残す（直して出し直せるように）。
+        var lines = (res && res.errors && res.errors.length) ? res.errors.join('\n') : '';
+        $('spResult').innerHTML = errHtml(res, '保存できませんでした') +
+                                  (lines ? '<div class="msg msg-err">' + esc(lines) + '</div>' : '');
+        return;
+      }
+      spApply(res);
+      // ★保存できた緑の文言と、サーバからの注意書き（黄色）を**両方**出す。注意があっても保存は成功している。
+      $('spResult').innerHTML = '<div class="msg msg-ok">' + esc('✅ ' + (res.message || '保存しました。')) + '</div>' +
+                                spWarnHtml(res) + spOldHtml(res);
+    }).catch(function(e) {
+      spBusy(false, btnId, doneLabel);
+      // ★黙って成功にしない。送れたのかどうか分からないことを、そのまま伝える。
+      spResult('msg-err', '保存できたか分かりません。読み込み直して、いまの日程を確かめてください。（' + e.message + '）');
+    });
+  }
+
+  function spSave() {
+    var f = state.spForm;
+    if (!f || f.loading || !f.data || f.saving) return;   // ★二度押しはここで止まる
+    if (state.submitting) { spResult('msg-warn', 'ほかの処理をしています。少しお待ちください。'); return; }
+    spSyncFromDom();
+    if (!f.slots.length) { spResetToAuto(); return; }     // 枠が0つ＝自動の日程に戻す（確認してから）
+    spSend(f.slots.map(spSlotOf), 'spSave', '保存する');
+  }
+
+  /** ［自動の日程に戻す］手入力を消して、自動で決まる日程に戻す */
+  function spResetToAuto() {
+    var f = state.spForm;
+    if (!f || f.loading || !f.data || f.saving) return;
+    if (state.submitting) { spResult('msg-warn', 'ほかの処理をしています。少しお待ちください。'); return; }
+    if (!confirm('この月の日程を消して、自動で決まる日程に戻します。よろしいですか？')) return;
+    spSend([], 'spReset', '自動の日程に戻す');
+  }
+
+  function spSetBase(base) {
+    var f = state.spForm;
+    if (!f || f.loading || f.saving || state.submitting) return;
+    if (base === f.base) return;
+    if (spDirty() && !confirm('入力中の日程は、まだ保存されていません。破棄して拠点を切り替えますか？')) return;
+    loadShiftPlan(base, f.ym);
+  }
+
+  function spMonth(delta) {
+    var f = state.spForm;
+    if (!f || f.loading || f.saving || state.submitting || !f.ym) return;
+    var target;
+    if (delta === 0) {
+      target = todayIso().slice(0, 7);
+    } else {
+      var idx = Number(f.ym.slice(0, 4)) * 12 + (Number(f.ym.slice(5, 7)) - 1) + delta;
+      target = Math.floor(idx / 12) + '-' + ('0' + (idx % 12 + 1)).slice(-2);
+    }
+    if (target === f.ym) return;
+    if (spDirty() && !confirm('入力中の日程は、まだ保存されていません。破棄して月を移動しますか？')) return;
+    loadShiftPlan(f.base, target);
   }
 
   // ─── アカウント ───
@@ -6603,7 +7113,11 @@ var App = (function() {
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
     submitShiftCycle: submitShiftCycle, pickMyColor: pickMyColor, toggleColorPalette: toggleColorPalette,
     updateCph: updateCph,   // ★配布時間の欄（時間・分）から呼ぶ（2026-09-11）
-    saMonth: saMonth, toggleSaDay: toggleSaDay, saSave: saSave
+    saMonth: saMonth, toggleSaDay: toggleSaDay, saSave: saSave,
+    // シフトの日程（管理者）
+    saSubTab: saSubTab, loadShiftPlan: loadShiftPlan, spSetBase: spSetBase, spMonth: spMonth,
+    spFillFromAuto: spFillFromAuto, spAddSlot: spAddSlot, spRemoveSlot: spRemoveSlot,
+    spSave: spSave, spResetToAuto: spResetToAuto
   };
 })();
 </script>
