@@ -1191,7 +1191,7 @@ button.spadd:disabled{color:var(--c-sub,#868e96);cursor:default}
 
       <div class="card" id="spEditCard" style="display:none">
         <h2>日程を入れる</h2>
-        <div class="case-info">枠は1つ〜6つまで作れます（関西は月2回など）。<b>4つの日付</b>を入れてください。<br>
+        <div class="case-info">枠は1つ〜3つまで作れます（関西は月2回など）。<b>4つの日付</b>を入れてください。<br>
           日付の決まりはこのあと<b>保存のときに確かめます</b>。おかしいところがあれば、赤い文で何を直せばよいかをお知らせします。</div>
         <button type="button" class="btn-ghost" id="spFillAuto" onclick="App.spFillFromAuto()" style="margin-top:10px">自動の日程を下敷きにする</button>
         <div id="spSlots"></div>
@@ -1430,13 +1430,75 @@ var App = (function() {
   }
 
   // ─── API呼び出し（転送規約: text/plain + JSON本文） ───
-  function api(payload) {
-    payload.apiVersion = 1;
-    if (state.idToken) payload.idToken = state.idToken;
+  //
+  // ★読むだけの問い合わせは、Googleの入り口が一時的に不調なとき「3秒おいて1回だけ」自動で取り直す
+  //   （2026-09-16 社長決定）。
+  //   2026-09-16 19時ごろ、Googleが数分間HTMLのエラーページを返し、シフト画面が
+  //   「読み込めませんでした」のままになった（サーバの処理自体は全部終わっていた）。
+  //   ・取り直すのは下の一覧（読み取り専用）の action だけ。一覧に無いものは絶対に取り直さない。
+  //     ★提出・保存・承認などの書き込みは、1回目がサーバで実は終わっていることがあり、
+  //       取り直すと二重登録になるので対象外。
+  //   ・取り直す条件は「応答がJSONでなかった（HTMLのエラーページ）」か「通信そのものが失敗した」だけ。
+  //     サーバがJSONで返したエラー（E_AUTH_INVALID_TOKEN・E_LOCK_TIMEOUT など）は取り直さない。
+  //   ・2回目も失敗したら、今までどおりの結果（E_SERVER_BUSY／通信エラー）を返す。画面の見た目は変えない。
+  var API_RETRY_MAX = 1;          // 取り直す回数（1回だけ）
+  var API_RETRY_WAIT_MS = 3000;   // 取り直す前に待つ時間（3秒）
+
+  // ★読み取り専用の action（許可リスト）。src/Api.gs の route と各 handler を読んで決めた（2026-09-16）。
+  //   基準＝シート・カレンダー・ドライブ・スクリプトのプロパティに書き込む可能性が少しでもあれば入れない
+  //   （認証結果・配布禁止の索引などのキャッシュ(CacheService)への書き込みだけは、取り直しても記録が増えないので可）。
+  //   迷ったら入れない。★新しい action をここへ足すときは、handler の中身（呼んでいる Store 等の先まで）を必ず読むこと。
+  //   ※bootstrap・myToday・banBoard・banAdminBoard も入れる（2026-09-16 判断）。この4つの経路で書き込みに届くのは
+  //     Store._avoidCheckSheet の「回避チェックシートが無ければ作る／見出しが崩れていれば直す」だけで、
+  //     記録を増やさない形の整え（何度やっても結果は同じ）。本番ではシートは既にある。
+  //     2026-09-16 19時ごろの障害ではログイン直後の読み込み（bootstrap）と本日の担当（myToday）も失敗していた。
+  var API_READONLY_ACTIONS = {
+    bootstrap: true,                // handleBootstrap: whoami＋cases と同じ読み取り・割当・報告を読む（書くのはキャッシュと、回避チェックシートが無ければ作る／見出しを直す整えだけ＝何度やっても同じ）
+    myToday: true,                  // handleMyToday: 本日の担当・案件・報告を読む（書くのは回避チェックシートが無ければ作る／見出しを直す整えだけ＝何度やっても同じ）
+    banBoard: true,                 // handleBanBoard: 配布禁止の一覧と回避チェックを読む（書くのは回避チェックシートが無ければ作る／見出しを直す整えだけ＝何度やっても同じ）
+    banAdminBoard: true,            // handleBanAdminBoard: 案件別の配布禁止と回避チェックの進み具合を読む（書くのは回避チェックシートが無ければ作る／見出しを直す整えだけ＝何度やっても同じ）
+    whoami: true,                   // handleWhoami: 認証＋名簿・申請中・配布禁止リスト設定を読むだけ（書くのはキャッシュのみ）
+    cases: true,                    // handleCases: 本人の報告できる割当・エリア・設定・名簿・カレンダー対応を読むだけ
+    caseTowns: true,                // handleCaseTowns: 案件台帳・割当の町・町名マスタ・配布禁止索引を読むだけ（書くのはキャッシュのみ）
+    myReports: true,                // handleMyReports: 本人の報告・修正申請・案件の状態を読むだけ
+    reportDetail: true,             // handleReportDetail: 報告・明細・GPS索引の件数を読むだけ
+    myShiftCycles: true,            // handleMyShiftCycles: シフト日程(手入力含む)・本人の提出・シフト行を読むだけ
+    myShiftChanges: true,           // handleMyShiftChanges: 本人のシフト行・シフト変更申請・提出を読むだけ
+    shiftChangeBoard: true,         // handleShiftChangeBoard: シフト変更申請の一覧を読むだけ
+    adminStaffShifts: true,         // handleAdminStaffShifts: 名簿・そのスタッフのシフト行を読むだけ
+    shiftPlanList: true,            // handleShiftPlanList: 管理者が入れたシフト日程（と提出状況）を読むだけ
+    shiftStaffForDate: true,        // handleShiftStaffForDate: その日のシフト出勤者を読むだけ
+    listStaff: true,                // handleListStaff: 在籍スタッフの名簿を読むだけ
+    listPendingRegistrations: true, // handleListPendingRegistrations: 登録申請・未登録の名簿を読むだけ
+    listPendingAmends: true,        // handleListPendingAmends: 修正申請・元の明細を読むだけ
+    listMyRegistrations: true,      // handleListMyRegistrations: 配布割当・報告・案件台帳を読むだけ
+    getAssignDetails: true,         // handleGetAssignDetails: 配布割当とカレンダーの予定本文を読むだけ
+    listOtherEvents: true,          // handleListOtherEvents: 拠点カレンダーの予定を読むだけ（失敗は Logger.log のみ）
+    overtimeBoard: true,            // handleOvertimeBoard: 残業シート・名簿を読むだけ
+    overtimeDays: true,             // handleOvertimeDays: 割当・シフト・報告・残業を読むだけ
+    unlockRegistration: true        // handleUnlockRegistration: 合言葉を照らし合わせて名簿の候補を返すだけ（記録しない）
+  };
+
+  /** その action を取り直してよいか（許可リストにあるものだけ） */
+  function apiCanRetry(action) {
+    return Object.prototype.hasOwnProperty.call(API_READONLY_ACTIONS, String(action || '')) &&
+           API_READONLY_ACTIONS[action] === true;
+  }
+
+  /** 取り直す前に待つ（待ち方はここ1か所だけ。テストでは setTimeout を差し替えて待たずに進める） */
+  function apiRetryWait(ms) {
+    return new Promise(function(resolve) { setTimeout(resolve, ms); });
+  }
+
+  /**
+   * 1回だけ送る。結果は { res, retry } か { error, retry }。
+   *   retry=true になるのは「JSONでなかった」「通信そのものが失敗した」ときだけ。
+   */
+  function apiSendOnce(bodyText) {
     return fetch(CONFIG.API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
+      body: bodyText
     }).then(function(r) {
       // ★Googleが一時的にJSONでなくHTMLのエラーページを返すことがある（2026-08-12 実機で発生）。
       //   そのまま r.json() を呼ぶと画面に
@@ -1444,13 +1506,36 @@ var App = (function() {
       //   屋外のスタッフには何が起きたのか分からず、直しようもない。
       //   本文を先に文字列で受け取り、JSONでなければ**日本語の案内**に置き換える。
       return r.text().then(function(body) {
-        try { return JSON.parse(body); }
+        var parsed;
+        try { parsed = JSON.parse(body); }
         catch (e) {
-          return { ok: false, code: 'E_SERVER_BUSY', retryable: true,
-                   message: 'Googleに一時的につながりませんでした。少し待ってから画面を読み込み直してください。' };
+          return { retry: true,
+                   res: { ok: false, code: 'E_SERVER_BUSY', retryable: true,
+                   message: 'Googleに一時的につながりませんでした。少し待ってから画面を読み込み直してください。' } };
         }
+        return { res: parsed, retry: false };   // サーバがJSONで返したもの（エラーでも）は取り直さない
       });
-    }).then(function(res) {
+    }, function(err) {
+      return { error: err, retry: true };       // 通信そのものが失敗した
+    });
+  }
+
+  function api(payload) {
+    payload.apiVersion = 1;
+    if (state.idToken) payload.idToken = state.idToken;
+    var bodyText = JSON.stringify(payload);
+    var canRetry = apiCanRetry(payload.action);
+    function attempt(n) {
+      return apiSendOnce(bodyText).then(function(out) {
+        if (out.retry && canRetry && n < API_RETRY_MAX) {
+          return apiRetryWait(API_RETRY_WAIT_MS).then(function() { return attempt(n + 1); });
+        }
+        return out;
+      });
+    }
+    return attempt(0).then(function(out) {
+      if (out.error) throw out.error;           // 通信エラーは今までどおり呼び出し側の catch へ
+      var res = out.res;
       // ★ログインの有効期限切れを「無言」にしない（総点検 2026-07-27・A-5）。
       //   Googleのログイン証は1時間で切れる。従来は失効すると全APIが失敗し、
       //   配布禁止タブは古いチェック状況のまま固まり、報告は入力ごと消えていた。
@@ -6686,7 +6771,7 @@ var App = (function() {
       base: f.base, ym: f.ym,
       bases: res.bases || prev.bases || [],
       all: all,
-      maxSlots: res.maxSlots || prev.maxSlots || 6,
+      maxSlots: res.maxSlots || prev.maxSlots || SP_MAX_SLOTS,
       labels: (res.labels && res.labels.length) ? res.labels : (prev.labels || []),
       // ★注意書き（warnings）は、いま届いた応答のものだけを持つ（前のものを引き継がない）。
       //   引き継ぐと、日程を直して重なりが無くなったあとも古い注意が出たままになる。
@@ -6773,11 +6858,14 @@ var App = (function() {
            names.join('・') + (old.count > names.length ? '・ほか' : '') + '）。') + '</div>';
   }
 
+  /** 枠の上限（サーバの maxSlots が届かないときだけ使う。サーバの Shift.CUSTOM_MAX_SLOTS と同じ数） */
+  var SP_MAX_SLOTS = 3;
+
   function spPaintSlots() {
     var f = state.spForm;
     if (!f) return;
     var labels = (f.data && f.data.labels) || [];
-    var max = (f.data && f.data.maxSlots) || 6;
+    var max = (f.data && f.data.maxSlots) || SP_MAX_SLOTS;
     if (!f.slots.length) {
       $('spSlots').innerHTML = '<div class="empty">まだ日程を入れていません。［自動の日程を下敷きにする］か［＋ 枠を追加］から始めてください。</div>';
     } else {
@@ -6830,7 +6918,7 @@ var App = (function() {
   function spAddSlot() {
     var f = state.spForm;
     if (!f || !f.data || f.saving) return;
-    var max = f.data.maxSlots || 6;
+    var max = f.data.maxSlots || SP_MAX_SLOTS;
     if (f.slots.length >= max) return;
     spSyncFromDom();
     var used = {};
