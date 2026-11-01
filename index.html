@@ -297,6 +297,10 @@
      min-width:0 が無いと nowrap の文字がボタンからはみ出し、ナビ全体が横に溢れる。 */
   #bottomNav.dense7 button { font-size: 9px; padding: 8px 0 10px; }
   #bottomNav.dense7 button .ic { font-size: 16px; }
+  /* ★8個並ぶ管理者（報告管理が増えた・2026-11-01）でも読めるよう、長い名前は短い名前に切り替える */
+  #bottomNav .nl-s { display: none; }
+  #bottomNav.dense7 .nl-l { display: none; }
+  #bottomNav.dense7 .nl-s { display: inline; }
   /* ── 📊 報告管理（スタッフ別の配布報告・2026-11-01） ── */
   .rb-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .rb-pill { width: auto; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--c-border); background: #fff;
@@ -1374,13 +1378,13 @@ button.spadd:disabled{color:var(--c-sub,#868e96);cursor:default}
 <nav id="bottomNav" class="hidden">
   <button type="button" data-tab="home" id="navReport" onclick="App.switchTab('home')"><span class="ic">📝</span>報告</button>
   <button type="button" data-tab="ban" id="navBan" onclick="App.switchTab('ban')" style="display:none"><span class="ic">📍</span>配布禁止<span class="navdot hidden" id="navBanDot"></span></button>
-  <button type="button" data-tab="banadmin" id="navBanAdmin" onclick="App.switchTab('banadmin')" style="display:none"><span class="ic">📍</span>配布禁止管理<span class="navdot hidden" id="navBanAdminDot"></span></button>
+  <button type="button" data-tab="banadmin" id="navBanAdmin" onclick="App.switchTab('banadmin')" style="display:none"><span class="ic">📍</span><span class="nl-l">配布禁止管理</span><span class="nl-s">禁止管理</span><span class="navdot hidden" id="navBanAdminDot"></span></button>
   <button type="button" data-tab="history" id="navHistory" onclick="App.switchTab('history')"><span class="ic">📋</span>履歴</button>
   <button type="button" data-tab="shift" id="navShift" onclick="App.switchTab('shift')"><span class="ic">📅</span>シフト<span class="navdot hidden" id="navShiftDot"></span></button>
   <button type="button" data-tab="register" id="navRegister" onclick="App.switchTab('register')" style="display:none"><span class="ic">🗓️</span>予定登録</button>
-  <button type="button" data-tab="staff" id="navStaff" onclick="App.switchTab('staff')" style="display:none"><span class="ic">👥</span>スタッフ管理</button>
+  <button type="button" data-tab="staff" id="navStaff" onclick="App.switchTab('staff')" style="display:none"><span class="ic">👥</span><span class="nl-l">スタッフ管理</span><span class="nl-s">スタッフ</span></button>
   <button type="button" data-tab="reportadmin" id="navReportAdmin" onclick="App.switchTab('reportadmin')" style="display:none"><span class="ic">📊</span>報告管理</button>
-  <button type="button" data-tab="shiftadmin" id="navShiftAdmin" onclick="App.switchTab('shiftadmin')" style="display:none"><span class="ic">🗂️</span>シフト管理</button>
+  <button type="button" data-tab="shiftadmin" id="navShiftAdmin" onclick="App.switchTab('shiftadmin')" style="display:none"><span class="ic">🗂️</span><span class="nl-l">シフト管理</span><span class="nl-s">シフト</span></button>
   <button type="button" data-tab="overtime" id="navOvertime" onclick="App.switchTab('overtime')" style="display:none"><span class="ic">⏰</span>勤務調整</button>
 </nav>
 
@@ -2735,6 +2739,7 @@ var App = (function() {
 
   // 案件の切替（ホームの本日カード or 報告忘れカードのタップ）。dayは割当日（省略時は当日分を選ぶ）。
   function pickCase(caseNo, day) {
+    if (gpsBusyBlock()) return;
     // ★修正の申請中に別の案件をタップしたら、まず「修正をやめるか」を確かめる。
     //   黙って抜けると直した数字が残り、承認を通さない報告として送れてしまう。
     if (state.correctingCase) {
@@ -3682,56 +3687,72 @@ var App = (function() {
    * 報告を受け付けたあと、GPS画像を1枚ずつ送る。
    * ★「完了」は**全部の画像についてサーバが ok（＝Googleドライブに保存し索引に記録した）を返してから**出す
    *   （2026-10-30 社長指示）。途中は「まだ終わっていません・画面を閉じないで」を出し続ける。
-   * @param {string} reportUuid
-   * @param {object=} res 報告の応答（最後に「✅ 反映しました」を出すために預かる。再試行では省略）
+   * ★送る相手（報告・案件・残りの画像・番号）は state.gpsUp に**送った時点の分を預けて**使う（2026-11-01 総点検）。
+   *   以前は「いま開いている案件」と「いま選択中の画像」を見ていたため、
+   *   失敗のあとで別の案件を押してから再送すると、0枚なのに「完了」と出て**別の案件が報告済み**になっていた。
+   * @param {string=} reportUuid 新しく送るときだけ（再送では省略）
+   * @param {object=} res 報告の応答（最後に「✅ 反映しました」を出すために預かる）
    */
   function uploadGpsSequential(reportUuid, res) {
     if (state.gpsUploading) return;
-    if (res) state.gpsPendingRes = res;
-    var doneRes = state.gpsPendingRes || null;
+    if (reportUuid && res) {
+      state.gpsUp = { uuid: reportUuid, res: res, caseRef: currentCase(), files: state.gpsFiles.slice(),
+                      saved: 0, nextSeq: 1 };
+    }
+    var up = state.gpsUp;
+    if (!up) return;
+    var area = $('resultArea');
+    $('gpsProgress').innerHTML = '';
+    if (!up.files.length) {
+      // 選び直し・×で消した等で、送る画像が手元に残っていない＝完了とは言わない
+      area.innerHTML = '<div class="msg msg-err">⚠ 送る画像が残っていません（' + up.saved + '枚は保存済み）。' +
+        '<br>足りない分は［報告履歴］のこの報告から「📷 GPS画像を追加」で足してください。</div>';
+      return;
+    }
     state.gpsUploading = true;
     setSubmitting(true, 'GPS画像を保存中…');
-    var files = state.gpsFiles.slice(), total = files.length, okCount = 0, failed = [];
-    var area = $('resultArea');
-    var seq0 = Number(state.gpsSavedCount) || 0;   // 再試行のとき、先に保存できた枚数（ファイル名の番号を続きにする）
-    $('gpsProgress').innerHTML = '';
-    var busy = function(i) {
+    var files = up.files.slice(), total = up.saved + files.length, failed = [];
+    var busy = function() {
       area.innerHTML = '<div class="msg msg-warn"><span class="spin"></span>⏳ <b>まだ終わっていません。</b>' +
-        '報告を受け付けました。続けてGPS画像をGoogleドライブに保存しています（' + i + '/' + total + '枚 保存済み）。' +
+        '報告を受け付けました。続けてGPS画像をGoogleドライブに保存しています（' + up.saved + '/' + total + '枚 保存済み）。' +
         '<br><b>終わるまで、画面を閉じたり、ほかのアプリに切り替えたりしないでください。</b></div>';
     };
     var next = function(i) {
       if (i >= files.length) {
         state.gpsUploading = false;
-        setSubmitting(false);
+        up.files = failed.slice();
+        var here = currentCase() === up.caseRef && !state.correctingCase;   // 送った案件をまだ開いているか
         if (failed.length === 0) {
-          state.gpsPendingRes = null;
-          state.gpsSavedCount = 0;
-          state.gpsFiles = []; renderGpsList();
-          clearFormAfterSuccess();
+          state.gpsUp = null;
+          setSubmitting(false);
+          if (here) { state.gpsFiles = []; renderGpsList(); clearFormAfterSuccess(); }
+          else if (up.caseRef) { up.caseRef.done = true; renderReportCases(); }   // 別の案件を開いていても、送った案件だけを済みにする
           // ★ここで初めて完了を出す（clearFormAfterSuccess の再描画より後に書く＝消されない）
-          if (doneRes) showResult(doneRes);
-          area.innerHTML = area.innerHTML + '<div class="msg msg-ok">📷 GPS画像 ' + (seq0 + okCount) +
+          showResult(up.res);
+          area.innerHTML = area.innerHTML + '<div class="msg msg-ok">📷 GPS画像 ' + up.saved +
             '枚をGoogleドライブに保存しました。これで報告は完了です。</div>';
           area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
-          state.gpsSavedCount = seq0 + okCount;
-          state.gpsFiles = failed.slice(); renderGpsList();
+          // ★報告そのものは受理済み＝この日はもう送れない（もう一度「報告を送信」を押せる状態に戻さない）
+          if (up.caseRef) up.caseRef.done = true;
+          setSubmitting(false);
+          if (here) { state.gpsFiles = failed.slice(); renderGpsList(); }
           area.innerHTML = '<div class="msg msg-err">⚠ <b>まだ終わっていません。</b>報告は受け付けましたが、GPS画像が <b>' +
-            failed.length + '枚</b> 保存できていません（' + (seq0 + okCount) + '枚は保存済み）。' +
+            failed.length + '枚</b> 保存できていません（' + up.saved + '枚は保存済み）。' +
             '<br>電波の良い場所で、下のボタンを押してください。' +
             '<br>※画面を閉じた場合は、［報告履歴］のこの報告から「📷 GPS画像を追加」で足せます。</div>' +
-            '<button type="button" class="btn-primary" onclick="App.retryGps(\'' + esc(reportUuid) + '\')">保存できなかった画像をもう一度送る</button>';
+            '<button type="button" class="btn-primary" onclick="App.retryGps()">保存できなかった画像をもう一度送る</button>';
           area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
         return;
       }
-      busy(seq0 + okCount);
+      busy();
+      var seq = up.nextSeq++;   // 番号は使い回さない（失敗した番号も飛ばして次へ）
       shrinkImage(files[i]).then(function(imgData) {
-        return api({ action: 'uploadGpsImage', reportUuid: reportUuid, seq: seq0 + i + 1,
+        return api({ action: 'uploadGpsImage', reportUuid: up.uuid, seq: seq,
           fileName: files[i].name, mimeType: imgData.mimeType, base64: imgData.dataUrl });
       }).then(function(r) {
-        if (r && r.ok) okCount++; else failed.push(files[i]);
+        if (r && r.ok) up.saved++; else failed.push(files[i]);
         next(i + 1);
       }).catch(function() { failed.push(files[i]); next(i + 1); });
     };
@@ -3739,7 +3760,14 @@ var App = (function() {
     next(0);
   }
 
-  function retryGps(reportUuid) { uploadGpsSequential(reportUuid); }
+  function retryGps() { uploadGpsSequential(); }
+
+  /** 画像の保存中は、ほかの案件・修正・追加に移らせない（送っている報告と取り違えないため） */
+  function gpsBusyBlock() {
+    if (!state.gpsUploading) return false;
+    alert('GPS画像を保存しています。終わるまで（「これで報告は完了です」と出るまで）お待ちください。');
+    return true;
+  }
 
   // ★画像の保存中にページを閉じようとしたら止める（対応しているブラウザだけ。iPhoneのSafariは出ないことがある）
   if (window.addEventListener) window.addEventListener('beforeunload', function(e) {
@@ -3789,7 +3817,9 @@ var App = (function() {
     (reports || []).forEach(function(r) { if (r.gpsCount != null) state.repGpsCount[r.reportUuid] = Number(r.gpsCount) || 0; });
     if (reports.length === 0) { $('reportsList').innerHTML = '<div class="empty">まだ報告がありません</div>'; return; }
     $('reportsList').innerHTML = reports.map(function(r) {
-      var short = gpsShortOf(r, gpsMin);
+      // 画像を送っている最中の報告は、足りない扱いにしない（まだ届いている途中）
+      var uploadingThis = !!(state.gpsUploading && state.gpsUp && state.gpsUp.uuid === r.reportUuid);
+      var short = !uploadingThis && gpsShortOf(r, gpsMin);
       // ★修正は「申請 → 管理者の承認」制（2026-08-24）。押しても数字は動かない。
       var pending = r.amendState === '申請中';
       var amendBtn = r.canAmend
@@ -3813,7 +3843,9 @@ var App = (function() {
         : '<span class="st-badge st-' + esc(r.status) + '">' + statusLabel(r.status) + '</span>';
       var qtyTxt = (r.status === 'NODIST') ? '部数の報告なし' : ((r.calcTotal || 0) + '部');
       var gpsTxt = (r.status === 'APPLIED' && r.gpsCount != null) ? ' ／ 📷 ' + r.gpsCount + '枚' : '';
-      var gpsWarn = short
+      var gpsWarn = uploadingThis
+        ? '<div class="msg" style="margin-top:6px">📷 GPS画像を保存しています…（報告の画面で続いています）</div>'
+        : short
         ? '<div class="msg msg-err" style="margin-top:6px">⚠ GPS画像が足りません（' + r.gpsCount + '枚・' + gpsMin +
           '枚必要）。下の「📷 GPS画像を追加」から足してください。</div>'
         : '';
@@ -3841,6 +3873,7 @@ var App = (function() {
    *   管理者が承認したときに初めて「取消 → 入れ直し」がサーバ側でまとめて行われる。
    */
   function correctReport(reportUuid) {
+    if (gpsBusyBlock()) return;
     if (state.correcting) return;
     state.correcting = true;
 
@@ -3921,6 +3954,7 @@ var App = (function() {
 
   // 履歴からGPS追加: 対象reportUuidを覚えてファイル選択を開く
   function addGpsToReport(reportUuid) {
+    if (gpsBusyBlock()) return;
     state.gpsAddTarget = reportUuid;
     $('gpsAddInput').click();
   }
@@ -5736,6 +5770,7 @@ var App = (function() {
   function loadReportBoard() {
     var rb = rbState();
     var seq = ++rb.seq;   // 遅れて届いた古い応答は捨てる（拠点や月を続けて押したとき）
+    rb.data = null; rb.sel = null;   // 前の拠点・月の中身は捨てる（読み込み中に表/スタッフ別を押しても出さない）
     rbRenderControls();
     $('rbBody').innerHTML = '<div class="empty"><span class="spin" style="border-color:var(--c-primary);border-top-color:transparent"></span> 読み込み中…</div>';
     $('rbDetail').innerHTML = '';
@@ -5772,10 +5807,11 @@ var App = (function() {
     if (!c) return { t: '', cls: '' };
     var t = [], cls = '';
     if (c.qty) t.push(String(c.qty));
+    else if (c.applied) t.push('0');   // 0部で受理された日（空欄＝何も無い日と見分ける）
     (c.marks || []).forEach(function(m) { t.push(m); });
     if (c.marks && c.marks.indexOf('未') >= 0) cls = 'rb-miss';
     else if (c.warn) cls = 'rb-warn';
-    else if (c.qty) cls = 'rb-ok';
+    else if (c.qty || c.applied) cls = 'rb-ok';
     else if (c.marks && c.marks.some(function(m) { return m === '送迎' || m === '指導' || m === '配布なし'; })) cls = 'rb-nod';
     else if (c.marks && c.marks.indexOf('予') >= 0) cls = 'rb-plan';
     return { t: t.join(' ') + (c.warn ? ' ⚠' : ''), cls: cls };
