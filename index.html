@@ -379,6 +379,10 @@
   .regpill .cnt { font-weight: 600; opacity: .8; margin-left: 3px; }
   /* 拠点のチップ（大きめ・拠点の色）2026-11-07 */
   .regpill.basepill { font-size: 15px; padding: 9px 20px; border-radius: 20px; border-width: 2px; border-style: solid; }
+  /* シフトアナウンス・回収催促の文（2026-11-07） */
+  .sptpl-opts { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
+  .sptpl-opts select { width: auto; flex: 1 1 200px; }
+  .sptpl-out { width: 100%; margin-top: 10px; font-size: 14px; line-height: 1.6; background: #fafafa; white-space: pre-wrap; }
   .regsort { margin-left: auto; }
   .regcount { font-size: 12px; color: var(--c-sub); margin: 2px 0 6px; }
   /* 専用リンクの配布状況（スタッフ管理・2026-11-07） */
@@ -1365,6 +1369,26 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
         <h2>いまの日程</h2>
         <div id="spNow"><div class="empty">読み込み中…</div></div>
         <button type="button" class="btn-ghost" id="spReload" onclick="App.loadShiftPlan()" style="margin-top:10px">↻ 読み込み直す</button>
+      </div>
+
+      <!-- ★シフトアナウンス・シフト回収催促の文（2026-11-07 社長依頼: 秘書ツール POS CONCIERGE のテンプレをここへ）。
+           上の「いまの日程」（スタッフの画面と同じ日程）から作る＝アナウンスとアプリの日付がずれない -->
+      <div class="card" id="spTplCard" style="display:none">
+        <h2>📣 LINE WORKS に送る文</h2>
+        <div class="subtabs">
+          <button type="button" class="subtab on" id="spTplTabAnn" onclick="App.spTplTab('ann')">シフトアナウンス</button>
+          <button type="button" class="subtab" id="spTplTabUrge" onclick="App.spTplTab('urge')">シフト回収催促</button>
+        </div>
+        <div class="case-info" id="spTplNote"></div>
+        <div id="spTplUrgeOpts" class="sptpl-opts" style="display:none">
+          <select id="spTplSlot" onchange="App.spTplRender()" aria-label="対象の提出期日"></select>
+          <select id="spTplWhen" onchange="App.spTplRender()" aria-label="送るタイミング">
+            <option value="pre">前日に送る（前日催促）</option>
+            <option value="day">当日に送る（当日催促）</option>
+          </select>
+        </div>
+        <textarea id="spTplOut" class="sptpl-out" readonly rows="14" aria-label="送る文"></textarea>
+        <button type="button" class="btn-primary" id="spTplCopy" onclick="App.spTplCopy()" style="margin-top:8px">📋 コピーして LINE WORKS に貼り付け</button>
       </div>
 
       <div class="card" id="spEditCard" style="display:none">
@@ -7564,7 +7588,7 @@ var App = (function() {
     // ★2026-11-07: 関西の自動の日程は周知どおり（2週間ずつ続ける）になったので、自動のときは注意ではなく案内にする
     var autoNote = plan.mode === 'monthly'
       ? 'この月は自動の日程（毎月19日19時までに、翌月分をまとめて）で動いています。'
-      : 'この月は自動の日程（2週間ずつすき間なく続け、期日は1つ目の期間が始まる15日前の日曜）で動いています。周知と違う月だけ、下の「日程を入れる」で直してください。';
+      : 'この月は自動の日程（期間は2週間ずつすき間なく続け、期日は第3日曜から1週間ずつ）で動いています。周知と違う月だけ、下の「日程を入れる」で直してください。';
     var h = '<div class="msg ' + (custom ? 'msg-ok' : '') + '">' +
             esc(custom ? '✅ ここで入れた日程で動いています。' : 'ℹ ' + autoNote) + '</div>';
     // ★受付開始は枠ごとに分かれない（いちばん早い日がその月の全部の枠に効く）。入力欄の説明と同じ言い方にそろえる。
@@ -7582,6 +7606,90 @@ var App = (function() {
     h += spWarnHtml(res);   // ★保存はできているが気をつけてほしいこと（黄色）。赤い不備とは別に出す。
     h += spSubmittedHtml(res);
     $('spNow').innerHTML = h;
+    spTplRender();
+  }
+
+  // ─── シフトアナウンス・シフト回収催促の文（2026-11-07 社長依頼） ───
+  //   社長の秘書ツール（POS CONCIERGE）のテンプレと同じ文面。日付は「いまの日程」（スタッフの画面と同じ）から作る。
+  //   関西＝①②（③）の枠ごと／東戸塚・稲毛・五香・豊田＝1か月分をまとめて。
+  var SP_TPL_CONTACT = '提出が間に合わないまたは期日を過ぎてから変更を行う場合は必ず北山さんまたは遠山宛まで連絡を入れるようお願いします。';
+  function spTplMd(iso) { var p = String(iso || '').split('-'); return p.length < 3 ? '' : Number(p[1]) + '月' + Number(p[2]) + '日'; }
+  function spTplHour(c) { var t = String((c && c.deadline) || '').slice(11, 13); return (t ? Number(t) : 19) + '時'; }
+  /** 「◯月分」（アナウンス月の翌月） */
+  function spTplTarget(ym) { var m = Number(String(ym || '').slice(5, 7)); return m ? (m % 12) + 1 : ''; }
+  var SP_CIRCLED = ['①', '②', '③', '④', '⑤', '⑥'];
+  /** シフトアナウンスの文（純粋関数）。monthly=1か月分まとめての拠点 */
+  function spAnnounceText(target, cycles, monthly) {
+    var lines = ['【周知】シフト提出について', '', 'お疲れ様です。'];
+    if (monthly) {
+      var c = cycles[0] || {};
+      lines.push(target + '月分のシフト希望提出のお知らせです。', '提出期日は下記の通りです。', '', '[提出期日と提出期間]',
+        '提出期日：' + spTplMd(c.deadlineDate) + ' ' + spTplHour(c) + 'まで',
+        '提出期間：' + spTplMd(c.periodStart) + '～' + spTplMd(c.periodEnd) + '（1か月分）', '');
+    } else {
+      lines.push(target + '月分のシフト希望提出タイミングのお知らせです。', '提出期日は下記の通りです。', '', '[提出期日と提出期間]');
+      cycles.forEach(function(c, i) {
+        var no = SP_CIRCLED[i] || (i + 1) + '.';
+        lines.push(no + '提出期日：' + spTplMd(c.deadlineDate) + ' ' + spTplHour(c) + 'まで',
+          '　提出期間：' + spTplMd(c.periodStart) + '～' + spTplMd(c.periodEnd), '');
+      });
+    }
+    lines.push('上記で' + target + '月分は設定させて頂きます。', SP_TPL_CONTACT, '', 'それでは宜しくお願い致します。');
+    return lines.join('\n');
+  }
+  /** シフト回収催促の文（純粋関数）。when='pre'（前日）／'day'（当日） */
+  function spUrgeText(target, c, when) {
+    var period = spTplMd(c.periodStart) + '～' + spTplMd(c.periodEnd);
+    var head = 'お疲れ様です。\n' + target + '月分の希望シフト提出のリマインドです。\n\n【対象】' + target + '月分(提出期間：' + period + ')\n';
+    return when === 'day'
+      ? head + '【提出期日】本日 ' + spTplMd(c.deadlineDate) + ' ' + spTplHour(c) + 'まで\n\n未提出の方は至急ご対応をお願いします！！\n' +
+        '(※提出期限より遅れる場合は、北山さん個人宛にいつ頃に提出可能か日付を明記の上で、必ず報告相談をしてください。)'
+      : head + '【提出期日】明日 ' + spTplMd(c.deadlineDate) + ' ' + spTplHour(c) + 'まで\n\n未提出の方はお早めにご対応をお願いします！！';
+  }
+  function spTplTab(t) {
+    state.spTpl = state.spTpl || {};
+    state.spTpl.tab = t;
+    spTplRender();
+  }
+  function spTplRender() {
+    var card = $('spTplCard'); if (!card) return;
+    var f = state.spForm || {}, res = f.data || {}, plan = res.plan || {}, cycles = plan.cycles || [];
+    if (!cycles.length || f.loading) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    var tab = (state.spTpl && state.spTpl.tab) || 'ann';
+    $('spTplTabAnn').classList.toggle('on', tab === 'ann');
+    $('spTplTabUrge').classList.toggle('on', tab === 'urge');
+    var monthly = plan.mode === 'monthly';
+    var target = spTplTarget(f.ym);
+    if (tab === 'ann') {
+      $('spTplUrgeOpts').style.display = 'none';
+      $('spTplNote').innerHTML = '送信先: LW板【ポスティング周知】。送るのは<b>毎月8〜10日</b>（スタッフが出せるようになる日のころ）。<br>' +
+        '日付は上の「いまの日程」（スタッフのシフト画面と同じ）から作っています。周知を変えたいときは、先に下の「日程を入れる」で直してください。';
+      $('spTplOut').value = spAnnounceText(target, cycles, monthly);
+      return;
+    }
+    // 回収催促: 対象の期日を選ぶ（いちばん近い、まだ過ぎていない期日を最初に選ぶ）
+    $('spTplUrgeOpts').style.display = '';
+    $('spTplNote').innerHTML = '送信先: LW板【ポスティング周知】。<b>シフトアナウンスのメッセージに「リプライ」する形</b>で、各提出期日の<b>前日と当日</b>に送ります。';
+    var sel = $('spTplSlot'), prev = sel.value;
+    var today = jstNow().date;
+    sel.innerHTML = cycles.map(function(c, i) {
+      var lab = (monthly ? '' : (SP_CIRCLED[i] || '') + ' ') + '提出期日 ' + spTplMd(c.deadlineDate) + '（期間 ' + spTplMd(c.periodStart) + '～' + spTplMd(c.periodEnd) + '）';
+      return '<option value="' + i + '">' + esc(lab) + '</option>';
+    }).join('');
+    var pick = cycles.length > Number(prev) && prev !== '' ? Number(prev) : 0;
+    if (prev === '' || prev == null) {
+      for (var i = 0; i < cycles.length; i++) { if (String(cycles[i].deadlineDate) >= today) { pick = i; break; } }
+    }
+    sel.value = String(pick);
+    $('spTplOut').value = spUrgeText(target, cycles[pick] || cycles[0], $('spTplWhen').value);
+  }
+  function spTplCopy() {
+    var v = $('spTplOut').value; if (!v) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(v).then(function() { alert('コピーしました。LINE WORKS に貼り付けて送ってください。'); },
+        function() { window.prompt('コピーしてください', v); });
+    } else { window.prompt('コピーしてください', v); }
   }
 
   /**
@@ -7947,6 +8055,7 @@ var App = (function() {
     claimSubmit: claimSubmit, onClaimName: onClaimName, unlockAccess: unlockAccess,
     loadPendingRegs: loadPendingRegs, approveReg: approveReg, rejectReg: rejectReg,
     changeStaffPerm: changeStaffPerm, onAcctBtn: onAcctBtn,
+    spTplTab: spTplTab, spTplRender: spTplRender, spTplCopy: spTplCopy,
     stToggleBase: stToggleBase, stAllBases: stAllBases, stSetKind: stSetKind, stSetLink: stSetLink, stOnSearch: stOnSearch, stClear: stClear,
     issueStaffLink: issueStaffLink, revokeStaffLink: revokeStaffLink, addLinkStaff: addLinkStaff, copyStaffLink: copyStaffLink, closeIssuedLink: closeIssuedLink,
     submitRegister: submitRegister,
