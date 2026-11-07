@@ -377,6 +377,8 @@
   .regpill { width: auto; border: 1px solid var(--c-border); background: #fff; color: var(--c-sub); border-radius: 14px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .regpill.on { background: var(--c-primary, #1a73e8); border-color: var(--c-primary, #1a73e8); color: #fff; }
   .regpill .cnt { font-weight: 600; opacity: .8; margin-left: 3px; }
+  /* 拠点のチップ（大きめ・拠点の色）2026-11-07 */
+  .regpill.basepill { font-size: 15px; padding: 9px 20px; border-radius: 20px; border-width: 2px; border-style: solid; }
   .regsort { margin-left: auto; }
   .regcount { font-size: 12px; color: var(--c-sub); margin: 2px 0 6px; }
   /* 専用リンクの配布状況（スタッフ管理・2026-11-07） */
@@ -7541,9 +7543,12 @@ var App = (function() {
     $('spMonthLabel').textContent = spYmLabel(f.ym);
     var counts = {};
     (res.all || []).forEach(function(a) { counts[a.base] = a.slotCount; });
+    // ★拠点のチップは大きめ・拠点の色で（2026-11-07 社長要望）。選んでいる拠点は塗りつぶし、ほかは色の枠と文字
     $('spBasePills').innerHTML = (res.bases || []).map(function(b) {
-      var n = counts[b] || 0;
-      return '<button type="button" class="regpill' + (b === f.base ? ' on' : '') + '" onclick="App.spSetBase(' + jsStr(b) + ')">' +
+      var n = counts[b] || 0, on = (b === f.base), col = BASE_COLORS[b] || '#5f6368';
+      var style = on ? 'background:' + col + ';border-color:' + col + ';color:#fff'
+                     : 'background:#fff;border-color:' + col + ';color:' + col;
+      return '<button type="button" class="regpill basepill' + (on ? ' on' : '') + '" style="' + style + '" onclick="App.spSetBase(' + jsStr(b) + ')">' +
              esc(b) + (n ? '<span class="cnt">' + n + '</span>' : '') + '</button>';
     }).join('');
     spPaintNow();
@@ -7556,9 +7561,12 @@ var App = (function() {
     var f = state.spForm, res = f.data || {};
     var plan = res.plan || {}, cycles = plan.cycles || [];
     var custom = (plan.mode === 'custom');
-    var h = '<div class="msg ' + (custom ? 'msg-ok' : 'msg-warn') + '">' +
-            esc(custom ? '✅ ここで入れた日程で動いています。'
-                       : '⚠ この月は日程を入れていません。いまは自動で決まる日程で動いています。') + '</div>';
+    // ★2026-11-07: 関西の自動の日程は周知どおり（2週間ずつ続ける）になったので、自動のときは注意ではなく案内にする
+    var autoNote = plan.mode === 'monthly'
+      ? 'この月は自動の日程（毎月19日19時までに、翌月分をまとめて）で動いています。'
+      : 'この月は自動の日程（2週間ずつすき間なく続け、期日は1つ目の期間が始まる15日前の日曜）で動いています。周知と違う月だけ、下の「日程を入れる」で直してください。';
+    var h = '<div class="msg ' + (custom ? 'msg-ok' : '') + '">' +
+            esc(custom ? '✅ ここで入れた日程で動いています。' : 'ℹ ' + autoNote) + '</div>';
     // ★受付開始は枠ごとに分かれない（いちばん早い日がその月の全部の枠に効く）。入力欄の説明と同じ言い方にそろえる。
     h += '<div class="spnow"><div class="spline">スタッフが出せるようになる日　<b>' + esc(spDay(plan.opensOn)) +
          '</b><br>この日から、下の枠が全部まとめて出せるようになります（枠ごとには分かれません）。</div>';
