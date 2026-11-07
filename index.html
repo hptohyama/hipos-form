@@ -345,6 +345,10 @@
   .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent;
           border-radius: 50%; animation: sp 0.8s linear infinite; vertical-align: -3px; margin-right: 6px; }
   @keyframes sp { to { transform: rotate(360deg); } }
+  /* 押したボタンの「保存中…」（2026-11-07・apiBusyStart）: 白いボタンでも見えるよう文字の色で回す */
+  .spin.spin-cur { border-color: currentColor; border-top-color: transparent; }
+  .spin.spin-only { margin-right: 0; }
+  button[aria-busy="true"] { cursor: progress; opacity: .85; }
   /* 本日の担当カード */
   .assign { border: 1px solid var(--c-border); border-radius: 10px; padding: 12px; margin-bottom: 8px; cursor: pointer; background:#fff; }
   .assign:active { background: #f1f3f4; }
@@ -369,6 +373,8 @@
   .reghead-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
   .base-badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 11px; border-radius: 12px; color: #fff; white-space: nowrap; flex-shrink: 0; }
   .subtabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  /* ★予定登録の上の3タブ（新規登録／登録済みの変更・取消／その他の予定）はスクロールしてもヘッダーの下に付いてくる（2026-11-07 社長依頼） */
+  #registerView > .subtabs { position: sticky; top: var(--hdr-h, 62px); z-index: 4; background: #f8f9fa; margin: -12px -12px 12px; padding: 12px 12px 10px; }
   .subtab { flex: 1; padding: 11px 8px; border: 1px solid var(--c-border); background: #fff; border-radius: 10px; font-weight: 700; color: var(--c-sub); cursor: pointer; }
   .subtab.on { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
   /* 登録済みの変更・取消：絞込みバー */
@@ -693,6 +699,7 @@ button.spadd:disabled{color:var(--c-sub,#868e96);cursor:default}
 body.pc header { padding: 12px 24px; }
 body.pc main { max-width: none; margin: 0 0 0 220px; padding: 24px 32px 48px; }
 body.pc main > .view, body.pc main > .card { max-width: 1200px; margin-left: auto; margin-right: auto; }
+body.pc #registerView > .subtabs { margin: -12px 0 12px; padding: 12px 0; }
 body.pc #bottomNav { top: var(--hdr-h, 66px); bottom: 0; left: 0; right: auto; width: 220px; max-width: none; margin: 0;
   flex-direction: column; justify-content: flex-start; gap: 2px; padding: 14px 10px; border-top: 0;
   border-right: 1px solid var(--c-border); overflow-y: auto; }
@@ -1737,6 +1744,55 @@ var App = (function() {
     });
   }
 
+  // ─── 押したボタンを「保存中…」にする（2026-11-07 社長指示: 保存中だと分かるように・システム全体） ───
+  //   ボタンを押した流れの中で「書き込みの問い合わせ」（API_READONLY_ACTIONS に無いもの）を送ったら、
+  //   そのボタンを押せなくして、くるくる＋「保存中…／送信中…／登録中…／処理中…」を出す。結果が返ったら元に戻す。
+  //   ・二度押しで同じ保存が2回届くのも防ぐ。
+  //   ・すでに自分で押せなくしているボタン（報告の送信・シフトの提出など）は触らない（表示が二重にならない）。
+  //   ・結果が返るまでにボタンの中身が描き直されていたら、文字は戻さない（新しい表示を優先）。押せる状態だけ戻す。
+  //   ・読むだけの問い合わせ（一覧の読み込みなど）では出さない。
+  var _clickBtn = null;
+  function noteClickedButton(ev) {
+    var t = ev && ev.target, b = null;
+    while (t && t.tagName !== undefined) { if (t.tagName === 'BUTTON') { b = t; break; } t = t.parentNode; }
+    _clickBtn = b;
+    if (b) setTimeout(function() { if (_clickBtn === b) _clickBtn = null; }, 0);   // 押した流れ（確認の窓を含む）が終わったら忘れる
+  }
+  function busyLabel(text) {
+    var t = String(text || '');
+    if (/保存|更新|変更/.test(t)) return '保存中…';
+    if (/登録|追加|発行/.test(t)) return '登録中…';
+    if (/送|提出|申請|報告/.test(t)) return '送信中…';
+    return '処理中…';
+  }
+  function apiBusyStart(action) {
+    var b = _clickBtn;
+    if (!b || apiCanRetry(action)) return null;
+    if (b._apiBusy) { b._apiBusy.n++; return b; }   // 1回押して2つ書き込むとき（両方終わるまで戻さない）
+    if (b.disabled) return null;                     // 呼び出し側が自分で「送信中…」にしている
+    var text = String(b.textContent || '').replace(/\s+/g, '');
+    var st = { n: 1, html: b.innerHTML, minW: b.style.minWidth };
+    try { if (b.offsetWidth) b.style.minWidth = b.offsetWidth + 'px'; } catch (e) {}   // 幅が縮んで並びが動かないように
+    b.innerHTML = (text.length <= 3)
+      ? '<span class="spin spin-cur spin-only"></span>'          // 小さいボタン（✕・誤表記・変更 など）はくるくるだけ
+      : '<span class="spin spin-cur"></span>' + busyLabel(text);
+    st.busyHtml = b.innerHTML;
+    b.disabled = true;
+    b.setAttribute('aria-busy', 'true');
+    b._apiBusy = st;
+    return b;
+  }
+  function apiBusyEnd(b) {
+    var st = b && b._apiBusy;
+    if (!st) return;
+    if (--st.n > 0) return;
+    b._apiBusy = null;
+    b.setAttribute('aria-busy', 'false');
+    b.style.minWidth = st.minW;
+    if (b.innerHTML === st.busyHtml) b.innerHTML = st.html;
+    b.disabled = false;
+  }
+
   function api(payload) {
     payload.apiVersion = 1;
     if (state.idToken) payload.idToken = state.idToken;              // 社員（Google）
@@ -1751,7 +1807,8 @@ var App = (function() {
         return out;
       });
     }
-    return attempt(0).then(function(out) {
+    var busyBtn = apiBusyStart(payload.action);   // ★押したボタンを「保存中…」に（書き込みだけ）
+    var p = attempt(0).then(function(out) {
       if (out.error) throw out.error;           // 通信エラーは今までどおり呼び出し側の catch へ
       var res = out.res;
       // ★ログインの有効期限切れを「無言」にしない（総点検 2026-07-27・A-5）。
@@ -1762,6 +1819,8 @@ var App = (function() {
       else if (res && res.code === 'E_AUTH_USE_LINK') { forgetGoogle(); }   // ★アルバイトが Googleで入ろうとした
       return res;
     });
+    if (busyBtn) p.then(function() { apiBusyEnd(busyBtn); }, function() { apiBusyEnd(busyBtn); });
+    return p;
   }
 
   // ─── 専用リンク（2026-11-07 社長決定: アルバイト（配布員）はこれだけで入る。社員は Googleログイン） ───
@@ -1892,7 +1951,7 @@ var App = (function() {
     if (lk) {
       state.linkToken = lk;
       _restoredSession = true;
-      $('userBar').textContent = '専用リンクでログイン中';
+      $('userBar').textContent = 'ログイン中';
       afterAuth();
       return true;
     }
@@ -3909,8 +3968,8 @@ var App = (function() {
     setSubmitting(true, 'GPS画像を保存中…');
     var files = up.files.slice(), total = up.saved + files.length, failed = [];
     var busy = function() {
-      area.innerHTML = '<div class="msg msg-warn"><span class="spin"></span>⏳ <b>まだ終わっていません。</b>' +
-        '報告を受け付けました。続けてGPS画像をGoogleドライブに保存しています（' + up.saved + '/' + total + '枚 保存済み）。' +
+      area.innerHTML = '<div class="msg msg-warn"><span class="spin spin-cur"></span>⏳ <b>まだ終わっていません。</b>' +
+        '報告を受け付けました。続けてGPS画像をGoogleドライブに保存しています<br>（' + up.saved + '/' + total + '枚 保存済み）。' +
         '<br><b>終わるまで、画面を閉じたり、ほかのアプリに切り替えたりしないでください。</b></div>';
     };
     var next = function(i) {
@@ -5202,9 +5261,17 @@ var App = (function() {
       } else {
         $('regListResult').innerHTML = errHtml(res, 'エラー');
       }
+      showRegListResult();
     }).catch(function(e) {
       $('regListResult').innerHTML = '<div class="msg msg-err">接続できません: ' + esc(e.message) + '</div>';
+      showRegListResult();
     });
+  }
+
+  /** 登録済み一覧の上の結果（更新しました／エラー）を見える位置へ（下の［保存する］から押すと見えないため・2026-11-07） */
+  function showRegListResult() {
+    var el = $('regListResult');
+    if (el && el.innerHTML && el.scrollIntoView) { try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
   }
 
   // 予定ごと取消（担当全員を外す）
@@ -5230,8 +5297,10 @@ var App = (function() {
       } else {
         $('regListResult').innerHTML = errHtml(res, 'エラー');
       }
+      showRegListResult();
     }).catch(function(e) {
       $('regListResult').innerHTML = '<div class="msg msg-err">接続できません: ' + esc(e.message) + '</div>';
+      showRegListResult();
     });
   }
 
@@ -8052,6 +8121,7 @@ var App = (function() {
 
   // ─── 初期化 ───
   function init() {
+    try { document.addEventListener('click', noteClickedButton, true); } catch (e) {}   // ★押したボタンを「保存中…」にするため
     state.deviceId = lsGet('hipos_device_id');
     if (!state.deviceId) { state.deviceId = uuid(); lsSet('hipos_device_id', state.deviceId); }
     $('distStart').value = todayIso();
