@@ -1929,7 +1929,7 @@ var App = (function() {
     $('regFormCard').classList.remove('hidden');
     $('pendingCard').classList.add('hidden');
     state.claimCandidates = (res && res.claimCandidates) || [];
-    var bases = (res && res.bases) || ['関西', '東戸塚', '稲毛', '五香'];
+    var bases = (res && res.bases) || REG_BASES;
     $('claimEmailLine').innerHTML = 'あなたのGoogleアカウント: <b>' + esc(state.email || '') + '</b>';
     // 氏名プルダウン: 先頭に「一覧に無い（新しく入った）」→ その後に未登録の在籍スタッフ
     var nameOpts = ['<option value="">― 選んでください ―</option>',
@@ -2027,7 +2027,7 @@ var App = (function() {
     } else {
       alert('お名前を選ぶか、「一覧に無い」を選んで入力してください'); return;
     }
-    if (!homeArea) { alert('拠点を選んでください（関西／東戸塚／稲毛／五香）'); return; }
+    if (!homeArea) { alert('拠点を選んでください（' + REG_BASES.join('／') + '）'); return; }
     var btn = $('claimSubmit');
     state.submitting = true; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>申請中…';
     api(payload).then(function(res) {
@@ -4144,9 +4144,9 @@ var App = (function() {
   }
 
   // ─── 予定登録（管理者） ───
-  var REG_BASES = ['関西', '東戸塚', '稲毛', '五香'];
+  var REG_BASES = ['関西', '東戸塚', '稲毛', '五香', '豊田'];   // ★2026-11-07 豊田を追加
   // 拠点バッジの色（登録済みの変更・取消カードで拠点を一目で分かるように）
-  var BASE_COLORS = { '関西': '#e8590c', '東戸塚': '#1c7ed6', '稲毛': '#2f9e44', '五香': '#9c36b5' };
+  var BASE_COLORS = { '関西': '#e8590c', '東戸塚': '#1c7ed6', '稲毛': '#2f9e44', '五香': '#9c36b5', '豊田': '#3b5bdb' };
   function regBaseOf(s) {
     var h = String((s && s.homeArea) || '').trim();
     return REG_BASES.indexOf(h) >= 0 ? h : 'その他';
@@ -4795,7 +4795,7 @@ var App = (function() {
       });
 
     // 拠点ピル（並び順＝関西→東戸塚→稲毛→五香→その他／件数付き。稲毛と五香は別拠点）
-    var order = ['関西', '東戸塚', '稲毛', '五香'], counts = {};
+    var order = REG_BASES, counts = {};
     byQ.forEach(function(x) { var b = regBaseLabel(x.r); counts[b] = (counts[b] || 0) + 1; });
     var bases = Object.keys(counts).sort(function(a, b) {
       var ia = order.indexOf(a), ib = order.indexOf(b); if (ia < 0) ia = 99; if (ib < 0) ib = 99;
@@ -4869,7 +4869,7 @@ var App = (function() {
     var today = todayIso();
     var byDay = {};
     items.forEach(function(x) { var d = String(x.r.distDate || ''); (byDay[d] = byDay[d] || []).push(x); });
-    var order = ['関西', '東戸塚', '稲毛', '五香'];
+    var order = REG_BASES;
     var rank = function(x) { var k = order.indexOf(regBaseLabel(x.r)); return k < 0 ? 99 : k; };
     var cells = oeGridDays(ym).map(function(day) {
       var inMonth = day.slice(0, 7) === ym;
