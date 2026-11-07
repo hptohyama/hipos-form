@@ -665,6 +665,46 @@ button.spdel{flex:0 0 auto;width:auto;padding:6px 10px;font-size:12px;font-weigh
 #spMonthLabel{font-size:14px;font-weight:800;line-height:1.4;white-space:normal}
 button.spadd{width:auto;padding:9px 14px;font-size:13px;margin-top:10px}
 button.spadd:disabled{color:var(--c-sub,#868e96);cursor:default}
+
+/* ═══ PC表示（2026-11-07 社長依頼）═══
+   ★管理者が PC（幅1024px以上・マウスで操作する端末）で開いたときだけ body に .pc が付く（applyLayout）。
+     スマホ・タブレット、アルバイト（配布員）は、どの端末でも今まで通りのモバイル表示。
+   ・下のタブ → 左の縦メニュー／本文は横に広く（最大1200px）／一覧はカードを横に並べる */
+body.pc header { padding: 12px 24px; }
+body.pc main { max-width: none; margin: 0 0 0 220px; padding: 24px 32px 48px; }
+body.pc main > .view, body.pc main > .card { max-width: 1200px; margin-left: auto; margin-right: auto; }
+body.pc #bottomNav { top: var(--hdr-h, 66px); bottom: 0; left: 0; right: auto; width: 220px; max-width: none; margin: 0;
+  flex-direction: column; justify-content: flex-start; gap: 2px; padding: 14px 10px; border-top: 0;
+  border-right: 1px solid var(--c-border); overflow-y: auto; }
+body.pc #bottomNav button, body.pc #bottomNav.dense button, body.pc #bottomNav.dense7 button {
+  flex: 0 0 auto; flex-direction: row; justify-content: flex-start; align-items: center; gap: 10px;
+  padding: 11px 12px; font-size: 14px; border-radius: 8px; text-align: left; position: relative; cursor: pointer; }
+body.pc #bottomNav button .ic, body.pc #bottomNav.dense7 button .ic { font-size: 18px; width: 22px; text-align: center; }
+body.pc #bottomNav button:hover { background: #f1f3f4; }
+body.pc #bottomNav button.active { background: #e8f0fe; }
+body.pc #bottomNav .nl-l, body.pc #bottomNav.dense7 .nl-l { display: inline; }
+body.pc #bottomNav .nl-s, body.pc #bottomNav.dense7 .nl-s { display: none; }
+body.pc #bottomNav .navdot { top: 50%; right: 12px; transform: translateY(-50%); }
+body.pc #undoToast { left: 252px; right: 32px; bottom: 24px; max-width: 640px; }
+body.pc .expiredbar { left: 252px; right: 32px; bottom: 24px; max-width: 640px; }
+body.pc .subtab { cursor: pointer; }
+/* スタッフ管理: 上の2枚（承認待ちの修正報告・スタッフを追加）を横並び／登録済みスタッフは全幅でカードを並べる */
+body.pc #staffView { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+body.pc #staffView > .card { margin-bottom: 0; }
+body.pc #staffView > .card:last-child { grid-column: 1 / -1; }
+body.pc #stRoster { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
+body.pc #stRoster > .case-info, body.pc #stRoster > .empty { grid-column: 1 / -1; }
+body.pc #stRoster .assign { margin-bottom: 0; cursor: default; }
+/* 予定登録（新規）: ①〜⑦を2列に。説明と登録ボタンは全幅 */
+body.pc #regNewPane { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+body.pc #regNewPane > .card { margin-bottom: 0; }
+body.pc #regNewPane > .card:first-child, body.pc #regNewPane > #regResult, body.pc #regNewPane > #regSubmit { grid-column: 1 / -1; }
+/* 勤務調整: シフト変更の申請と残業を横並び */
+body.pc #overtimeView { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+body.pc #overtimeView > .card { margin-bottom: 0; }
+body.pc #overtimeView > #scAdminCard { grid-row: span 3; }
+/* 配布禁止管理: 案件ごとの回避状況をカードで横に並べる */
+body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
 </style>
 </head>
 <body>
@@ -2128,7 +2168,36 @@ var App = (function() {
     for (var bi = 0; bi < navBtns.length; bi++) { if (navBtns[bi].style.display !== 'none') visibleTabs++; }
     $('bottomNav').classList.toggle('dense', visibleTabs >= 6);
     $('bottomNav').classList.toggle('dense7', visibleTabs >= 7);   // ⏰残業タブが出る管理者（2026-08-25）
+    applyLayout();   // ★PC表示（管理者が PC で開いたときだけ）
     return true;
+  }
+
+  // ─── PC表示（2026-11-07 社長依頼） ───
+  //   管理者が PC で開いたら、PCに合わせた表示（左の縦メニュー・広い本文）。スマホ・タブレットは今まで通り。
+  //   アルバイト（配布員）は、PCで開いても一貫してモバイル表示（社長指示）。
+  //   PC＝幅1024px以上で、マウスで操作する端末（タッチだけのタブレットは含めない）。
+  var PC_MQ = '(min-width: 1024px) and (hover: hover) and (pointer: fine)';
+  function isPcScreen() {
+    try { return !!(window.matchMedia && window.matchMedia(PC_MQ).matches); } catch (e) { return false; }
+  }
+  /** いまの端末と権限で、PC表示にするか（純粋な判定） */
+  function wantPcLayout(isAdmin, pcScreen) { return !!isAdmin && !!pcScreen; }
+  var _layoutBound = false;
+  function applyLayout() {
+    var pc = wantPcLayout(state.isAdmin, isPcScreen());
+    document.body.classList.toggle('pc', pc);
+    try {   // 左の縦メニューをヘッダーのすぐ下から始める
+      var h = document.querySelector && document.querySelector('header');
+      if (h && document.body.style && document.body.style.setProperty) document.body.style.setProperty('--hdr-h', h.offsetHeight + 'px');
+    } catch (e) { /* 既定の高さのまま */ }
+    if (!_layoutBound) {   // 窓の大きさを変えたら（PCで窓を狭めた等）切り替える
+      _layoutBound = true;
+      try {
+        var mq = window.matchMedia && window.matchMedia(PC_MQ);
+        if (mq && mq.addEventListener) mq.addEventListener('change', applyLayout);
+        else if (mq && mq.addListener) mq.addListener(applyLayout);
+      } catch (e) { /* 切り替わらなくても表示は崩れない */ }
+    }
   }
 
   // cases相当（bootstrap上位 or cases応答）を反映
