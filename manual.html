@@ -7,6 +7,7 @@
 <title>Hiポス スタッフマニュアル</title>
 <!--
   manual.html — アルバイトスタッフ向けの使い方マニュアル（2026-11-07 社長依頼・全拠点共通）
+  ★趣旨（社長 2026-11-07）: アプリの操作で迷わないためのもの。LINE WORKS の流れ（出勤報告など）はスタッフが把握済み＝書かない。
   ★アプリ（index.html）の右上のアイコン →［📖 マニュアルを見る］で、アプリの画面の上に重ねて読み込む（install.html と同じ方式）。
     単独で開いても読める（アプリの中に重ねたときは、こちらの見出しは隠してアプリ側の見出しと［閉じる］を使う）。
   ★方針（社長決定）: 使い方だけでなく「なぜやるのか」（反響率を上げるため）も書く／インセンティブの仕組みは書かない／
@@ -75,13 +76,13 @@
 <body>
 <header>
   <h1>📖 Hiポス スタッフマニュアル</h1>
-  <p>アプリの使い方と、ポスティングで大切にしていること（全拠点共通）</p>
+  <p>アプリの使い方（全拠点共通）</p>
 </header>
 <main>
   <nav class="toc" aria-label="目次">
     <a href="#intro">はじめに</a>
     <a href="#login">入り方</a>
-    <a href="#flow">1日の流れ</a>
+    <a href="#flow">使う場面</a>
     <a href="#report">配布報告</a>
     <a href="#ban">配布禁止</a>
     <a href="#history">直したいとき</a>
@@ -119,6 +120,7 @@
       <li>そのままアプリが開きます。<b>Googleアカウントやパスワードはいりません。</b></li>
       <li>ログインが外れたときは、<b>同じリンクをもう一度押せば</b>入れます。</li>
     </ol>
+    <p>※ Googleアカウントのメールアドレスを管理者に登録してもらっている人は、ログイン画面の<b>［Googleでログイン］</b>からも入れます。</p>
     <div class="rule"><b class="head">⚠ 守ってほしいこと</b>
       <ul>
         <li>リンクは<b>あなた専用の鍵</b>です。<b class="em">ほかの人に送らないでください</b>（その人があなたとして報告できてしまいます）。</li>
@@ -128,32 +130,29 @@
     </div>
   </section>
 
+  <!-- ★2026-11-07 社長指示: このマニュアルはアプリの操作だけ（LINE WORKS の流れはスタッフが把握済み＝書かない） -->
   <section id="flow">
-    <h2><span class="no">3</span>1日の流れ</h2>
-    <p><span class="tag lw">LINE WORKS</span>で送るものと、<span class="tag app">アプリ</span>でやるものがあります。</p>
-    <div class="when">🏢 出勤したら</div>
-    <ul class="flow">
-      <li><span class="tag lw">LINE WORKS</span><b>出勤報告</b>（10時まで）</li>
-      <li><span class="tag lw">LINE WORKS</span>社用車を運転する人は、<b>アルコールチェック</b>の写真と結果</li>
-      <li><span class="tag etc">受け取る</span><b>GPS端末</b>を1人1台受け取る</li>
-      <li><span class="tag lw">LINE WORKS</span><b>積み込んだチラシ</b>の内容と部数</li>
-    </ul>
+    <h2><span class="no">3</span>アプリを使う場面</h2>
+    <p>アプリを開くのは、次の場面です。</p>
     <div class="when">📍 配布エリアに着いたら</div>
     <ul class="flow">
-      <li><span class="tag app">アプリ</span><span class="ui">📍 配布禁止</span> で、今日のエリアの<b>配ってはいけない家</b>を確認<br>
-        <span class="note">（LINE WORKS への「確認しました」の報告は不要です）</span></li>
+      <li><span class="ui">📍 配布禁止</span> で、今日のエリアの<b>配ってはいけない家</b>を確認</li>
     </ul>
     <div class="when">🚶 配布中</div>
     <ul class="flow">
-      <li><span class="tag etc">記録</span>GPS端末と<b>ランキーパー</b>で、歩いた道と時間を記録</li>
-      <li><span class="tag app">アプリ</span>配布禁止の家を避けたら <span class="ui">☐ 回避したらタップ</span></li>
-      <li><span class="tag lw">LINE WORKS</span><b>補給チラシ</b>を置いたら、写真と住所</li>
+      <li>配布禁止の家を避けたら <span class="ui">☐ 回避したらタップ</span></li>
     </ul>
     <div class="when">✅ 配り終わったら</div>
     <ul class="flow">
-      <li><span class="tag app">アプリ</span><span class="ui">📝 報告</span> から<b>配布報告</b>（ランキーパーの時間もここに入れます）<br>
-        <span class="note">（ランキーパーを LINE WORKS に送る必要はありません）</span></li>
-      <li><span class="tag etc">返す</span>カバンにチラシ・「配布中」のラミネート・GPS端末が残っていないか確かめて、<b>GPS端末を返す</b></li>
+      <li><span class="ui">📝 報告</span> から<b>配布報告</b>（部数・ランキーパーの時間・GPSの写真）</li>
+    </ul>
+    <div class="when">✏️ 報告を間違えたとき</div>
+    <ul class="flow">
+      <li><span class="ui">📋 履歴</span> から直す</li>
+    </ul>
+    <div class="when">📅 シフトを出す時期</div>
+    <ul class="flow">
+      <li><span class="ui">📅 シフト</span> から出勤できる日を出す</li>
     </ul>
   </section>
 
@@ -211,12 +210,12 @@
     <h2><span class="no">7</span>シフトの出し方</h2>
     <p><span class="ui">📅 シフト</span> で、日ごとに <b>終日・午前・午後・不可</b> を選んで <span class="ui">この内容で提出</span> を押します。</p>
     <div class="rule"><b class="head">関西</b>
-      2週間ずつ出します。<b>提出期日は毎月 第3日曜・第4日曜の19時</b>（月によって3回）。お知らせは LINE WORKS で届きます。</div>
+      2週間ずつ出します。<b>提出期日は毎月 第3日曜・第4日曜の19時</b>（月によって3回）。</div>
     <div class="rule"><b class="head">東戸塚・稲毛・五香・豊田</b>
       月1回、<b>毎月19日の19時までに、翌月1か月分</b>を出します。</div>
     <ul>
       <li>1週間（月〜日）に出勤できるのは<b>5日まで</b>です。</li>
-      <li>締切のあとで変えたいとき：<span class="ui">🔄 シフト変更の申請</span>（前日まで・出勤か欠勤か）→ 管理者が承認すると変わります。<b>当日の変更</b>は LINE WORKS で連絡してください。</li>
+      <li>締切のあとで変えたいとき：<span class="ui">🔄 シフト変更の申請</span>（前日まで・出勤か欠勤か）→ 管理者が承認すると変わります。<b>当日の変更</b>はアプリではできないので、担当者に連絡してください。</li>
       <li class="em"><b>提出が間に合わないとき・期日を過ぎてから変えたいときは、必ず北山さんまたは遠山まで連絡してください。</b></li>
     </ul>
     <div class="why"><span class="t">💡 なぜ期日が大事？</span>
@@ -235,7 +234,7 @@
       <dt>報告の数字を間違えた</dt>
       <dd><a href="#history">「報告を直したいとき」</a>を見てください。</dd>
       <dt>シフトを出し忘れた・期日に間に合わない</dt>
-      <dd>北山さんまたは遠山まで、LINE WORKS で連絡してください。</dd>
+      <dd>北山さんまたは遠山まで連絡してください。</dd>
     </dl>
     <p class="note">分からないことは、遠慮なく北山さん・遠山に聞いてください。</p>
   </section>

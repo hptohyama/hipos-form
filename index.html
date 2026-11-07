@@ -1288,7 +1288,7 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
 
     <div class="card">
       <h2>登録済みスタッフ</h2>
-      <div class="case-info">権限を付け間違えたときは、各スタッフの<b>権限</b>を選び直して［変更］で直せます。<br>アルバイト（配布員）は［🔗 リンクを発行］で、入るための専用リンクを作れます（社員はGoogleでログインするので出ません）。</div>
+      <div class="case-info">権限を付け間違えたときは、各スタッフの<b>権限</b>を選び直して［変更］で直せます。<br>アルバイト（配布員）は［🔗 リンクを発行］で、入るための専用リンクを作れます（社員はGoogleでログインするので出ません）。<br>アルバイトでも配布員マスタの<b>E列にGoogleのメール</b>が入っている人は、リンクが無くてもGoogleで入れます。</div>
       <div id="stPermResult"></div>
       <div id="stLinkResult"></div>
       <!-- ★専用リンクの配布状況（アルバイト導入期向け・2026-11-07）。数字を押すとその人たちだけを一覧に出す -->
@@ -6120,7 +6120,7 @@ var App = (function() {
   /** 専用リンクの状態（アルバイトだけ）: 'used'＝入ったことあり／'unused'＝発行したがまだ入っていない／'none'＝未発行 */
   function stLinkState(s) {
     if (!s || !s.linkAllowed) return '';
-    if (!s.link) return 'none';
+    if (!s.link) return s.email ? 'google' : 'none';   // ★メールがあれば Google でも入れる（2026-11-07 夜）＝未発行に数えない
     return s.linkSeen ? 'used' : 'unused';
   }
   function stIsEmployee(s) { return /管理者/.test(String((s && s.perm) || '')); }
@@ -6156,7 +6156,7 @@ var App = (function() {
     var el = $('stLinkStatus'); if (!el) return;
     var parts = (list || []).filter(function(s) { return s.linkAllowed; });
     if (!parts.length) { el.innerHTML = ''; return; }
-    var n = { used: 0, unused: 0, none: 0 };
+    var n = { used: 0, unused: 0, none: 0, google: 0 };
     parts.forEach(function(s) { var k = stLinkState(s); if (k) n[k]++; });
     var f = stf();
     var pill = function(key, label, color) {
@@ -6173,7 +6173,8 @@ var App = (function() {
     }
     el.innerHTML = '<div class="stlink-box"><b>🔗 専用リンクの配布状況</b>（アルバイト ' + parts.length + '名）' +
       '<div class="regfrow">' + pill('unused', '🟡 発行したがまだ入っていない', '#f29900') + pill('none', '⚪ 未発行', '#5f6368') +
-      pill('used', '🟢 入ったことがある', '#188038') + '</div>' + names + '</div>';
+      pill('used', '🟢 入ったことがある', '#188038') +
+      (n.google ? pill('google', '✉ リンク無し（Googleで入る）', '#1a73e8') : '') + '</div>' + names + '</div>';
   }
 
   function renderStaffList() {
@@ -6233,7 +6234,7 @@ var App = (function() {
         // メール: 社員は Googleログインに使うので出す（無ければ注意）。アルバイトは専用リンクなので出さない
         var mail = stIsEmployee(s)
           ? (s.email ? esc(s.email) : '<span style="color:var(--c-err)">⚠ メール未登録（Googleでログインできません）</span>')
-          : 'アルバイト';
+          : (s.email ? 'アルバイト（Googleでも入れます: ' + esc(s.email) + '）' : 'アルバイト');
         var just = !!(state.lastLink && state.lastLink.staffId && state.lastLink.staffId === s.staffId);
         return '<div class="assign st-row' + (just ? ' st-just' : '') + '" id="st_' + esc(s.staffId) + '" style="display:block">' +
           '<div class="store" style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
@@ -6255,7 +6256,7 @@ var App = (function() {
     var btn = 'class="btn-ghost" style="width:auto;padding:6px 12px;white-space:nowrap;font-size:13px"';
     if (!s.link) {
       return '<div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">' +
-        '<span class="footer-note">🔗 専用リンク: なし</span>' +
+        '<span class="footer-note">🔗 専用リンク: なし' + (s.email ? '（Googleでも入れます）' : '') + '</span>' +
         '<button type="button" ' + btn + ' onclick="App.issueStaffLink(\'' + id + '\')">🔗 リンクを発行</button></div>';
     }
     var seen = s.linkSeen ? ('最後に使った日時 ' + fmtLinkSeen(s.linkSeen)) : 'まだ使われていません';
