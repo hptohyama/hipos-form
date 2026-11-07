@@ -688,6 +688,8 @@ button.spadd:disabled{color:var(--c-sub,#868e96);cursor:default}
     <div class="login-logo"><img src="logo.png" alt="Hiポス" width="120" height="120"></div>
     <h2>サインイン</h2>
     <p class="signin-note">配布報告には本人確認が必要です。会社に登録済みのGoogleアカウントでサインインしてください。</p>
+    <!-- ★専用リンク（2026-11-07）: Googleを使わない人への案内 -->
+    <p class="signin-note" id="linkLoginNote" style="font-size:13px">Googleアカウントをお持ちでない方は、管理者から届く<b>「専用リンク」</b>を押すと、そのまま入れます。<br>専用リンクで使っている方は、この画面が出たら<b>LINE WORKS のリンクをもう一度押してください</b>。</p>
     <!-- ★LINEなどのアプリの中で開いたときの案内（2026-09-13）。中身は renderLoginGuide が書く -->
     <div id="inAppGuide" class="inapp-guide hidden"></div>
     <div id="gsiButton"></div>
@@ -1169,10 +1171,23 @@ button.spadd:disabled{color:var(--c-sub,#868e96);cursor:default}
       <button type="button" class="btn-ghost" onclick="App.loadPendingRegs()" style="margin-top:10px">↻ 更新</button>
     </div>
 
+    <!-- ★専用リンク（Googleを使わずに入る・2026-11-07 社長決定） -->
+    <div class="card" id="linkStaffCard">
+      <h2>🔗 Googleを使わないスタッフを追加</h2>
+      <div class="case-info">Googleアカウントを持っていない・Googleのログインでつまずく<b>配布員</b>向けです。追加すると<b>専用リンク</b>が出るので、LINE WORKS で本人に送ってください。本人はそれを押すだけで入れます。<br>すでに登録済みの人は、下の一覧の［🔗 リンクを発行］を使います。</div>
+      <label>氏名（インセン集計シートの列名と同じ書き方）</label>
+      <input id="lsName" type="text" placeholder="例: 山田 花子" autocomplete="off">
+      <label>拠点</label>
+      <select id="lsBase"></select>
+      <button type="button" class="btn-primary" id="lsSubmit" style="margin-top:12px" onclick="App.addLinkStaff()">追加して専用リンクを発行</button>
+      <div id="lsResult" style="margin-top:10px"></div>
+    </div>
+
     <div class="card">
       <h2>登録済みスタッフ</h2>
-      <div class="case-info">権限を付け間違えたときは、各スタッフの<b>権限</b>を選び直して［変更］で直せます。</div>
+      <div class="case-info">権限を付け間違えたときは、各スタッフの<b>権限</b>を選び直して［変更］で直せます。<br>配布員は［🔗 リンクを発行］で、Googleを使わずに入れる専用リンクを作れます。</div>
       <div id="stPermResult"></div>
+      <div id="stLinkResult"></div>
       <div id="stRoster"><div class="empty">読み込み中…</div></div>
       <button type="button" class="btn-ghost" onclick="App.loadStaff()" style="margin-top:10px">↻ 更新</button>
     </div>
@@ -1394,7 +1409,9 @@ button.spadd:disabled{color:var(--c-sub,#868e96);cursor:default}
 // ════════════════════════════════════════════════════
 var CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbx-oCBJqrmFtx4Cca8GaJ06e0FGEngjO_Lou3G0azkS2JQytjKlLa_uyz__lQ0KAHR_9g/exec',
-  OAUTH_CLIENT_ID: '654669981739-o1iosejqh7dmvumciaannkn84rv6jdhs.apps.googleusercontent.com'
+  OAUTH_CLIENT_ID: '654669981739-o1iosejqh7dmvumciaannkn84rv6jdhs.apps.googleusercontent.com',
+  // 専用リンクで配るアドレス（本番の画面・2026-11-07）
+  APP_URL: 'https://hptohyama.github.io/hipos-form/'
 };
 
 // カレンダーのリンク（?case=案件番号）から催事を自動選択するための値。
@@ -1589,6 +1606,7 @@ var App = (function() {
   function api(payload) {
     payload.apiVersion = 1;
     if (state.idToken) payload.idToken = state.idToken;
+    else if (state.linkToken) payload.staffLink = state.linkToken;   // ★専用リンク（Googleを使わない人）
     var bodyText = JSON.stringify(payload);
     var canRetry = apiCanRetry(payload.action);
     function attempt(n) {
@@ -1606,6 +1624,7 @@ var App = (function() {
       //   Googleのログイン証は1時間で切れる。従来は失効すると全APIが失敗し、
       //   配布禁止タブは古いチェック状況のまま固まり、報告は入力ごと消えていた。
       if (res && res.code === 'E_AUTH_INVALID_TOKEN') { onTokenExpired(); }
+      if (res && res.code === 'E_AUTH_LINK_INVALID') { onLinkInvalid(); }
       return res;
     });
   }
@@ -1630,6 +1649,46 @@ var App = (function() {
     bar.classList.remove('hidden');
   }
 
+  // ─── 専用リンク（Googleを使わずに入る・2026-11-07） ───
+  //   管理者が発行したリンク（…/#k=xxxx）を押すと、中身を端末に覚えて、アドレス欄からは消す。
+  //   「#」より後ろはサーバ（GitHub）へ送られないので、リンクの中身が記録に残らない。
+  var LINK_KEY = 'hipos_link';
+  /** アドレスの #k=… を取り出す（無ければ ''）。取り出したらアドレス欄から消す */
+  function takeLinkFromUrl() {
+    var h = String((typeof location !== 'undefined' && location && location.hash) || '');
+    var m = h.match(/[#&]k=([A-Za-z0-9]{20,80})(?:&|$)/);
+    if (!m) return '';
+    try {
+      if (typeof history !== 'undefined' && history.replaceState) {
+        history.replaceState(null, '', String(location.pathname || '') + String(location.search || ''));
+      }
+    } catch (e) { /* 消せなくても動作には影響しない */ }
+    return m[1];
+  }
+  /** 専用リンクが使えなくなった（発行し直し・止めた・退職）＝覚えているリンクを捨てて案内する */
+  var _linkInvalidShown = false;
+  function onLinkInvalid() {
+    lsDel(LINK_KEY);
+    state.linkToken = null;
+    // 起動中なら showAuthError がログイン画面に理由を出す。Googleで入れる人のためにボタンも用意する
+    if (!state.staff) { startGsiLogin(); return; }
+    if (_linkInvalidShown) return;
+    _linkInvalidShown = true;
+    try { saveDraft(); } catch (e) {}
+    try { banAutoSyncStop(); } catch (e) {}
+    var bar = $('expiredBar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'expiredBar';
+      bar.className = 'expiredbar';
+      document.body.appendChild(bar);
+    }
+    bar.innerHTML = '⚠ このログイン用リンクは使えなくなりました。<br>' +
+      '管理者から新しい「専用リンク」をもらって、それを押してください。' +
+      '<button type="button" onclick="location.reload()">閉じる</button>';
+    bar.classList.remove('hidden');
+  }
+
   // ─── 認証 ───
   function initGsi() {
     if (!window.google || !google.accounts || !google.accounts.id) { showGsiFail(); return; }
@@ -1650,6 +1709,7 @@ var App = (function() {
 
   function onSignIn(credential) {
     state.idToken = credential;
+    state.linkToken = null; lsDel(LINK_KEY);   // Googleで入ったら専用リンクは使わない
     try {
       var claims = JSON.parse(atob(credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
       state.tokenExp = (claims.exp || 0) * 1000;
@@ -1661,6 +1721,21 @@ var App = (function() {
   }
 
   function tryRestoreSession() {
+    // ★専用リンク: 押して開いたとき（#k=…）が最優先。次に、この端末が覚えているリンク。
+    var fresh = takeLinkFromUrl();
+    if (fresh && lsGet('hipos_id_token') &&
+        !confirm('この端末はいまGoogleでログインしています。\n専用リンクの人として入り直しますか？\n（管理者の方が試しに押した場合は「キャンセル」）')) {
+      fresh = '';   // 使わない（アドレス欄からは消えている）
+    }
+    if (fresh) { lsSet(LINK_KEY, fresh); lsDel('hipos_id_token'); }
+    var lk = fresh || lsGet(LINK_KEY);
+    if (lk) {
+      state.linkToken = lk;
+      _restoredSession = true;
+      $('userBar').textContent = '専用リンクでログイン中';
+      afterAuth();
+      return true;
+    }
     var t = lsGet('hipos_id_token');
     if (t) {
       try {
@@ -1674,7 +1749,8 @@ var App = (function() {
   }
 
   function logout() {
-    lsDel('hipos_id_token'); lsDel('hipos_staff_token');
+    if (state.linkToken && !confirm('ログアウトすると、もう一度「専用リンク」を押すまで入れなくなります。\nログアウトしますか？')) return;
+    lsDel('hipos_id_token'); lsDel('hipos_staff_token'); lsDel(LINK_KEY);
     try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
     location.reload();
   }
@@ -2038,6 +2114,7 @@ var App = (function() {
   // whoami相当（bootstrap上位 or whoami応答）を反映。戻り値=在籍登録済みか（未登録は案内画面にして false）。
   function applyWhoami(res) {
     state.email = res.email || state.email;
+    state.loginMethod = res.loginMethod || (state.linkToken ? 'link' : 'gsi');
     state.isAdmin = !!res.isAdmin;
     // canReport: サーバが返さない旧デプロイでは undefined → 従来どおり全員報告可(true)に倒す
     state.canReport = (res.canReport === undefined) ? true : !!res.canReport;
@@ -5302,6 +5379,7 @@ var App = (function() {
   function loadStaff() {
     loadPendingRegs();     // 承認待ちの登録申請も同時に読む
     loadPendingAmends();   // 承認待ちの修正報告も同時に読む
+    renderLinkStaffForm(); // 🔗 Googleを使わないスタッフの追加（拠点の選択肢）
     $('stRoster').innerHTML = '<div class="empty">読み込み中…</div>';
     api({ action: 'listStaff' }).then(function(res) {
       if (!res.ok) { $('stRoster').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
@@ -5940,8 +6018,140 @@ var App = (function() {
             '<span class="footer-note" style="white-space:nowrap">権限</span>' +
             '<select id="rp_' + esc(s.staffId) + '" style="width:auto;max-width:60%">' + opts + '</select>' +
             '<button type="button" class="btn-ghost" style="width:auto;padding:8px 16px;white-space:nowrap" onclick="App.changeStaffPerm(\'' + esc(s.staffId) + '\')">変更</button>' +
-          '</div></div>';
+          '</div>' + linkRowHtml(s) + '</div>';
       }).join('');
+  }
+
+  // ─── 専用リンクの発行・止める（管理者・2026-11-07） ───
+  /** 一覧の1人ぶんの「🔗 専用リンク」の行（管理者には出さない＝管理者はGoogleで入る） */
+  function linkRowHtml(s) {
+    if (!s || !s.linkAllowed) return '';
+    var id = esc(s.staffId);
+    var btn = 'class="btn-ghost" style="width:auto;padding:6px 12px;white-space:nowrap;font-size:13px"';
+    if (!s.link) {
+      return '<div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">' +
+        '<span class="footer-note">🔗 専用リンク: なし</span>' +
+        '<button type="button" ' + btn + ' onclick="App.issueStaffLink(\'' + id + '\')">🔗 リンクを発行</button></div>';
+    }
+    var seen = s.linkSeen ? ('最後に使った日時 ' + fmtLinkSeen(s.linkSeen)) : 'まだ使われていません';
+    return '<div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">' +
+      '<span class="footer-note">🔗 専用リンク: 発行済み（' + esc(seen) + '）</span>' +
+      '<button type="button" ' + btn + ' onclick="App.issueStaffLink(\'' + id + '\')">発行し直す</button>' +
+      '<button type="button" ' + btn + ' onclick="App.revokeStaffLink(\'' + id + '\')">止める</button></div>';
+  }
+  function fmtLinkSeen(iso) {
+    var m = String(iso || '').match(/^\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    return m ? (Number(m[1]) + '/' + Number(m[2]) + ' ' + m[3] + ':' + m[4]) : String(iso || '');
+  }
+  /** 配るリンク（この画面と同じ場所 ＋ #k=…） */
+  function linkUrlFor(token) {
+    // ★本番の画面のアドレスに固定する（管理者が別の場所から開いていても、配るリンクは本番を指す）
+    var base = CONFIG.APP_URL;
+    if (!base) {
+      var loc = (typeof location !== 'undefined' && location) || {};
+      base = String(loc.origin || '') + String(loc.pathname || '');
+    }
+    return base + '#k=' + token;
+  }
+  /** 発行できたリンクを見せる（この画面でだけ出る。見失ったら発行し直す） */
+  function showLinkResult(boxId, res) {
+    var url = linkUrlFor(res.token);
+    var text = '【Hiポス】' + res.name + 'さん専用のログイン用リンクです。\n' +
+      '押すと、そのまま配布報告の画面に入れます（Googleのログインは要りません）。\n' +
+      'このリンクは他の人には送らないでください。\n' + url;
+    state.lastLink = { url: url, text: text };
+    $(boxId).innerHTML = '<div class="msg msg-ok" style="white-space:pre-wrap">' + esc(res.message || '') + '</div>' +
+      '<div class="case-info" style="margin-top:8px">［送る文面をコピー］を押して、LINE WORKS で <b>' + esc(res.name) + '</b> さんに送ってください。<br>' +
+      '※このリンクは、いまこの画面にしか出ません。見失ったら［発行し直す］を押してください。</div>' +
+      '<input type="text" class="inapp-url" readonly value="' + esc(url) + '" onclick="this.focus();this.setSelectionRange(0,this.value.length)" aria-label="専用リンク">' +
+      '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
+        '<button type="button" class="btn-primary" style="width:auto;padding:8px 16px" onclick="App.copyStaffLink(true)">送る文面をコピー</button>' +
+        '<button type="button" class="btn-ghost" style="width:auto;padding:8px 16px" onclick="App.copyStaffLink(false)">リンクだけコピー</button>' +
+      '</div>';
+  }
+  function copyStaffLink(withText) {
+    var l = state.lastLink; if (!l) return;
+    var v = withText ? l.text : l.url;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(v).then(function() { alert('コピーしました。LINE WORKS に貼り付けて送ってください。'); },
+        function() { window.prompt('コピーしてください', v); });
+    } else { window.prompt('コピーしてください', v); }
+  }
+  function issueStaffLink(staffId) {
+    if (state.submitting) return;
+    var st = (state.roster || []).filter(function(s) { return s.staffId === staffId; })[0];
+    var nm = st ? st.name : staffId;
+    var ask = (st && st.link)
+      ? nm + ' さんの専用リンクを発行し直しますか？\n前のリンクはその場で使えなくなります（本人には新しいリンクを送り直してください）。'
+      : nm + ' さんの専用リンクを発行しますか？';
+    if (!confirm(ask)) return;
+    state.submitting = true;
+    $('stLinkResult').innerHTML = '<div class="msg">発行中…</div>';
+    api({ action: 'issueStaffLink', staffId: staffId }).then(function(res) {
+      state.submitting = false;
+      if (!res || !res.ok || !res.token) {
+        $('stLinkResult').innerHTML = '<div class="msg msg-warn" style="white-space:pre-wrap">' + esc((res && (res.message || res.code)) || '発行できませんでした') + '</div>';
+        return;
+      }
+      showLinkResult('stLinkResult', res);
+      try { $('stLinkResult').scrollIntoView(); } catch (e) {}
+      loadStaffRosterOnly();
+    }).catch(function(e) {
+      state.submitting = false;
+      $('stLinkResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) +
+        '<br>発行し直しの途中だった場合、前のリンクはもう止まっているかもしれません。もう一度［発行し直す］を押してください。</div>';
+    });
+  }
+  function revokeStaffLink(staffId) {
+    if (state.submitting) return;
+    var st = (state.roster || []).filter(function(s) { return s.staffId === staffId; })[0];
+    var nm = st ? st.name : staffId;
+    if (!confirm(nm + ' さんの専用リンクを止めますか？\n止めると、そのリンクでは入れなくなります（あとで発行し直せます）。')) return;
+    state.submitting = true;
+    $('stLinkResult').innerHTML = '<div class="msg">処理中…</div>';
+    api({ action: 'revokeStaffLink', staffId: staffId }).then(function(res) {
+      state.submitting = false;
+      $('stLinkResult').innerHTML = '<div class="msg ' + (res && res.ok ? 'msg-ok' : 'msg-warn') + '">' + esc((res && (res.message || res.code)) || '') + '</div>';
+      if (res && res.ok) loadStaffRosterOnly();
+    }).catch(function(e) {
+      state.submitting = false;
+      $('stLinkResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
+    });
+  }
+  /** 拠点の選択肢（Googleを使わないスタッフの追加） */
+  function renderLinkStaffForm() {
+    var sel = $('lsBase'); if (!sel) return;
+    if (sel.innerHTML) return;   // 入力途中の選択を消さない
+    sel.innerHTML = '<option value="">拠点を選ぶ</option>' +
+      REG_BASES.map(function(b) { return '<option value="' + esc(b) + '">' + esc(b) + '</option>'; }).join('');
+  }
+  function addLinkStaff(forceNew) {
+    if (state.submitting) return;
+    var name = String($('lsName').value || '').trim();
+    var base = String($('lsBase').value || '').trim();
+    if (!name) { alert('氏名を入れてください'); return; }
+    if (!base) { alert('拠点を選んでください'); return; }
+    if (forceNew !== true && !confirm(name + ' さん（' + base + '・配布員）を追加して、専用リンクを発行しますか？')) return;
+    state.submitting = true;
+    $('lsResult').innerHTML = '<div class="msg">追加中…</div>';
+    api({ action: 'addLinkStaff', name: name, homeArea: base, forceNew: forceNew === true }).then(function(res) {
+      state.submitting = false;
+      if (res && res.code === 'E_SAME_NAME_EXISTS' && res.needsConfirm) {
+        $('lsResult').innerHTML = '';
+        if (confirm(res.message + '\n\n別の人として追加しますか？')) addLinkStaff(true);
+        return;
+      }
+      if (!res || !res.ok || !res.token) {
+        $('lsResult').innerHTML = '<div class="msg msg-warn" style="white-space:pre-wrap">' + esc((res && (res.message || res.code)) || '追加できませんでした') + '</div>';
+        return;
+      }
+      $('lsName').value = '';
+      showLinkResult('lsResult', res);
+      loadStaffRosterOnly();
+    }).catch(function(e) {
+      state.submitting = false;
+      $('lsResult').innerHTML = '<div class="msg msg-warn">接続できません: ' + esc(e.message) + '</div>';
+    });
   }
 
   // ロスターからスタッフの権限だけを変更する（管理者・付け間違いの修正用）
@@ -7365,7 +7575,9 @@ var App = (function() {
     $('accountBody').innerHTML =
       '<div class="case-info" style="line-height:1.9">' +
       '氏名: <b>' + esc(s.name || '') + '</b><br>' +
-      'メール: <b>' + esc(state.email || '') + '</b><br>' +
+      (state.loginMethod === 'link'
+        ? 'ログイン方法: <b>専用リンク</b>（ログインが外れたら、LINE WORKS のリンクをもう一度押してください）<br>'
+        : 'メール: <b>' + esc(state.email || '') + '</b><br>') +
       'ID: <b>' + esc(s.staffId || '') + '</b><br>' +
       '拠点: <b>' + esc(s.homeArea || '(未設定)') + '</b>' +
       '<br>権限: <b>' + esc(state.isAdmin ? (state.canReport ? '管理者（配布者）' : '管理者') : '配布員') + '</b>' +
@@ -7472,19 +7684,24 @@ var App = (function() {
     setInterval(refreshShiftDisplays, 60000);  // JST判定を1分ごとに再評価（8日0時・19時跨ぎで表示が自動切替）
     showInstallBtn(true);   // ★［アプリ化はこちら］（ログイン前の画面・アイコンから開いたとき以外）
     renderLoginGuide();   // ★LINEなどのアプリの中で開いたときの案内（ログイン画面にだけ見える）
-    if (!tryRestoreSession()) {
-      if (hasValidClientId()) {
-        // Googleログインを主導線として初期化（読み込めない時だけトークンにフォールバック）
-        var tries = 0;
-        var timer = setInterval(function() {
-          tries++;
-          if (window.google && google.accounts && google.accounts.id) { clearInterval(timer); initGsi(); }
-          else if (tries > 40) { clearInterval(timer); showGsiFail(); }
-        }, 250);
-      } else {
-        // OAuthクライアントID未設定（準備中）: Google枠に「準備中」を出し、トークンは小さな導線から
-        $('gsiPending').classList.remove('hidden');
-      }
+    if (!tryRestoreSession()) startGsiLogin();
+  }
+  /** Googleログインのボタンを用意する（起動時／専用リンクが使えなかったとき） */
+  var _gsiStarted = false;
+  function startGsiLogin() {
+    if (_gsiStarted) return;
+    _gsiStarted = true;
+    if (hasValidClientId()) {
+      // Googleログインを主導線として初期化
+      var tries = 0;
+      var timer = setInterval(function() {
+        tries++;
+        if (window.google && google.accounts && google.accounts.id) { clearInterval(timer); initGsi(); }
+        else if (tries > 40) { clearInterval(timer); showGsiFail(); }
+      }, 250);
+    } else {
+      // OAuthクライアントID未設定（準備中）: Google枠に「準備中」を出す
+      $('gsiPending').classList.remove('hidden');
     }
   }
   document.addEventListener('DOMContentLoaded', init);
@@ -7499,6 +7716,7 @@ var App = (function() {
     claimSubmit: claimSubmit, onClaimName: onClaimName, unlockAccess: unlockAccess,
     loadPendingRegs: loadPendingRegs, approveReg: approveReg, rejectReg: rejectReg,
     changeStaffPerm: changeStaffPerm,
+    issueStaffLink: issueStaffLink, revokeStaffLink: revokeStaffLink, addLinkStaff: addLinkStaff, copyStaffLink: copyStaffLink,
     submitRegister: submitRegister,
     gotoBanTab: gotoBanTab, loadBanAdmin: loadBanAdmin, toggleAvoid: toggleAvoid, toggleMislisted: toggleMislisted, openInBrowser: openInBrowser, copyAppUrl: copyAppUrl,
     toggleRegBan: toggleRegBan, updateRegHh: updateRegHh,
