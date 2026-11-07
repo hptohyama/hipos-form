@@ -128,6 +128,7 @@
   .msg-ok { background: var(--c-ok-bg); color: var(--c-ok); }
   .msg-err { background: var(--c-err-bg); color: var(--c-err); }
   .msg-warn { background: var(--c-warn-bg); color: var(--c-warn); }
+  .msg-info { background: #e8f0fe; color: #174ea6; border: 1px solid #aecbfa; }
   .msg-merge { background: var(--c-merge-bg); color: var(--c-merge); }
   /* エラーの記号（E_XXX）は本文の邪魔をしない小さな添え字にする（現場で読むのは日本語の本文だけ） */
   .errcode { display: block; margin-top: 8px; font-size: 11px; font-weight: 400;
@@ -749,11 +750,17 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
   <div class="install-bar"><b>アプリ化の手順</b><button type="button" class="install-close" onclick="App.closeInstallGuide()">閉じる</button></div>
   <iframe id="installFrame" class="install-frame" title="アプリ化の手順"></iframe>
 </div>
+<!-- ★スタッフマニュアル（2026-11-07 社長依頼）。押したときに初めて manual.html を読み込む（アプリを重くしない） -->
+<div id="manualModal" class="install-modal hidden" role="dialog" aria-modal="true" aria-label="スタッフマニュアル">
+  <div class="install-bar"><b>📖 スタッフマニュアル</b><button type="button" class="install-close" onclick="App.closeManual()">閉じる</button></div>
+  <iframe id="manualFrame" class="install-frame" title="スタッフマニュアル"></iframe>
+</div>
 <!-- ★PC表示のときだけ、右上のアイコンでログイン情報をポップアップで出す（2026-11-07 社長依頼） -->
 <div id="acctPop" class="acct-pop hidden" role="dialog" aria-label="ログイン情報">
   <div class="acct-pop-title">ログイン情報</div>
   <div id="acctPopBody"></div>
-  <button type="button" class="btn-ghost" style="margin-top:12px" onclick="App.logout()">ログアウト</button>
+  <button type="button" class="btn-ghost" style="margin-top:12px" onclick="App.openManual()">📖 マニュアルを見る</button>
+  <button type="button" class="btn-ghost" style="margin-top:8px" onclick="App.logout()">ログアウト</button>
 </div>
 <main>
 
@@ -964,7 +971,8 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
     <div class="card">
       <h2>ログイン情報</h2>
       <div id="accountBody"></div>
-      <button class="btn-ghost" style="margin-top:12px" onclick="App.logout()">ログアウト</button>
+      <button class="btn-primary" style="margin-top:12px" onclick="App.openManual()">📖 マニュアルを見る</button>
+      <button class="btn-ghost" style="margin-top:8px" onclick="App.logout()">ログアウト</button>
     </div>
     <!-- ★読み込み速度（計測用・2026-08-12）。
          ふだんは出さない（本番運用ではスタッフにも管理者にも見えない）。
@@ -1391,7 +1399,9 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
         <button type="button" class="btn-primary" id="spTplCopy" onclick="App.spTplCopy()" style="margin-top:8px">📋 コピーして LINE WORKS に貼り付け</button>
       </div>
 
-      <div class="card" id="spEditCard" style="display:none">
+      <!-- ★2026-11-07 社長指示: 「日程を入れる」（手で日程を入れる・自動の日程を下敷きにする・自動に戻す）は画面に出さない。
+           自動の日程が周知どおりになったため。仕組みは休眠で残す（class="hidden" を外せば戻る） -->
+      <div class="card hidden" id="spEditCard" style="display:none">
         <h2>日程を入れる</h2>
         <div class="case-info">枠は1つ〜3つまで作れます（関西は月2回など）。<b>4つの日付</b>を入れてください。<br>
           日付の決まりはこのあと<b>保存のときに確かめます</b>。おかしいところがあれば、赤い文で何を直せばよいかをお知らせします。</div>
@@ -1941,6 +1951,24 @@ var App = (function() {
       if (!_installHist && typeof history !== 'undefined' && history.pushState) { history.pushState({ hiposInstall: 1 }, ''); _installHist = true; }
     } catch (e) { /* 履歴を使えないブラウザでも［閉じる］で閉じられる */ }
   }
+  // ─── スタッフマニュアル（2026-11-07 社長依頼） ───
+  var _manualHist = false, _manualPopBound = false;
+  function onManualPop() { if (_manualHist) { _manualHist = false; closeManual(true); } }
+  function openManual() {
+    var m = $('manualModal'), f = $('manualFrame'); if (!m || !f) return;
+    closeAcctPop();
+    if (!f.getAttribute('src')) f.setAttribute('src', 'manual.html');
+    m.classList.remove('hidden');
+    try {
+      if (!_manualPopBound && window.addEventListener) { window.addEventListener('popstate', onManualPop); _manualPopBound = true; }
+      if (!_manualHist && typeof history !== 'undefined' && history.pushState) { history.pushState({ hiposManual: 1 }, ''); _manualHist = true; }
+    } catch (e) { /* 履歴を使えないブラウザでも［閉じる］で閉じられる */ }
+  }
+  function closeManual(fromBack) {
+    var m = $('manualModal'); if (m) m.classList.add('hidden');
+    if (_manualHist && fromBack !== true) { _manualHist = false; try { history.back(); } catch (e) {} }
+  }
+
   /** 手順を閉じる。［閉じる］で閉じたときは、積んだ履歴も1つ戻す（fromBack=true は「戻る」で閉じたとき） */
   function closeInstallGuide(fromBack) {
     var m = $('installModal'); if (m) m.classList.add('hidden');
@@ -4172,7 +4200,7 @@ var App = (function() {
   // ─── 予定登録（管理者） ───
   var REG_BASES = ['関西', '東戸塚', '稲毛', '五香', '豊田'];   // ★2026-11-07 豊田を追加
   // 拠点バッジの色（登録済みの変更・取消カードで拠点を一目で分かるように）
-  var BASE_COLORS = { '関西': '#e8590c', '東戸塚': '#1c7ed6', '稲毛': '#2f9e44', '五香': '#9c36b5', '豊田': '#3b5bdb' };
+  var BASE_COLORS = { '関西': '#e8590c', '東戸塚': '#1c7ed6', '稲毛': '#2f9e44', '五香': '#9c36b5', '豊田': '#d6336c' };   // 豊田＝ピンク（2026-11-07 東戸塚の青と見分けやすく）
   function regBaseOf(s) {
     var h = String((s && s.homeArea) || '').trim();
     return REG_BASES.indexOf(h) >= 0 ? h : 'その他';
@@ -7588,9 +7616,11 @@ var App = (function() {
     // ★2026-11-07: 関西の自動の日程は周知どおり（2週間ずつ続ける）になったので、自動のときは注意ではなく案内にする
     var autoNote = plan.mode === 'monthly'
       ? 'この月は自動の日程（毎月19日19時までに、翌月分をまとめて）で動いています。'
-      : 'この月は自動の日程（期間は2週間ずつすき間なく続け、期日は第3日曜から1週間ずつ）で動いています。周知と違う月だけ、下の「日程を入れる」で直してください。';
-    var h = '<div class="msg ' + (custom ? 'msg-ok' : '') + '">' +
-            esc(custom ? '✅ ここで入れた日程で動いています。' : 'ℹ ' + autoNote) + '</div>';
+      : 'この月は自動の日程（期間は2週間ずつすき間なく続け、期日は第3日曜から1週間ずつ）で動いています。';
+    // ★2026-11-07 社長指示: 「ℹ」だけでは分かりにくい → 見出しを付けた青い帯にする
+    var h = custom
+      ? '<div class="msg msg-ok"><b>✅ 手で入れた日程</b><br>' + esc('この月は、手で入れた日程で動いています。') + '</div>'
+      : '<div class="msg msg-info"><b>📅 自動で決まる日程</b><br>' + esc(autoNote) + '</div>';
     // ★受付開始は枠ごとに分かれない（いちばん早い日がその月の全部の枠に効く）。入力欄の説明と同じ言い方にそろえる。
     h += '<div class="spnow"><div class="spline">スタッフが出せるようになる日　<b>' + esc(spDay(plan.opensOn)) +
          '</b><br>この日から、下の枠が全部まとめて出せるようになります（枠ごとには分かれません）。</div>';
@@ -7664,7 +7694,7 @@ var App = (function() {
     if (tab === 'ann') {
       $('spTplUrgeOpts').style.display = 'none';
       $('spTplNote').innerHTML = '送信先: LW板【ポスティング周知】。送るのは<b>毎月8〜10日</b>（スタッフが出せるようになる日のころ）。<br>' +
-        '日付は上の「いまの日程」（スタッフのシフト画面と同じ）から作っています。周知を変えたいときは、先に下の「日程を入れる」で直してください。';
+        '日付は上の「いまの日程」（スタッフのシフト画面と同じ）から作っています。';
       $('spTplOut').value = spAnnounceText(target, cycles, monthly);
       return;
     }
@@ -8054,7 +8084,7 @@ var App = (function() {
     onGpsAddSelect: onGpsAddSelect, logout: logout, copyEmail: copyEmail,
     claimSubmit: claimSubmit, onClaimName: onClaimName, unlockAccess: unlockAccess,
     loadPendingRegs: loadPendingRegs, approveReg: approveReg, rejectReg: rejectReg,
-    changeStaffPerm: changeStaffPerm, onAcctBtn: onAcctBtn,
+    changeStaffPerm: changeStaffPerm, onAcctBtn: onAcctBtn, openManual: openManual, closeManual: closeManual,
     spTplTab: spTplTab, spTplRender: spTplRender, spTplCopy: spTplCopy,
     stToggleBase: stToggleBase, stAllBases: stAllBases, stSetKind: stSetKind, stSetLink: stSetLink, stOnSearch: stOnSearch, stClear: stClear,
     issueStaffLink: issueStaffLink, revokeStaffLink: revokeStaffLink, addLinkStaff: addLinkStaff, copyStaffLink: copyStaffLink, closeIssuedLink: closeIssuedLink,

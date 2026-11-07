@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Hiポス スタッフマニュアル</title>
+<!--
+  manual.html — アルバイトスタッフ向けの使い方マニュアル（2026-11-07 社長依頼・全拠点共通）
+  ★アプリ（index.html）の右上のアイコン →［📖 マニュアルを見る］で、アプリの画面の上に重ねて読み込む（install.html と同じ方式）。
+    単独で開いても読める（アプリの中に重ねたときは、こちらの見出しは隠してアプリ側の見出しと［閉じる］を使う）。
+  ★方針（社長決定）: 使い方だけでなく「なぜやるのか」（反響率を上げるため）も書く／インセンティブの仕組みは書かない／
+    「配り方のコツ」は後で足す（いまは無し）。
+  ★#flow などのページ内リンクで、目次から各章へ飛べる。
+-->
+<style>
+  :root { --c-primary: #1a73e8; --c-text: #202124; --c-sub: #5f6368; --c-bg: #f6f8fb; --c-why: #fff8e1; --c-why-b: #f6c344;
+          --c-lw: #00c73c; --c-app: #1a73e8; }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+         color: var(--c-text); background: var(--c-bg); font-size: 16px; line-height: 1.75; }
+  header { background: var(--c-primary); color: #fff; padding: 14px 16px; }
+  header h1 { margin: 0; font-size: 19px; }
+  header p { margin: 2px 0 0; font-size: 13px; opacity: .9; }
+  .framed header { display: none; }   /* アプリの中に重ねて表示するときは、アプリ側の見出しと［閉じる］を使う */
+  main { max-width: 640px; margin: 0 auto; padding: 12px 14px 60px; }
+  nav.toc { position: sticky; top: 0; z-index: 2; background: var(--c-bg); padding: 8px 0 10px; display: flex; gap: 6px;
+            overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  nav.toc::-webkit-scrollbar { display: none; }
+  nav.toc a { flex: 0 0 auto; text-decoration: none; color: var(--c-primary); background: #fff; border: 1.5px solid var(--c-primary);
+              border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+  section { background: #fff; border-radius: 14px; padding: 16px 16px 14px; margin: 0 0 14px; scroll-margin-top: 60px; }
+  h2 { margin: 0 0 10px; font-size: 19px; display: flex; align-items: center; gap: 8px; }
+  h2 .no { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%;
+           background: var(--c-primary); color: #fff; font-size: 15px; flex: 0 0 auto; }
+  h3 { margin: 16px 0 6px; font-size: 16px; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0; padding-left: 1.3em; }
+  li { margin: 3px 0; }
+  b.em { color: #c5221f; }
+  .why { background: var(--c-why); border-left: 5px solid var(--c-why-b); border-radius: 10px; padding: 10px 12px; margin: 12px 0 4px; }
+  .why .t { font-weight: 700; display: block; margin-bottom: 2px; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; color: #fff; border-radius: 6px; padding: 0 7px; margin-right: 6px; vertical-align: 1px; }
+  .tag.lw { background: var(--c-lw); }
+  .tag.app { background: var(--c-app); }
+  .tag.etc { background: #80868b; }
+  .flow { list-style: none; padding: 0; margin: 4px 0; }
+  .flow > li { border-left: 3px solid #d0d7e2; margin: 0 0 0 10px; padding: 2px 0 10px 14px; position: relative; }
+  .flow > li::before { content: ""; position: absolute; left: -8px; top: 9px; width: 13px; height: 13px; border-radius: 50%;
+                       background: #fff; border: 3px solid var(--c-primary); }
+  .when { font-weight: 700; color: var(--c-primary); margin: 12px 0 4px; }
+  .steps { counter-reset: s; list-style: none; padding: 0; }
+  .steps > li { counter-increment: s; padding-left: 34px; position: relative; margin: 0 0 8px; }
+  .steps > li::before { content: counter(s); position: absolute; left: 0; top: 1px; width: 24px; height: 24px; border-radius: 50%;
+                        background: #e8f0fe; color: var(--c-primary); font-weight: 700; font-size: 13px; display: flex;
+                        align-items: center; justify-content: center; }
+  .ui { display: inline-block; background: #f1f3f4; border: 1px solid #dadce0; border-radius: 6px; padding: 0 6px; font-size: 14px; white-space: nowrap; }
+  .note { font-size: 14px; color: var(--c-sub); }
+  .tabs4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0; }
+  .tabs4 div { background: #f8f9fa; border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+  .tabs4 b { display: block; font-size: 15px; }
+  .rule { border: 1.5px solid #dadce0; border-radius: 10px; padding: 8px 12px; margin: 8px 0; }
+  .rule b.head { display: block; }
+  dl.faq dt { font-weight: 700; margin-top: 10px; }
+  dl.faq dt::before { content: "Q. "; color: var(--c-primary); }
+  dl.faq dd { margin: 2px 0 0 0; padding-left: 1.6em; }
+  footer { text-align: center; font-size: 13px; color: var(--c-sub); margin-top: 16px; }
+</style>
+<script>
+  // アプリの中に重ねて開いたときは、このページの見出しを隠す（アプリ側の見出しと［閉じる］を使う）
+  try { if (window.self !== window.top) document.documentElement.className += ' framed'; } catch (e) { document.documentElement.className += ' framed'; }
+</script>
+</head>
+<body>
+<header>
+  <h1>📖 Hiポス スタッフマニュアル</h1>
+  <p>アプリの使い方と、ポスティングで大切にしていること（全拠点共通）</p>
+</header>
+<main>
+  <nav class="toc" aria-label="目次">
+    <a href="#intro">はじめに</a>
+    <a href="#login">入り方</a>
+    <a href="#flow">1日の流れ</a>
+    <a href="#report">配布報告</a>
+    <a href="#ban">配布禁止</a>
+    <a href="#history">直したいとき</a>
+    <a href="#shift">シフト</a>
+    <a href="#faq">困ったとき</a>
+  </nav>
+
+  <section id="intro">
+    <h2><span class="no">1</span>はじめに：私たちの仕事</h2>
+    <p>ポスティングは、お店のチラシを「そのお店に来てほしい人」の家に届ける仕事です。</p>
+    <p>私たちがいちばん大切にしているのは<b>「反響率」</b>です。<br>
+      反響率＝<b>チラシを見てお店に来てくれた人の割合</b>（来店数 ÷ 配った部数）。</p>
+    <p>決められたエリアに、一枚一枚ていねいに届けることで、お店に人が来て、次のお仕事につながります。</p>
+    <div class="why"><span class="t">💡 アプリで報告したことは、こう使われます</span>
+      <ul>
+        <li><b>どの町に何部配ったか</b> → 反響率を正しく出すため</li>
+        <li><b>次にどこに配るか</b>を決める材料</li>
+        <li><b>きちんと配ったことの証明</b>（GPS）</li>
+      </ul>
+      だから報告は<b>「正確に・その日のうちに」</b>お願いします。</div>
+    <h3>アプリの画面</h3>
+    <div class="tabs4">
+      <div><b>📝 報告</b>今日の配布報告</div>
+      <div><b>📍 配布禁止</b>配ってはいけない家</div>
+      <div><b>📋 履歴</b>送った報告・直したいとき</div>
+      <div><b>📅 シフト</b>出勤できる日を出す</div>
+    </div>
+    <p class="note">右上の丸いアイコン → ログイン情報・ログアウト・このマニュアル</p>
+  </section>
+
+  <section id="login">
+    <h2><span class="no">2</span>アプリの入り方</h2>
+    <ol class="steps">
+      <li>管理者から LINE WORKS で届く<b>「あなた専用のリンク」</b>を押します。</li>
+      <li>そのままアプリが開きます。<b>Googleアカウントやパスワードはいりません。</b></li>
+      <li>ログインが外れたときは、<b>同じリンクをもう一度押せば</b>入れます。</li>
+    </ol>
+    <div class="rule"><b class="head">⚠ 守ってほしいこと</b>
+      <ul>
+        <li>リンクは<b>あなた専用の鍵</b>です。<b class="em">ほかの人に送らないでください</b>（その人があなたとして報告できてしまいます）。</li>
+        <li>スマホをなくした・リンクを人に送ってしまったときは、すぐ管理者に連絡してください（新しいリンクに取り替えます）。</li>
+        <li>iPhone は、ホーム画面のアイコンではなく <b>LINE WORKS のリンクから</b>開いてください。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="flow">
+    <h2><span class="no">3</span>1日の流れ</h2>
+    <p><span class="tag lw">LINE WORKS</span>で送るものと、<span class="tag app">アプリ</span>でやるものがあります。</p>
+    <div class="when">🏢 出勤したら</div>
+    <ul class="flow">
+      <li><span class="tag lw">LINE WORKS</span><b>出勤報告</b>（10時まで）</li>
+      <li><span class="tag lw">LINE WORKS</span>社用車を運転する人は、<b>アルコールチェック</b>の写真と結果</li>
+      <li><span class="tag etc">受け取る</span><b>GPS端末</b>を1人1台受け取る</li>
+      <li><span class="tag lw">LINE WORKS</span><b>積み込んだチラシ</b>の内容と部数</li>
+    </ul>
+    <div class="when">📍 配布エリアに着いたら</div>
+    <ul class="flow">
+      <li><span class="tag app">アプリ</span><span class="ui">📍 配布禁止</span> で、今日のエリアの<b>配ってはいけない家</b>を確認<br>
+        <span class="note">（LINE WORKS への「確認しました」の報告は不要です）</span></li>
+    </ul>
+    <div class="when">🚶 配布中</div>
+    <ul class="flow">
+      <li><span class="tag etc">記録</span>GPS端末と<b>ランキーパー</b>で、歩いた道と時間を記録</li>
+      <li><span class="tag app">アプリ</span>配布禁止の家を避けたら <span class="ui">☐ 回避したらタップ</span></li>
+      <li><span class="tag lw">LINE WORKS</span><b>補給チラシ</b>を置いたら、写真と住所</li>
+    </ul>
+    <div class="when">✅ 配り終わったら</div>
+    <ul class="flow">
+      <li><span class="tag app">アプリ</span><span class="ui">📝 報告</span> から<b>配布報告</b>（ランキーパーの時間もここに入れます）<br>
+        <span class="note">（ランキーパーを LINE WORKS に送る必要はありません）</span></li>
+      <li><span class="tag etc">返す</span>カバンにチラシ・「配布中」のラミネート・GPS端末が残っていないか確かめて、<b>GPS端末を返す</b></li>
+    </ul>
+  </section>
+
+  <section id="report">
+    <h2><span class="no">4</span>配布報告のやり方</h2>
+    <p><span class="ui">📝 報告</span> を開くと、今日の担当の案件が出ます。上から順に入れていきます。</p>
+    <ol class="steps">
+      <li><b>① 本日の案件</b>　お店の名前と配るエリアを確かめます。</li>
+      <li><b>② 町×部数</b>　町ごとに<b>配った部数</b>を入れます。<b>配らなかった町は空欄のまま</b>でOK。合計は自動で出ます。</li>
+      <li><b>③ 勤務実績</b>　<b>配布時間</b>に、ランキーパーに出た時間をそのまま（時間と分）入れます。勤務時間は、いつもと違う日だけ直します。</li>
+      <li><b>④ GPS軌跡画像</b>　GPSアプリの軌跡のスクリーンショットを<b>4枚以上</b>つけます（足りないと送れません）。</li>
+      <li><span class="ui">報告を送信</span> を押します。<b class="em">「これで報告は完了です」と出るまで、画面を閉じないでください</b>（写真を1枚ずつ保存しています）。</li>
+    </ol>
+    <h3>こんなときは</h3>
+    <ul>
+      <li><b>送迎・現場指導だけの日</b>：町と写真の欄は出ません。勤務時間だけ確かめて送信します。</li>
+      <li><b>報告を忘れた日がある</b>：黄色の <span class="ui">⚠ 報告忘れ</span> のカードを押すと、その日の報告ができます。</li>
+      <li><b>写真の保存が途中で止まった</b>：電波のよい所で <span class="ui">保存できなかった画像をもう一度送る</span> を押します。</li>
+    </ul>
+    <div class="why"><span class="t">💡 なぜ大事？</span>
+      <ul>
+        <li><b>部数がずれると反響率がずれます。</b>「この町は反響がよい／悪い」の判断を間違え、次のエリア選びに響きます。</li>
+        <li><b>GPSは、きちんと配った証明</b>です。「チラシが入っていない」と言われたときに、あなたとお店を守ります。</li>
+        <li><b>その日のうちに</b>報告すれば、記憶が新しいので正確です。</li>
+      </ul></div>
+  </section>
+
+  <section id="ban">
+    <h2><span class="no">5</span>配布禁止エリア</h2>
+    <p>「チラシお断り」などで、<b>配ってはいけない家</b>があります。<span class="ui">📍 配布禁止</span> に、今日の案件のぶんが出ます。</p>
+    <ol class="steps">
+      <li>配布エリアに着いたら、リストの<b>住所を確認</b>します。</li>
+      <li>その家を避けたら <span class="ui">☐ 回避したらタップ</span> を押します。</li>
+      <li>リストの住所が見つからない・実際と違うときは <span class="ui">誤表記</span> を押します。</li>
+      <li>全部チェックすると<b>「すべて回避済み」</b>になります。</li>
+    </ol>
+    <p class="note">同じ案件のメンバーで<b>リストは共有</b>です。誰かがチェックすると、ほかの人の画面にも「回避済み」と出ます。</p>
+    <div class="why"><span class="t">💡 なぜ大事？</span>
+      「お断り」の家にチラシを入れると<b>苦情</b>になり、お店と会社の<b>信用を失います</b>。1件のミスでお仕事そのものが無くなることもあります。
+      みんなで同じリストを見ることで、配り分けたときも漏れなく避けられます。</div>
+  </section>
+
+  <section id="history">
+    <h2><span class="no">6</span>報告を直したいとき</h2>
+    <p><span class="ui">📋 履歴</span> に、これまで送った報告が並んでいます。</p>
+    <ul>
+      <li><b>数字を間違えた</b>：その報告を押して <span class="ui">✏️ 数字を修正</span> → 直して申請します。<b>管理者が承認すると反映</b>されます（承認までは前の数字のまま）。送った日から7日以内なら直せます。</li>
+      <li><b>GPSの写真が足りない（⚠）</b>：<span class="ui">📷 GPS画像を追加</span> から足せます。</li>
+    </ul>
+    <div class="why"><span class="t">💡 なぜ承認が必要？</span>
+      部数は反響率の計算に使われる大事な数字なので、直すときは管理者が確かめてから反映します。</div>
+  </section>
+
+  <section id="shift">
+    <h2><span class="no">7</span>シフトの出し方</h2>
+    <p><span class="ui">📅 シフト</span> で、日ごとに <b>終日・午前・午後・不可</b> を選んで <span class="ui">この内容で提出</span> を押します。</p>
+    <div class="rule"><b class="head">関西</b>
+      2週間ずつ出します。<b>提出期日は毎月 第3日曜・第4日曜の19時</b>（月によって3回）。お知らせは LINE WORKS で届きます。</div>
+    <div class="rule"><b class="head">東戸塚・稲毛・五香・豊田</b>
+      月1回、<b>毎月19日の19時までに、翌月1か月分</b>を出します。</div>
+    <ul>
+      <li>1週間（月〜日）に出勤できるのは<b>5日まで</b>です。</li>
+      <li>締切のあとで変えたいとき：<span class="ui">🔄 シフト変更の申請</span>（前日まで・出勤か欠勤か）→ 管理者が承認すると変わります。<b>当日の変更</b>は LINE WORKS で連絡してください。</li>
+      <li class="em"><b>提出が間に合わないとき・期日を過ぎてから変えたいときは、必ず北山さんまたは遠山まで連絡してください。</b></li>
+    </ul>
+    <div class="why"><span class="t">💡 なぜ期日が大事？</span>
+      みんなのシフトがそろってはじめて、<b>どの日にどのエリアを誰が配るか</b>が組めます。遅れると、配布の予定がずれてお店に迷惑がかかります。</div>
+  </section>
+
+  <section id="faq">
+    <h2><span class="no">8</span>困ったとき</h2>
+    <dl class="faq">
+      <dt>アプリに入れない／「このログイン用リンクは使えません」と出る</dt>
+      <dd>リンクが新しくなった可能性があります。管理者に新しいリンクをもらってください。</dd>
+      <dt>写真の保存が終わらない</dt>
+      <dd>電波のよい所で <span class="ui">保存できなかった画像をもう一度送る</span> を押してください。「これで報告は完了です」と出たら完了です。</dd>
+      <dt>今日の案件が出てこない・送信できない</dt>
+      <dd>予定がまだ登録されていないかもしれません。管理者に連絡してください。</dd>
+      <dt>報告の数字を間違えた</dt>
+      <dd><a href="#history">「報告を直したいとき」</a>を見てください。</dd>
+      <dt>シフトを出し忘れた・期日に間に合わない</dt>
+      <dd>北山さんまたは遠山まで、LINE WORKS で連絡してください。</dd>
+    </dl>
+    <p class="note">分からないことは、遠慮なく北山さん・遠山に聞いてください。</p>
+  </section>
+
+  <footer>Hiポス スタッフマニュアル（全拠点共通）</footer>
+</main>
+</body>
+</html>
