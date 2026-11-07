@@ -154,10 +154,6 @@
   details summary { font-size: 13px; color: var(--c-sub); cursor: pointer; }
   .signin-note { font-size: 13px; color: var(--c-sub); line-height: 1.6; }
   #gsiButton { display: flex; justify-content: center; margin: 12px 0; }
-  .login-sec { border-top: 1px solid #e0e0e0; margin-top: 16px; padding-top: 14px; }
-  .link-paste { display: flex; gap: 8px; margin-top: 8px; }
-  .link-paste input { flex: 1; min-width: 0; }
-  .link-paste button { width: auto; padding: 8px 16px; white-space: nowrap; }
   .footer-note { font-size: 11px; color: var(--c-sub); text-align: center; margin-top: 16px; }
   .reg-staff { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
   .reg-chk { display: flex; align-items: center; gap: 8px; border: 1px solid var(--c-border); border-radius: 8px; padding: 10px; font-size: 14px; cursor: pointer; }
@@ -691,33 +687,21 @@ button.spadd:disabled{color:var(--c-sub,#868e96);cursor:default}
   <!-- ═══ サインイン ═══ -->
   <div class="card" id="authCard">
     <div class="login-logo"><img src="logo.png" alt="Hiポス" width="120" height="120"></div>
-    <h2>ログイン</h2>
+    <h2>サインイン</h2>
+    <p class="signin-note">配布報告には本人確認が必要です。会社に登録済みのGoogleアカウントでサインインしてください。</p>
+    <!-- ★2026-11-07: アルバイト（配布員）は専用リンク（…/#k=xxxx）を押すと、この画面を通らずに入る。
+         この画面は社員（管理者）の Googleログイン用（社長指示: アルバイト向けの記載は出さない）。
+         リンクが使えなかったときの理由は #loginMsg に出る -->
     <div id="loginMsg"></div>
-    <!-- ★2026-11-07 社長決定: アルバイト（配布員）は管理者が発行する「専用リンク」だけ／社員（管理者）は Googleログイン -->
-    <div class="login-sec" id="linkLoginSec" style="border-top:0;margin-top:0;padding-top:0">
-      <b>アルバイトの方</b>
-      <p class="signin-note" style="margin-top:4px">管理者から届いた<b>あなた専用のリンク</b>を押して開きます。<br>
-        この画面が出たときは、<b>LINE WORKS に届いたリンクをもう一度押してください</b>。</p>
-      <div class="footer-note" style="text-align:left">ホーム画面のアイコンから開いた場合などは、届いたリンクを長押しして「コピー」し、下に貼り付けて［入る］を押してください（1回だけでOK）。</div>
-      <div class="link-paste">
-        <input id="linkPaste" type="text" placeholder="ここに専用リンクを貼り付け" autocomplete="off" aria-label="専用リンク">
-        <button type="button" class="btn-primary" onclick="App.loginWithPastedLink()">入る</button>
-      </div>
-      <p class="signin-note" style="margin-top:8px;font-size:12px">リンクが見つからないときは、管理者に連絡してください。</p>
-    </div>
-    <div class="login-sec" id="googleLoginSec">
-      <b>社員（管理者）の方</b>
-      <p class="signin-note" style="margin-top:4px">会社に登録済みのGoogleアカウントでログインしてください。</p>
-      <div id="gsiButton"></div>
-      <p class="signin-note" style="font-size:12px">LINE WORKSなどのアプリの中の画面ではGoogleログインできません。Safari（AndroidはChrome）で開いてください。</p>
-      <div id="gsiPending" class="signin-note hidden" style="text-align:center;margin-top:8px">Googleログインを準備中です…</div>
-      <div id="gsiFail" class="hidden">
-        <div class="footer-note" style="margin-top:14px;text-align:left">
-          <b>Googleログインを表示できませんでした。</b><br>
-          ①通信状況を確認して、画面を読み込み直してください（更新ボタン）。<br>
-          ②LINE WORKSなどのアプリから開いた場合は、Safari（AndroidはChrome）で開き直してください。<br>
-          ③それでも表示されない場合は管理者までご連絡ください。
-        </div>
+    <div id="gsiButton"></div>
+    <p class="signin-note" style="margin-top:10px;font-size:12px">LINE WORKSなどのアプリの中の画面ではGoogleログインできません。Safari（AndroidはChrome）で開いてください。</p>
+    <div id="gsiPending" class="signin-note hidden" style="text-align:center;margin-top:8px">Googleログインを準備中です…</div>
+    <div id="gsiFail" class="hidden">
+      <div class="footer-note" style="margin-top:14px;text-align:left">
+        <b>Googleログインを表示できませんでした。</b><br>
+        ①通信状況を確認して、画面を読み込み直してください（更新ボタン）。<br>
+        ②LINE WORKSなどのアプリから開いた場合は、Safari（AndroidはChrome）で開き直してください。<br>
+        ③それでも表示されない場合は管理者までご連絡ください。
       </div>
     </div>
   </div>
@@ -1687,24 +1671,6 @@ var App = (function() {
       }
     } catch (e) { /* 消せなくても動作には影響しない */ }
     return v;
-  }
-  /** 貼り付けられた文字からリンクの中身を取り出す（リンクまるごと・#k=…・中身だけ のどれでもよい） */
-  function linkFromText(t) {
-    t = String(t || '').trim();
-    var m = t.match(/[#&?]k=([A-Za-z0-9]{20,80})(?:[&\s]|$)/) || t.match(/^([A-Za-z0-9]{20,80})$/);
-    return m ? m[1] : '';
-  }
-  /** ［入る］: 貼り付けたリンクで入る（iPhone のホーム画面のアイコンは Safari と保存場所が別のため） */
-  function loginWithPastedLink() {
-    var el = $('linkPaste'); if (!el) return;
-    var k = linkFromText(el.value);
-    if (!k) { $('loginMsg').innerHTML = '<div class="msg msg-warn">リンクを読み取れませんでした。LINE WORKS に届いたリンクを、そのまま全部貼り付けてください。</div>'; return; }
-    el.value = '';
-    $('loginMsg').innerHTML = '';
-    lsSet(LINK_KEY, k);
-    state.linkToken = k;
-    $('userBar').textContent = '専用リンクでログイン中';
-    afterAuth();
   }
   /** 専用リンクが使えなくなった（発行し直し・止めた・退職）＝覚えているリンクを捨てて案内する */
   var _linkInvalidShown = false;
@@ -7705,7 +7671,7 @@ var App = (function() {
     changeStaffPerm: changeStaffPerm,
     issueStaffLink: issueStaffLink, revokeStaffLink: revokeStaffLink, addLinkStaff: addLinkStaff, copyStaffLink: copyStaffLink,
     submitRegister: submitRegister,
-    gotoBanTab: gotoBanTab, loadBanAdmin: loadBanAdmin, toggleAvoid: toggleAvoid, toggleMislisted: toggleMislisted, loginWithPastedLink: loginWithPastedLink, onLinkStaffPerm: onLinkStaffPerm,
+    gotoBanTab: gotoBanTab, loadBanAdmin: loadBanAdmin, toggleAvoid: toggleAvoid, toggleMislisted: toggleMislisted, onLinkStaffPerm: onLinkStaffPerm,
     toggleRegBan: toggleRegBan, updateRegHh: updateRegHh,
     loadPendingAmends: loadPendingAmends, approveAmend: approveAmend, rejectAmend: rejectAmend,
     loadOvertime: loadOvertime, saveOvertime: saveOvertime, clearOvertime: clearOvertime, otMonth: otMonth,
