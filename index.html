@@ -345,6 +345,26 @@
   .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent;
           border-radius: 50%; animation: sp 0.8s linear infinite; vertical-align: -3px; margin-right: 6px; }
   @keyframes sp { to { transform: rotate(360deg); } }
+  /* ★シフトの「これからの予定」（2026-11-08 社長指示: 出勤と欠勤が見分けにくい）
+     出勤＝緑の帯＋緑の札「出勤」＋時間／欠勤＝灰色で薄く＋灰色の札「欠勤」。週ごとに区切って出勤日数を出す */
+  .scd-week { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 2px 6px; font-size: 13px; color: var(--c-sub); font-weight: 700; }
+  .scd-week .scd-wn { font-weight: 700; color: #188038; }
+  .scd { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 6px; border-radius: 10px;
+         border: 1px solid var(--c-border); border-left-width: 6px; background: #fff; }
+  .scd.on { border-left-color: #188038; background: #f3faf5; }
+  .scd.off { border-left-color: #c4c7c5; background: #f6f7f8; }
+  .scd.off .scd-date { color: #80868b; }
+  .scd.half { border-left-color: #e37400; background: #fff8ef; }
+  .scd-date { font-weight: 700; font-size: 16px; min-width: 6.2em; }
+  .scd-tag { display: inline-block; font-size: 14px; font-weight: 700; border-radius: 999px; padding: 3px 12px; white-space: nowrap; }
+  .scd.on .scd-tag { background: #188038; color: #fff; }
+  .scd.off .scd-tag { background: #e3e5e8; color: #5f6368; }
+  .scd.half .scd-tag { background: #e37400; color: #fff; }
+  .scd-time { font-size: 12px; color: #188038; margin-left: 6px; white-space: nowrap; }
+  .scd-mid { flex: 1; min-width: 0; }
+  .scd-note { font-size: 12px; color: var(--c-sub); margin-top: 2px; }
+  .scd-note.pend { color: #b06000; font-weight: 700; }
+  .scd .btn-ghost { width: auto; padding: 6px 10px; margin: 0; flex: 0 0 auto; }
   /* 押したボタンの「保存中…」（2026-11-07・apiBusyStart）: 白いボタンでも見えるよう文字の色で回す */
   .spin.spin-cur { border-color: currentColor; border-top-color: transparent; }
   .spin.spin-only { margin-right: 0; }
@@ -692,10 +712,98 @@ button.spdel{flex:0 0 auto;width:auto;padding:6px 10px;font-size:12px;font-weigh
 button.spadd{width:auto;padding:9px 14px;font-size:13px;margin-top:10px}
 button.spadd:disabled{color:var(--c-sub,#868e96);cursor:default}
 
+/* ═══ アルバイト向けの見やすさ（2026-11-08 社長選択 #2〜#20）═══ */
+/* #14 小さい灰色の文字を少し大きく（屋外で読めるように） */
+.footer-note { font-size: 13px; }
+.summary .lbl { font-size: 12px; }
+.rep .meta, .assign .meta, .ban-item .note, .bchk-sub, .bchk-note, .bchk-by, .bchk-misby, .bchk-progress,
+.sendtarget .lbl, .lockhint, .scd-note, .scd-time, .bchk-staff { font-size: 13px; }
+.st-badge, .assign .badge, .badge-inline { font-size: 12px; }
+.sgrid-dow span { font-size: 12px; }
+#bottomNav:not(.dense):not(.dense7) button { font-size: 12px; }
+/* #2 GPSの写真を選ぶボタン（スマホ標準の「ファイル選択」は小さく分かりにくい）＋選んだ写真を小さな画像で並べる */
+.gps-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+label.gps-pick { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 4px 0 0; padding: 14px 12px;
+  border: 2px dashed var(--c-primary); border-radius: 12px; background: #f3f7fe; color: var(--c-primary); font-weight: 700;
+  font-size: 16px; cursor: pointer; }
+label.gps-pick:active { background: #e3edfd; }
+.gps-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin-top: 10px; }
+.gps-th { position: relative; aspect-ratio: 3 / 4; border-radius: 8px; overflow: hidden; background: #e8eaed; border: 1px solid var(--c-border); }
+.gps-th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gps-th .gps-no { position: absolute; left: 4px; top: 4px; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; font-weight: 700;
+  border-radius: 6px; padding: 0 6px; }
+.gps-th .gps-nm { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 4px 4px; font-size: 11px; color: #3c4043; word-break: break-all; }
+button.gps-x { position: absolute; right: 4px; top: 4px; width: 28px; height: 28px; padding: 0; margin: 0; border-radius: 50%;
+  border: none; background: rgba(197,34,31,.92); color: #fff; font-size: 16px; line-height: 28px; cursor: pointer; }
+/* #3 合計と「送れるか」を画面の下に固定（町が多いと合計が見えなくなる） */
+.report-dock { position: sticky; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); z-index: 4; margin: 12px 0 8px;
+  background: #fff; border: 1.5px solid var(--c-border); border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  padding: 10px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 14px; }
+.report-dock.ready { border-color: #188038; }
+.report-dock .rd-tot { font-weight: 700; font-size: 16px; }
+.report-dock .rd-it { white-space: nowrap; }
+.report-dock .rd-it.ng { color: #c5221f; font-weight: 700; cursor: pointer; text-decoration: underline; }
+.report-dock .rd-it.okk { color: #188038; }
+.report-dock .rd-st { margin-left: auto; font-weight: 700; white-space: nowrap; }
+.report-dock.ready .rd-st { color: #188038; }
+.report-dock:not(.ready) .rd-st { color: #c5221f; }
+/* #4 世帯数は各町の入力欄の横に。上の一覧はたたむ */
+.town-row .hh-chip { flex: 0 0 5.2em; text-align: center; font-size: 12px; color: var(--c-sub); background: #f1f3f4; border-radius: 6px; padding: 3px 2px; white-space: nowrap; overflow: hidden; }
+.hhref details > summary { cursor: pointer; font-weight: 700; list-style: none; }
+.hhref details > summary::-webkit-details-marker { display: none; }
+.hhref details > summary::after { content: '　▼ 一覧を見る'; font-weight: 400; color: var(--c-primary); font-size: 13px; }
+.hhref details[open] > summary::after { content: '　▲ 閉じる'; }
+.hhref details[open] > .hh-list { margin-top: 6px; }
+/* #6 配布禁止の説明は最初の1回だけ開く（2回目からは「この画面の使い方」で開ける） */
+details.help-box > summary { cursor: pointer; color: var(--c-primary); font-size: 14px; font-weight: 700; list-style: none; padding: 2px 0; }
+details.help-box > summary::-webkit-details-marker { display: none; }
+details.help-box > summary::before { content: 'ⓘ '; }
+details.help-box[open] > summary { margin-bottom: 6px; }
+/* #8 全部回避したら大きく「完了」 */
+.bchk-alldone { font-size: 17px !important; text-align: center; padding: 14px 12px !important; border-radius: 12px; }
+.bchk-bar { height: 8px; background: #e8eaed; border-radius: 999px; overflow: hidden; margin: 4px 0 2px; }
+.bchk-bar > span { display: block; height: 100%; background: #188038; border-radius: 999px; }
+#okToast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 70;
+  background: #188038; color: #fff; font-weight: 700; font-size: 15px; padding: 12px 18px; border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100vw - 32px); text-align: center; }
+#okToast.hidden { display: none; }
+/* #9 #10 履歴: 押せることが分かる「›」・承認待ちは目立たせる */
+.rep .top { cursor: pointer; }
+.rep .top .rep-chev { flex: 0 0 auto; margin-left: 8px; font-size: 20px; color: var(--c-sub); transition: transform .15s; }
+.rep.open .top .rep-chev { transform: rotate(90deg); }
+.rep.pending { border-color: #f29900; border-left-width: 5px; }
+.st-badge.st-AMEND { background: #f29900; color: #fff; }
+/* #11 シフトの提出がまだのとき、報告の画面にも出す */
+.warn-b { background: #e8f0fe; color: #174ea6; }
+.warnbox .wb-go { display: inline-block; width: auto; margin: 6px 0 0; padding: 6px 12px; font-size: 14px; border-radius: 8px;
+  border: 1px solid currentColor; background: #fff; color: inherit; font-weight: 700; cursor: pointer; }
+/* #12 提出したシフトを小さなカレンダーで見せる（出勤＝緑） */
+.cyc-mini { margin-top: 10px; }
+.cyc-mini .cm-dow, .cyc-mini .cm-wk { display: grid; grid-template-columns: repeat(7, 1fr) 2.6em; gap: 3px; }
+.cyc-mini .cm-dow span { text-align: center; font-size: 11px; color: var(--c-sub); }
+.cyc-mini .cm-wk { margin-top: 3px; }
+.cyc-mini .cm-d { text-align: center; font-size: 13px; padding: 5px 0; border-radius: 6px; background: #f1f3f4; color: #9aa0a6; }
+.cyc-mini .cm-d.on { background: #188038; color: #fff; font-weight: 700; }
+.cyc-mini .cm-d.half { background: #e37400; color: #fff; font-weight: 700; }
+.cyc-mini .cm-d.blank { background: transparent; }
+.cyc-mini .cm-n { text-align: center; font-size: 12px; color: #188038; font-weight: 700; align-self: center; }
+.cyc-mini .cm-leg { font-size: 12px; color: var(--c-sub); margin-top: 4px; }
+
+/* #13 確認の窓（ブラウザ標準の「hptohyama.github.io の内容」をやめて、アプリの見た目に） */
+.uc-back { position: fixed; inset: 0; z-index: 90; background: rgba(32,33,36,.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.uc-back.hidden { display: none; }
+.uc-box { background: #fff; border-radius: 16px; width: 100%; max-width: 440px; padding: 20px 18px 16px; box-shadow: 0 16px 40px rgba(0,0,0,.3); }
+.uc-msg { font-size: 15px; line-height: 1.7; white-space: pre-wrap; color: var(--c-text); max-height: 60vh; overflow-y: auto; }
+.uc-btns { display: flex; gap: 10px; margin-top: 18px; }
+.uc-btns button { flex: 1; margin: 0; padding: 13px 8px; font-size: 15px; font-weight: 700; border-radius: 10px; cursor: pointer; }
+.uc-btns .uc-cancel { background: #fff; color: var(--c-text); border: 1.5px solid var(--c-border); }
+.uc-btns .uc-ok { background: var(--c-primary); color: #fff; border: none; }
+.uc-btns .uc-ok.danger { background: #c5221f; }
+
 /* ═══ PC表示（2026-11-07 社長依頼）═══
    ★管理者が PC（幅1024px以上・マウスで操作する端末）で開いたときだけ body に .pc が付く（applyLayout）。
      スマホ・タブレット、アルバイト（配布員）は、どの端末でも今まで通りのモバイル表示。
-   ・下のタブ → 左の縦メニュー／本文は横に広く（最大1200px）／一覧はカードを横に並べる */
+   ・下のタブ → 左の縦メニュー／本文は横に広く（最大1680px・表の画面は全幅・広い画面ほど拡大）／一覧はカードを横に並べる */
 body.pc header { padding: 12px 24px; }
 body.pc main { max-width: none; margin: 0 0 0 220px; padding: 24px 32px 48px; }
 body.pc main > .view, body.pc main > .card { max-width: 1200px; margin-left: auto; margin-right: auto; }
@@ -740,6 +848,32 @@ body.pc #overtimeView > .card { margin-bottom: 0; }
 body.pc #overtimeView > #scAdminCard { grid-row: span 3; }
 /* 配布禁止管理: 案件ごとの回避状況をカードで横に並べる */
 body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
+/* #19 承認待ちの修正報告が無いとき: 細い1行にたたみ、「スタッフを追加」を全幅で横一列に（左上の大きな空きを無くす） */
+body.pc #staffView.amend-empty #pendingAmendCard { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 10px 16px; }
+body.pc #staffView.amend-empty #pendingAmendCard > h2 { margin: 0; white-space: nowrap; }
+body.pc #staffView.amend-empty #pendingAmendCard > .case-info { display: none; }
+body.pc #staffView.amend-empty #pendingAmendCard #pendingAmendList { flex: 1; }
+body.pc #staffView.amend-empty #pendingAmendCard #pendingAmendList .empty { padding: 0; text-align: left; }
+body.pc #staffView.amend-empty #pendingAmendCard > button { width: auto; margin: 0 !important; padding: 6px 14px; }
+body.pc #staffView.amend-empty #linkStaffCard { grid-column: 1 / -1; }
+body.pc #staffView.amend-empty #linkStaffCard .ls-fields { display: grid; grid-template-columns: minmax(200px, 2fr) minmax(140px, 1fr) minmax(200px, 1.4fr) auto; gap: 0 14px; align-items: end; }
+body.pc #staffView.amend-empty #linkStaffCard .ls-fields .ls-wide { grid-column: 1 / -1; }
+body.pc #staffView.amend-empty #linkStaffCard .ls-fields #lsSubmit { margin-top: 0 !important; white-space: nowrap; }
+/* #20 報告管理: マスを押した中身を表の右に（広い画面でスクロールしなくても見える） */
+body.pc .rb-split.has-detail { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+body.pc .rb-split.has-detail #rbDetail { position: sticky; top: calc(var(--hdr-h, 66px) + 12px); border: 1px solid var(--c-border);
+  border-radius: 12px; padding: 4px 14px 14px; background: #fff; max-height: calc(100vh - var(--hdr-h, 66px) - 40px); overflow-y: auto; }
+/* ★広い画面（2026-11-08 社長指示: 真ん中に寄りすぎ → もっと大きく使いやすく）
+   ・本文の上限を 1200px → 1680px に。表が主役の画面（報告管理・シフト管理・配布禁止管理）は上限なし＝画面いっぱい
+   ・画面が広いほど全体（文字・ボタン・余白）を拡大する（1700px以上で1.1倍／2000px以上で1.2倍／2400px以上で1.3倍）。
+     body に zoom を掛けるので、左のメニュー・ヘッダー・ポップアップも同じ割合でそろって大きくなる */
+body.pc main > .view, body.pc main > .card { max-width: 1680px; }
+body.pc main > #reportAdminView, body.pc main > #shiftAdminView, body.pc main > #banAdminView { max-width: none; }
+body.pc .rb-mx { font-size: 13px; }
+body.pc .rb-mx th, body.pc .rb-mx td { padding: 7px 5px; }
+@media (min-width: 1700px) { body.pc { zoom: 1.1; } }
+@media (min-width: 2000px) { body.pc { zoom: 1.2; } }
+@media (min-width: 2400px) { body.pc { zoom: 1.3; } }
 </style>
 </head>
 <body>
@@ -950,12 +1084,16 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
 
       <div class="card" id="gpsCard">
         <h2 id="gpsHeading">④ GPS軌跡画像（必須・4枚以上）</h2>
-        <input type="file" id="gpsFiles" accept="image/*" multiple onchange="App.onGpsSelect(this)">
+        <!-- ★#2（2026-11-08）: スマホ標準の「ファイル選択」は小さく分かりにくいので、大きなボタンにした（input は見えなくして label で押す） -->
+        <input type="file" id="gpsFiles" class="gps-input" accept="image/*" multiple onchange="App.onGpsSelect(this)">
+        <label for="gpsFiles" class="gps-pick" id="gpsPick">📷 GPSの写真を選ぶ</label>
         <div id="gpsList" style="margin-top:8px"></div>
         <div class="case-info" id="gpsHint">GPSアプリの軌跡スクリーンショットを<b>4枚以上</b>添付してください。足りないと送信できません。<br>※「✏️数字を修正」で送り直すときは、<b>前回の画像がそのまま引き継がれます</b>（追加もできます）。</div>
         <div id="gpsProgress"></div>
       </div>
 
+      <!-- ★#3（2026-11-08）: 合計と「送れるか（足りないもの）」を画面の下に固定。町が多くても見える -->
+      <div id="reportDock" class="report-dock hidden" aria-live="polite"></div>
       <div id="resultArea"></div>
       <!-- ★送信先の取り違えを現場で止める最後の砦（総点検 2026-07-27） -->
       <div id="sendTarget" class="sendtarget hidden"></div>
@@ -1275,21 +1413,24 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
         ・<b>アルバイト（配布員）</b>：追加すると<b>専用リンク</b>が出るので、LINE WORKS で本人に送ってください。本人はそれを押すだけで入れます（Googleは使いません）。<br>
         ・<b>社員（管理者）</b>：その人の<b>Googleアカウントのメール</b>を入れて追加します。本人はGoogleでログインします。<br>
         すでに登録済みのアルバイトには、下の一覧の［🔗 リンクを発行］を使います。</div>
-      <label>氏名（インセン集計シートの列名と同じ書き方）</label>
-      <input id="lsName" type="text" placeholder="例: 山田 花子" autocomplete="off">
-      <label>拠点</label>
-      <select id="lsBase"></select>
-      <label>権限</label>
-      <select id="lsPerm" onchange="App.onLinkStaffPerm()">
-        <option value="配布員">配布員（アルバイト）</option>
-        <option value="管理者">管理者（社員）</option>
-        <option value="管理者（配布者）">管理者（配布者）（社員）</option>
-      </select>
-      <div id="lsEmailWrap" class="hidden">
-        <label>Googleアカウントのメール（社員はこれでログインします）</label>
-        <input id="lsEmail" type="email" placeholder="例: yamada@gmail.com" autocomplete="off">
+      <!-- ★#19（2026-11-08）: PCで横一列に並べられるよう、項目ごとにまとめた（スマホは今まで通り縦に並ぶ） -->
+      <div class="ls-fields">
+        <div><label>氏名（インセン集計シートの列名と同じ書き方）</label>
+        <input id="lsName" type="text" placeholder="例: 山田 花子" autocomplete="off"></div>
+        <div><label>拠点</label>
+        <select id="lsBase"></select></div>
+        <div><label>権限</label>
+        <select id="lsPerm" onchange="App.onLinkStaffPerm()">
+          <option value="配布員">配布員（アルバイト）</option>
+          <option value="管理者">管理者（社員）</option>
+          <option value="管理者（配布者）">管理者（配布者）（社員）</option>
+        </select></div>
+        <button type="button" class="btn-primary" id="lsSubmit" style="margin-top:12px" onclick="App.addLinkStaff()">追加して専用リンクを発行</button>
+        <div id="lsEmailWrap" class="hidden ls-wide">
+          <label>Googleアカウントのメール（社員はこれでログインします）</label>
+          <input id="lsEmail" type="email" placeholder="例: yamada@gmail.com" autocomplete="off">
+        </div>
       </div>
-      <button type="button" class="btn-primary" id="lsSubmit" style="margin-top:12px" onclick="App.addLinkStaff()">追加して専用リンクを発行</button>
       <div id="lsResult" style="margin-top:10px"></div>
     </div>
 
@@ -1327,8 +1468,11 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
         <button type="button" class="subtab" id="rbModeStaff" onclick="App.rbMode('staff')">スタッフ別</button>
       </div>
       <div id="rbSummary"></div>
-      <div id="rbBody"><div class="empty">読み込み中…</div></div>
-      <div id="rbDetail"></div>
+      <!-- ★#20（2026-11-08）: PCでは、押したマスの中身を表の右に出す（スマホは今まで通り下） -->
+      <div class="rb-split" id="rbSplit">
+        <div id="rbBody"><div class="empty">読み込み中…</div></div>
+        <div id="rbDetail"></div>
+      </div>
       <button type="button" class="btn-ghost" onclick="App.loadReportBoard()" style="margin-top:10px">↻ 更新</button>
     </div>
   </div>
@@ -1477,7 +1621,10 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
   <div class="view hidden" id="banView">
     <div class="card">
       <h2>📍 配布禁止</h2>
+      <!-- ★#6（2026-11-08）: 毎回同じ説明が画面の上を占めるので、最初の1回だけ開いておき、2回目からはたたむ -->
+      <details class="help-box" id="banHelp"><summary>この画面の使い方</summary>
       <div class="case-info">本日の担当案件に対応する<b>配布禁止エリア</b>です。まず<b>マップ</b>で場所を確認し、回避したら物件ごとに<b>「回避した」をタップ</b>してください。<br>このリストは<b>同じ案件の担当者全員で共有</b>されます（誰か1人がタップすれば全員に反映されます・自動更新）。<br><span style="font-size:12px">町名が同じだけで<b>別の都道府県など、配布エリアと関係のない住所</b>が出ているときは、小さな「誤表記」を押してください。</span></div>
+      </details>
     </div>
 
     <!-- 今日の配布禁止マップ（新しいタブで開く） -->
@@ -1524,6 +1671,18 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
 
 <!-- 下部固定ナビ -->
 <!-- 「元に戻す」トースト（承認・却下の直後だけ・一定時間で自動的に消える） -->
+<!-- ★#13（2026-11-08）: 確認の窓。uiConfirm() が文とボタンの名前を入れて出す -->
+<div id="uiConfirm" class="uc-back hidden" role="dialog" aria-modal="true" aria-labelledby="ucMsg">
+  <div class="uc-box">
+    <div class="uc-msg" id="ucMsg"></div>
+    <div class="uc-btns">
+      <button type="button" class="uc-cancel" id="ucCancel" onclick="App.ucAnswer(false)">やめる</button>
+      <button type="button" class="uc-ok" id="ucOk" onclick="App.ucAnswer(true)">OK</button>
+    </div>
+  </div>
+</div>
+<!-- ★#8 #16（2026-11-08）: できたときに数秒だけ出る緑の帯 -->
+<div id="okToast" class="hidden" role="status"></div>
 <div id="undoToast" class="hidden">
   <div class="ut-text"><div id="undoToastMsg"></div></div>
   <button type="button" class="ut-btn" id="undoToastBtn" onclick="App.doUndo()">元に戻す</button>
@@ -1532,7 +1691,8 @@ body.pc #banCaseList { display: grid; grid-template-columns: repeat(auto-fill, m
 
 <nav id="bottomNav" class="hidden">
   <button type="button" data-tab="home" id="navReport" onclick="App.switchTab('home')"><span class="ic">📝</span>報告</button>
-  <button type="button" data-tab="ban" id="navBan" onclick="App.switchTab('ban')" style="display:none"><span class="ic">📍</span>配布禁止<span class="navdot hidden" id="navBanDot"></span></button>
+  <!-- ★読み込み中の枠は、いちばん多いアルバイトと同じ4つ（報告・配布禁止・履歴・シフト）で出す（2026-11-08 社長指摘: 3つしか出ていなかった）。ログイン後は applyWhoami が権限で出し分ける -->
+  <button type="button" data-tab="ban" id="navBan" onclick="App.switchTab('ban')"><span class="ic">📍</span>配布禁止<span class="navdot hidden" id="navBanDot"></span></button>
   <button type="button" data-tab="banadmin" id="navBanAdmin" onclick="App.switchTab('banadmin')" style="display:none"><span class="ic">📍</span><span class="nl-l">配布禁止管理</span><span class="nl-s">禁止管理</span><span class="navdot hidden" id="navBanAdminDot"></span></button>
   <button type="button" data-tab="history" id="navHistory" onclick="App.switchTab('history')"><span class="ic">📋</span>履歴</button>
   <button type="button" data-tab="shift" id="navShift" onclick="App.switchTab('shift')"><span class="ic">📅</span>シフト<span class="navdot hidden" id="navShiftDot"></span></button>
@@ -1744,6 +1904,19 @@ var App = (function() {
     });
   }
 
+  // ─── #16（2026-11-08）: できたときの合図。対応している端末だけ短く振動（iPhone は振動しない＝何も起きないだけ） ───
+  function hapticOk() {
+    try { if (typeof navigator !== 'undefined' && navigator && typeof navigator.vibrate === 'function') navigator.vibrate(60); } catch (e) {}
+  }
+  var _okToastTimer = null;
+  function showOkToast(msg) {
+    var el = $('okToast'); if (!el) return;
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    if (_okToastTimer) clearTimeout(_okToastTimer);
+    _okToastTimer = setTimeout(function() { el.classList.add('hidden'); }, 3000);
+  }
+
   // ─── 押したボタンを「保存中…」にする（2026-11-07 社長指示: 保存中だと分かるように・システム全体） ───
   //   ボタンを押した流れの中で「書き込みの問い合わせ」（API_READONLY_ACTIONS に無いもの）を送ったら、
   //   そのボタンを押せなくして、くるくる＋「保存中…／送信中…／登録中…／処理中…」を出す。結果が返ったら元に戻す。
@@ -1792,6 +1965,46 @@ var App = (function() {
     if (b.innerHTML === st.busyHtml) b.innerHTML = st.html;
     b.disabled = false;
   }
+
+  // ─── #13 確認の窓（2026-11-08 社長選択）────────────────────────────────
+  //   uiConfirm(文, { ok: 'ボタンの名前', cancel: 'やめる', danger: true }, OKのとき, やめたとき)
+  //   ・ブラウザ標準の confirm（「hptohyama.github.io の内容」・OK/キャンセル）をやめ、何が起きるかが分かる名前のボタンにする。
+  //   ・押したあとの処理は「OKのとき」の関数で続ける（confirm のように止まって待てないため）。
+  //     呼び出し側は「同じ関数を、その質問に答えた印を付けてもう一度呼ぶ」形にしてある（確認より前は確かめるだけで何も変えない）。
+  //   ・OKを押したら、最初に押したボタンに「保存中…」が出るようにする（_clickBtn を戻してから続ける）。
+  //   ★テスト（偽のブラウザ）は window.__HIPOS_NATIVE_CONFIRM を立てて、今まで通り confirm() で答える（同期のまま）。
+  var _uc = null;
+  function uiConfirm(msg, opts, onOk, onCancel) {
+    opts = opts || {};
+    var native = (typeof window !== 'undefined' && window && window.__HIPOS_NATIVE_CONFIRM) || !$('uiConfirm');
+    if (native) {
+      if (confirm(msg)) { if (onOk) onOk(); } else if (onCancel) { onCancel(); }
+      return;
+    }
+    if (_uc) { var prevCancel = _uc.onCancel; _uc = null; if (prevCancel) { try { prevCancel(); } catch (e) {} } }   // 前の窓は「やめる」扱い
+    _uc = { onOk: onOk, onCancel: onCancel, orig: _clickBtn };
+    $('ucMsg').textContent = String(msg == null ? '' : msg);
+    var okb = $('ucOk'), cb = $('ucCancel');
+    okb.textContent = opts.ok || 'OK';
+    okb.classList.toggle('danger', !!opts.danger);
+    cb.textContent = opts.cancel || 'やめる';
+    $('uiConfirm').classList.remove('hidden');
+    try { okb.focus(); } catch (e) {}
+  }
+  function ucAnswer(yes) {
+    var u = _uc; _uc = null;
+    $('uiConfirm').classList.add('hidden');
+    if (!u) return;
+    if (yes) {
+      var keep = _clickBtn;
+      _clickBtn = u.orig;   // ★最初に押したボタンに「保存中…」を出す
+      try { if (u.onOk) u.onOk(); } finally { if (_clickBtn === u.orig) _clickBtn = keep; }
+    } else if (u.onCancel) {
+      u.onCancel();
+    }
+  }
+  /** いま確認の窓が出ているか（Esc・戻るで閉じるため） */
+  function ucOpen() { return !!_uc; }
 
   function api(payload) {
     payload.apiVersion = 1;
@@ -1941,10 +2154,16 @@ var App = (function() {
   function tryRestoreSession() {
     // ★専用リンク: 押して開いたとき（#k=…）が最優先。次に、この端末が覚えているリンク。
     var fresh = takeLinkFromUrl();
-    if (fresh && lsGet('hipos_id_token') &&
-        !confirm('この端末はいまGoogleでログインしています。\n専用リンクの人として入り直しますか？\n（管理者の方が試しに押した場合は「キャンセル」）')) {
-      fresh = '';   // 使わない（アドレス欄からは消えている）
+    if (fresh && lsGet('hipos_id_token')) {
+      uiConfirm('この端末はいまGoogleでログインしています。\n専用リンクの人として入り直しますか？\n（管理者の方が試しに押した場合は「このまま」）',
+        { ok: '専用リンクの人として入る', cancel: 'このまま' },
+        function() { restoreSessionWith(fresh); },
+        function() { restoreSessionWith(''); });   // 使わない（アドレス欄からは消えている）
+      return true;
     }
+    return restoreSessionWith(fresh);
+  }
+  function restoreSessionWith(fresh) {
     if (fresh) { lsSet(LINK_KEY, fresh); lsDel('hipos_id_token'); }
     if (lsGet('hipos_staff_token')) lsDel('hipos_staff_token');   // 昔の個別トークンの残骸は掃除だけ
     var lk = fresh || lsGet(LINK_KEY);
@@ -1966,8 +2185,11 @@ var App = (function() {
     return false;
   }
 
-  function logout() {
-    if (state.linkToken && !confirm('ログアウトすると、もう一度「専用リンク」を押すまで入れなくなります。\nログアウトしますか？')) return;
+  function logout(ok) {
+    if (state.linkToken && ok !== true) {
+      return uiConfirm('ログアウトすると、もう一度「専用リンク」を押すまで入れなくなります。\nログアウトしますか？',
+        { ok: 'ログアウトする' }, function() { logout(true); });
+    }
     lsDel('hipos_id_token'); lsDel('hipos_staff_token'); lsDel(LINK_KEY);
     try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
     location.reload();
@@ -2476,7 +2698,7 @@ var App = (function() {
     else if (name === 'staff') loadStaff();
     else if (name === 'shift') { var sd = $('shiftDone'); if (sd) sd.innerHTML = ''; loadShifts(); }
     else if (name === 'shiftadmin') loadShiftAdmin();
-    else if (name === 'ban') loadBanBoard();
+    else if (name === 'ban') { banHelpFirstOpen(); loadBanBoard(); }
     else if (name === 'banadmin') loadBanAdmin();
     else if (name === 'overtime') loadOvertime();
     else if (name === 'reportadmin') loadReportBoard();
@@ -2505,7 +2727,8 @@ var App = (function() {
     if (!res.ok) { $('todayList').innerHTML = '<div class="empty">' + esc(res.message || res.code) + '</div>'; return; }
     var list = res.todayAssignments || [];
     if (list.length === 0) {
-      $('todayList').innerHTML = '<div class="empty">本日の割当はありません。<br>下の「催事」から選んで報告できます。</div>';
+      // ★「催事から選ぶ」は廃止済み（2026-11-08 社長指摘で古い案内を直した）
+      $('todayList').innerHTML = '<div class="empty">今日の担当はありません。<br>予定が違うときは、担当者に連絡してください。</div>';
     } else {
       $('todayList').innerHTML = list.map(function(a) {
         var roleTag = a.role === '送迎' ? '（送迎）' : a.role === '現場指導' ? '（現場指導）' : '';
@@ -2671,7 +2894,8 @@ var App = (function() {
       var banner = allDone
         ? '<div class="bchk-alldone">✅ この案件の配布禁止 ' + total + '件はすべて' +
             (mislisted ? '確認済みです（回避 ' + avoided + '件・誤表記 ' + mislisted + '件）' : '回避済みです') + '</div>'
-        : '<div class="bchk-progress">回避 ' + avoided + (mislisted ? '・誤表記 ' + mislisted : '') +
+        : '<div class="bchk-bar"><span style="width:' + Math.round(done * 100 / total) + '%"></span></div>' +
+          '<div class="bchk-progress">回避 ' + avoided + (mislisted ? '・誤表記 ' + mislisted : '') +
             ' / ' + total + ' 件（未チェック ' + (total - done) + ' 件）</div>';
       // 管理者の画面では「誰が配るのか」と「自分の担当か」が分かるようにする（2026-07-27）
       var who2 = c.staffNames ? '<div class="bchk-staff">担当: ' + esc(c.staffNames) + '</div>' : '';
@@ -2681,6 +2905,21 @@ var App = (function() {
         '<span>' + esc(c.areaDisplay || '') + ' ・ 禁止' + total + '件</span></div>' +
         who2 + banner + items + '</div>';
     }).join('');
+  }
+
+  /** ★#6（2026-11-08）: 配布禁止の「この画面の使い方」は、この端末で初めて開いたときだけ開いておく */
+  function banHelpFirstOpen() {
+    var d = $('banHelp'); if (!d) return;
+    if (lsGet('hipos_banhelp_seen')) return;
+    d.setAttribute('open', '');
+    lsSet('hipos_banhelp_seen', '1');
+  }
+
+  /** その案件の配布禁止が全部「回避した」か「誤表記」になっているか */
+  function banCaseAllDone(c) {
+    var bans = (c && c.bans) || [];
+    if (!bans.length) return false;
+    return bans.every(function(b) { return b.state === '回避した' || b.state === '誤表記'; });
   }
 
   // 現在の配列から (案件×配布日×住所) で対象banを引き直す（自動更新で配列が差し替わっても迷子にならない）
@@ -2708,16 +2947,30 @@ var App = (function() {
   //   紛れ込んだときに押す。「回避した」とは記録を分ける。
   //   ★以前廃止した「該当なし」（配布エリア内だがルートに入らない）の抜け道にならないよう、
   //     付けるときだけ確認を1回挟む（取り消すときは聞かない）。
-  function toggleMislisted(scope, ci, bi) {
+  function toggleMislisted(scope, ci, bi, ok) {
     var c = (state.banToday[scope] || [])[ci]; if (!c) return;
     var b = c.bans[bi]; if (!b) return;
     // ★送信中の物件なら、確認を出す前に知らせる（OKまで押したのに黙って無視される、を防ぐ）
     if (state.banPending[banPendingKey(c, b)]) { alert(BAN_BUSY_MSG); return; }
-    if (b.state !== '誤表記' && !confirm(
+    if (b.state !== '誤表記' && ok !== true) {
+      // ★窓が出ている間に自動更新で並びが変わっても取り違えないよう、OKのときは住所で引き直す
+      var caseNo = c.caseNo, dateIso = c.dateIso || c.distDate || '', raw = b.raw;
+      return uiConfirm(
         'この住所を「誤表記」として報告しますか？\n\n' +
         '　' + b.raw + '\n\n' +
         '誤表記＝町名が同じだけで、別の都道府県など配布エリアと関係のない住所が出ている場合です。\n\n' +
-        '※配布エリア内の住所なら、誤表記ではなく「回避した」を押してください。')) return;
+        '※配布エリア内の住所なら、誤表記ではなく「回避した」を押してください。',
+        { ok: '誤表記として報告する' },
+        function() {
+          var cases = state.banToday[scope] || [];
+          for (var i = 0; i < cases.length; i++) {
+            if (cases[i].caseNo !== caseNo || ((cases[i].dateIso || cases[i].distDate || '') !== dateIso)) continue;
+            for (var j = 0; j < (cases[i].bans || []).length; j++) {
+              if (cases[i].bans[j].raw === raw) { toggleMislisted(scope, i, j, true); return; }
+            }
+          }
+        });
+    }
     banToggleState(scope, ci, bi, '誤表記');
   }
 
@@ -2743,9 +2996,15 @@ var App = (function() {
                                state: isOn ? '' : label,
                                byName: isOn ? '' : ((state.staff && state.staff.name) || '自分'),
                                atHm: isOn ? '' : nowHm() };
+    var wasAllDone = banCaseAllDone(c);
     b.state = state.banPending[pkey].state;            // 楽観的更新
     b.byName = state.banPending[pkey].byName;
     b.atHm = state.banPending[pkey].atHm;
+    // ★#8 #16（2026-11-08）: 最後の1件を押して「全部済み」になった瞬間に、はっきり知らせる（短く振動＋緑の帯）
+    if (!wasAllDone && banCaseAllDone(c)) {
+      hapticOk();
+      showOkToast('✅ ' + (c.storeClean || 'この案件') + ' の配布禁止はすべてチェックしました');
+    }
     var wrapId = (scope === 'admin') ? 'banAdminTodayWrap' : 'banTodayWrap';
     renderBanTodayInto(wrapId, scope);
     function apply(vals, msg) {
@@ -2965,9 +3224,40 @@ var App = (function() {
       return '<span><b>' + esc(t) + '</b> ' + esc(v) + '</span>';
     }).join('');
     var tot = hasNum ? '（計 ' + total.toLocaleString('en-US') + (hasUnknown ? '＋不明' : '') + '）' : '';
-    box.innerHTML = '<div class="hh-total">🏠 世帯数' + tot + '</div>' +
-                    '<div class="hh-list">' + rows + '</div>';
+    // ★#4（2026-11-08）: 町ごとの世帯数は各町の入力欄の横に出す。ここ（一覧）はたたんでおく（27町だと入力欄が遠くなる）
+    box.innerHTML = '<details><summary class="hh-total">🏠 世帯数' + tot + '</summary>' +
+                    '<div class="hh-list">' + rows + '</div></details>';
     box.classList.remove('hidden');
+    state.hhList = { towns: towns.slice(), hh: hh.slice() };
+    decorateTownRowsHh();
+  }
+
+  /** ★#4: 各町の入力欄の横に「🏠 300」（世帯数）を出す。世帯数が分からない町は出さない */
+  function decorateTownRowsHh() {
+    var rowsBox = $('townRows'); if (!rowsBox) return;
+    var map = {};
+    var L = state.hhList || { towns: [], hh: [] };
+    (L.towns || []).forEach(function(t, i) {
+      var v = String((L.hh || [])[i] == null ? '' : L.hh[i]).trim();
+      if (v && v !== '－' && v !== '-' && v !== 'ー') map[String(t || '').trim()] = v;
+    });
+    var hasAny = Object.keys(map).length > 0;   // 世帯数が1つも無い案件では出さない。あれば全行に出して幅をそろえる（分からない町は「－」）
+    var rows = rowsBox.querySelectorAll('.town-row');
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var tEl = r.querySelector('.town'); if (!tEl) continue;
+      var v = map[String(tEl.value || '').trim()] || (hasAny ? '－' : '');
+      var chip = r.querySelector('.hh-chip');
+      if (!v) { if (chip) chip.remove(); continue; }
+      var txt = '🏠 ' + v;
+      if (chip) { if (chip.textContent !== txt) chip.textContent = txt; continue; }
+      chip = document.createElement('span');
+      chip.className = 'hh-chip';
+      chip.title = '世帯数';
+      chip.textContent = txt;
+      var q = r.querySelector('.qty');
+      if (q) r.insertBefore(chip, q); else r.appendChild(chip);
+    }
   }
 
   /**
@@ -2992,14 +3282,32 @@ var App = (function() {
     renderGpsList();
   }
 
+  /**
+   * 別の案件に切り替えると消えてしまう「入力中のもの」の説明（無ければ ''）。
+   * ★GPS画像も「入力中のもの」として数える（2026-08-24 レビュー）。
+   *   部数が空でも画像だけ選んだ状態はよくあり、以前はそこで確認が出ないまま
+   *   画像だけが次の案件に持ち越されて、別案件の報告に添付されていた。
+   */
+  function caseSwitchWarn() {
+    var hasTyped = readLinesRaw().some(function(l) { return String(l.qty || '') !== ''; });
+    var hasGps = state.gpsFiles.length > 0;
+    return (hasTyped && hasGps) ? '入力中の部数と、選択中のGPS画像があります。'
+         : hasTyped ? '入力中の部数があります。'
+         : hasGps ? '選択中のGPS画像があります。' : '';
+  }
+
   // 案件の切替（ホームの本日カード or 報告忘れカードのタップ）。dayは割当日（省略時は当日分を選ぶ）。
-  function pickCase(caseNo, day) {
+  function pickCase(caseNo, day, ok) {
     if (gpsBusyBlock()) return;
+    ok = ok || {};
     // ★修正の申請中に別の案件をタップしたら、まず「修正をやめるか」を確かめる。
     //   黙って抜けると直した数字が残り、承認を通さない報告として送れてしまう。
     if (state.correctingCase) {
       var typed = readLinesRaw().some(function(l) { return String(l.qty || '') !== ''; });
-      if (typed && !confirm('修正の申請をやめて、別の案件の報告に移りますか？\n（直した数字は送られません）')) return;
+      if (typed && !ok.amend) {
+        return uiConfirm('修正の申請をやめて、別の案件の報告に移りますか？\n（直した数字は送られません）',
+          { ok: '修正をやめて移る', cancel: '修正を続ける' }, function() { ok.amend = true; pickCase(caseNo, day, ok); });
+      }
       exitAmendMode();
     }
     var list = state.cases || [];
@@ -3012,8 +3320,19 @@ var App = (function() {
     if (!c) { for (var j = 0; j < list.length; j++) { if (list[j].caseNo === caseNo && list[j].status === 'today') { c = list[j]; break; } } }
     if (!c) { for (var k = 0; k < list.length; k++) { if (list[k].caseNo === caseNo) { c = list[k]; break; } } }
     if (!c) { alert('この案件は報告対象にありません（受付終了の可能性）'); return; }
+    // ★#13: 入力中の部数・選んだ写真が消える切り替えは、ここ（押したとき）で先に聞く。
+    //   答えたら下の描画では聞き直さない（描画の途中で止まって待てないため）。
+    if (!ok.sw && !state.correctingCase && state.townRowsKey && state.townRowsKey !== caseKeyOf(c)) {
+      var w = caseSwitchWarn();
+      if (w) {
+        return uiConfirm(w + '別の案件に切り替えると消えます。よろしいですか？',
+          { ok: '切り替える（入力を消す）', cancel: 'やめる' }, function() { ok.sw = true; pickCase(caseNo, day, ok); });
+      }
+    }
+    state.caseSwitchOk = !!ok.sw;
     state.reportCase = c;
     renderReportCases();
+    state.caseSwitchOk = false;
     $('caseInfo').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -3143,6 +3462,7 @@ var App = (function() {
 
     // 案件切替の起点で前案件の世帯数参照をクリア（caseTowns失敗時の他案件への誤適用を防ぐ）
     renderHhRef([], []);   // 前案件の世帯数参照を消す（新案件の取得成功で上書き）
+    state.hhList = null;
 
     // ★★別の案件に切り替えたら、前の案件の町行を残さない（2026-08-09 総点検）。
     //   プリフィルは「入力済みの行があれば上書きしない」ので、前の案件の町名が
@@ -3151,15 +3471,9 @@ var App = (function() {
     //   合計部数は合うので数字では気づけず、配布実績の記録が恒久的に狂う。
     var newKey = caseKeyOf(c);
     if (!state.correctingCase && state.townRowsKey && state.townRowsKey !== newKey) {
-      var hasTyped = readLinesRaw().some(function(l) { return String(l.qty || '') !== ''; });
-      // ★GPS画像も「入力中のもの」として数える（2026-08-24 レビュー）。
-      //   部数が空でも画像だけ選んだ状態はよくあり、以前はそこで確認が出ないまま
-      //   画像だけが次の案件に持ち越されて、別案件の報告に添付されていた。
-      var hasGps = state.gpsFiles.length > 0;
-      var warn = (hasTyped && hasGps) ? '入力中の部数と、選択中のGPS画像があります。'
-               : hasTyped ? '入力中の部数があります。'
-               : hasGps ? '選択中のGPS画像があります。' : '';
-      if (!warn || confirm(warn + '別の案件に切り替えると消えます。よろしいですか？')) {
+      var warn = caseSwitchWarn();
+      // ★#13: 押して切り替えたときは pickCase で先に聞いている（state.caseSwitchOk）。それ以外の経路だけここで聞く
+      if (!warn || state.caseSwitchOk || confirm(warn + '別の案件に切り替えると消えます。よろしいですか？')) {
         $('townRows').innerHTML = '';   // 登録された配布エリアはこのあと読み直して入れ直す
         if ($('note')) $('note').value = '';
         resetWorkFields();
@@ -3461,6 +3775,7 @@ var App = (function() {
   }
 
   function recalc() {
+    decorateTownRowsHh();   // ★#4 行が作り直されても世帯数を付け直す
     var hint = $('townLockHint');
     if (hint) hint.classList.toggle('hidden', lockedRowCount() === 0);   // 消せない行があるときだけ案内を出す
     $('autoTotal').textContent = autoSum();
@@ -3512,6 +3827,45 @@ var App = (function() {
     var cph = (total > 0 && dm > 0) ? Math.round(total * 60 / dm) : '';
     $('workCph').value = cph;
     if ($('workCphView')) $('workCphView').textContent = cph || 0;
+    updateReportDock();
+  }
+
+  /**
+   * ★#3（2026-11-08 社長選択）: 報告の画面の下に「合計・配布時間・写真」と「送れるか」を固定で出す。
+   *   足りないもの（配布時間・写真）は赤で出し、押すとその場所へ移動する。判定は submit() と同じ基準
+   *   （写真＝修正の再送で前回の画像を引き継ぐときは免除／配布時間＝必須）。部数0でも送れる（配らなかった記録）。
+   *   報告済み・送迎/現場指導の日・案件が無いときは出さない。
+   */
+  function reportDockState() {
+    var c = currentCase();
+    if (!c || (!state.correctingCase && c.done) || isNoDistRole(c) || lockedRowCount() === 0) return null;
+    var carried = gpsCarryCount();
+    var have = state.gpsFiles.length + carried;
+    var gpsOk = carried > 0 || have >= state.gpsMin;
+    var dm = distMinValue();
+    return { total: autoSum(), distMin: dm, distOk: dm != null, gps: have, gpsMin: state.gpsMin, gpsOk: gpsOk, carried: carried };
+  }
+  function updateReportDock() {
+    var el = $('reportDock'); if (!el) return;
+    var st = reportDockState();
+    if (!st) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+    var ready = st.distOk && st.gpsOk;
+    var dist = st.distOk
+      ? '<span class="rd-it okk">配布時間 ' + Math.floor(st.distMin / 60) + ':' + ('0' + (st.distMin % 60)).slice(-2) + ' ✓</span>'
+      : '<span class="rd-it ng" onclick="App.dockGo(\'dist\')">配布時間が未入力</span>';
+    var gps = st.carried > 0
+      ? '<span class="rd-it okk">📷 前回の写真を引き継ぎ ✓</span>'
+      : (st.gpsOk ? '<span class="rd-it okk">📷 ' + st.gps + '枚 ✓</span>'
+                  : '<span class="rd-it ng" onclick="App.dockGo(\'gps\')">📷 写真 あと' + (st.gpsMin - st.gps) + '枚</span>');
+    el.innerHTML = '<span class="rd-tot">合計 ' + Number(st.total || 0).toLocaleString('en-US') + '部</span>' + dist + gps +
+      '<span class="rd-st">' + (ready ? '✓ 送信できます' : 'まだ送れません') + '</span>';
+    el.classList.toggle('ready', ready);
+    el.classList.remove('hidden');
+  }
+  function dockGo(what) {
+    if (what === 'gps') { var g = $('gpsHeading'); if (g && g.scrollIntoView) g.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    var d = $('workDistLabel'); if (d && d.scrollIntoView) d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var h = $('workDistH'); if (h && h.focus) h.focus();
   }
 
   // 勤務実績の初期値（休憩1h・勤務8h）を入れる。部数毎時は自動。
@@ -3525,8 +3879,9 @@ var App = (function() {
   }
 
   // ─── 送信 ───
-  function submit(ev) {
-    ev.preventDefault();
+  function submit(ev, ok) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    ok = ok || {};
     if (state.submitting) return;
     var c = currentCase();
     if (!c) { alert('催事を選択してください'); return; }
@@ -3542,6 +3897,7 @@ var App = (function() {
     if (isNoDistRole(c)) { submitNoDist(c); return; }
     // ★履歴からの修正は「申請」＝ここでは数字を動かさない。管理者が承認して初めて反映される。
     if (state.correctingCase) { submitAmend(c); return; }
+    var again = function(k) { return function() { ok[k] = true; submit(null, ok); }; };   // ★#13 答えたらもう一度
     var lines = readLines();
     // ★行は「登録された配布エリア」からしか作られない（手入力は廃止・2026-08-19）。
     //   0行＝その案件に配布エリアが登録されていない＝スタッフ側では解決できない。
@@ -3559,7 +3915,7 @@ var App = (function() {
     //   1200 を 12000 と打っても素通りし、そのまま配布インセンティブの根拠になる。
     //   世帯数（取得済み）と実務上の上限で「明らかにおかしい値」だけを止める。
     var qtyWarn = checkQtySanity(lines);
-    if (qtyWarn && !confirm(qtyWarn + '\n\nこの内容で送信しますか？')) return;
+    if (qtyWarn && !ok.qty) return uiConfirm(qtyWarn + '\n\nこの内容で送信しますか？', { ok: 'この内容で送信する', cancel: '直す' }, again('qty'));
     // ★GPS軌跡画像の添付を必須にする（U-2・社長判断 2026-07-28）。
     //   「④ GPS軌跡画像」まで指が届かず未添付のまま送られると、あとから本人に頼み直すことになる。
     //   ただし「✏️数字を修正」の再送は、前回の報告に付いていた画像をサーバが引き継ぐので免除する。
@@ -3586,7 +3942,7 @@ var App = (function() {
       return;
     }
     var distWarn = checkDistSanity(distMinValue());
-    if (distWarn && !confirm(distWarn + '\n\nこの時間で報告しますか？')) return;
+    if (distWarn && !ok.dist) return uiConfirm(distWarn + '\n\nこの時間で報告しますか？', { ok: 'この時間で報告する', cancel: '直す' }, again('dist'));
     // 配布禁止物件の回避確認は報告送信ゲートから撤去（Phase2/3）。回避は「配布禁止」タブで行う。
     // ★送信IDは「案件×配布日」に紐づける（総点検 2026-07-28）。
     //   電波が切れて送信が失敗すると、再送できるよう state.reportUuid を残す（これは正しい）。
@@ -3628,10 +3984,13 @@ var App = (function() {
    *   「報告を送信」がそのままこの経路になった（以前は専用ボタンだった）。
    *   勤務時間だけはサーバに渡して記録する。
    */
-  function submitNoDist(c) {
+  function submitNoDist(c, ok) {
     var day = c.assignDate || c.distEnd || '';
-    if (!confirm('「' + c.storeClean + '（' + day + '）」の報告を送信します。\n' +
-                 '（' + ((c.role === '送迎') ? '送迎' : '現場指導') + 'のため、部数の報告はありません）\n\nよろしいですか？')) return;
+    if (ok !== true) {
+      return uiConfirm('「' + c.storeClean + '（' + day + '）」の報告を送信します。\n' +
+                 '（' + ((c.role === '送迎') ? '送迎' : '現場指導') + 'のため、部数の報告はありません）\n\nよろしいですか？',
+        { ok: '送信する' }, function() { submitNoDist(c, true); });
+    }
     // ★送信IDは「案件×配布日」に紐づける（通常の報告と同じ理由＝別案件の結果が返るのを防ぐ）
     var ckey = caseKeyOf(c);
     if (!state.reportUuid || state.reportUuidKey !== ckey) {
@@ -3654,6 +4013,7 @@ var App = (function() {
         // ★お知らせは後片づけの**後**に出す（先に出すと下書き復元の案内で上書きされて消える）
         clearFormAfterSuccess();
         $('resultArea').innerHTML = '<div class="msg msg-ok">✅ ' + esc(res.message || '報告を受け付けました') + '</div>';
+        hapticOk();   // ★#16
         $('resultArea').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } else {
         $('resultArea').innerHTML = errHtml(res, 'エラー');
@@ -3670,7 +4030,8 @@ var App = (function() {
    * 履歴からの「✏️ 数字を修正」＝修正内容の申請。
    * ★ここでは元の報告に一切触れない（数字は動かない）。管理者が承認して初めて反映される。
    */
-  function submitAmend(c) {
+  function submitAmend(c, ok) {
+    ok = ok || {};
     var lines = readLines();
     if (lines.length === 0) {
       alert('修正する町×部数がありません。画面を読み込み直してからお試しください。');
@@ -3690,13 +4051,17 @@ var App = (function() {
       var dfx = $('workDistH'); if (dfx) dfx.focus();
       return;
     }
+    var again = function(k) { return function() { ok[k] = true; submitAmend(c, ok); }; };   // ★#13 答えたらもう一度
     var distWarn2 = checkDistSanity(distMinValue());
-    if (distWarn2 && !confirm(distWarn2 + '\n\nこの時間で申請しますか？')) return;
+    if (distWarn2 && !ok.dist) return uiConfirm(distWarn2 + '\n\nこの時間で申請しますか？', { ok: 'この時間で申請する', cancel: '直す' }, again('dist'));
     var qtyWarn = checkQtySanity(lines);
-    if (qtyWarn && !confirm(qtyWarn + '\n\nこの内容で申請しますか？')) return;
+    if (qtyWarn && !ok.qty) return uiConfirm(qtyWarn + '\n\nこの内容で申請しますか？', { ok: 'この内容で申請する', cancel: '直す' }, again('qty'));
     var total = autoSum();
-    if (!confirm('この内容で修正を申請します。\n\n合計 ' + total + ' 部\n\n' +
-                 '管理者が承認すると反映されます（承認までは、いまの報告内容がそのまま残ります）。')) return;
+    if (!ok.fin) {
+      return uiConfirm('この内容で修正を申請します。\n\n合計 ' + total + ' 部\n\n' +
+                 '管理者が承認すると反映されます（承認までは、いまの報告内容がそのまま残ります）。',
+        { ok: '申請する' }, again('fin'));
+    }
     setSubmitting(true, '申請中…');
     api({
       action: 'submitAmendRequest', deviceId: state.deviceId,
@@ -3715,6 +4080,7 @@ var App = (function() {
         // ★申請できたお知らせは renderReportCases の**後**に出す。
         //   先に出すと、戻った先の案件に下書きがあったとき restoreDraft の案内で上書きされて消える。
         $('resultArea').innerHTML = '<div class="msg msg-ok" style="white-space:pre-wrap">✅ ' + esc(res.message || '修正内容を申請しました') + '</div>';
+        hapticOk();   // ★#16
         $('resultArea').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } else {
         $('resultArea').innerHTML = errHtml(res, '申請できませんでした');
@@ -3892,20 +4258,48 @@ var App = (function() {
         '枚 添付済みです（そのまま引き継がれます）<br><span style="font-weight:400">追加したいときだけ下から選んでください。</span></div>'
       : '';
     // 未添付＝送信できない状態なので、その場で分かるように出す（U-2）
+    var pick = $('gpsPick');
+    if (pick) pick.textContent = state.gpsFiles.length ? '📷 写真を追加する' : '📷 GPSの写真を選ぶ';
     if (state.gpsFiles.length === 0) {
+      gpsThumbsPrune();
       box.innerHTML = carried || '<div class="gpsneed">📷 まだ添付されていません（' + state.gpsMin + '枚以上が必要です）</div>';
+      updateReportDock();
       return;
     }
     box.innerHTML = carried + gpsFileListHtml();
+    updateReportDock();
+  }
+
+  // ★#2（2026-11-08）: 選んだ写真は小さな画像で並べる（ファイル名だけだと、どれを選んだか分からない）。
+  //   画像の表示用URLは選び直し・削除のたびに使っていない分を捨てる（スマホのメモリを食わない）。
+  var _gpsThumbs = [];
+  function gpsThumbUrl(f) {
+    try {
+      if (typeof URL === 'undefined' || !URL.createObjectURL) return '';
+      for (var i = 0; i < _gpsThumbs.length; i++) if (_gpsThumbs[i].f === f) return _gpsThumbs[i].url;
+      var url = URL.createObjectURL(f);
+      _gpsThumbs.push({ f: f, url: url });
+      return url;
+    } catch (e) { return ''; }
+  }
+  function gpsThumbsPrune() {
+    _gpsThumbs = _gpsThumbs.filter(function(t) {
+      var keep = state.gpsFiles.indexOf(t.f) >= 0;
+      if (!keep) { try { URL.revokeObjectURL(t.url); } catch (e) {} }
+      return keep;
+    });
   }
 
   /** これから送る（新しく選んだ）画像の一覧HTML */
   function gpsFileListHtml() {
-    var html = state.gpsFiles.map(function(f, i) {
+    gpsThumbsPrune();
+    var html = '<div class="gps-thumbs">' + state.gpsFiles.map(function(f, i) {
       var kb = Math.round(f.size / 1024);
-      return '<div class="town-row"><input class="town" value="📷 ' + esc(f.name) + '（' + kb + 'KB）" readonly>' +
-             '<button type="button" onclick="App.removeGpsFile(' + i + ')">×</button></div>';
-    }).join('');
+      var url = gpsThumbUrl(f);
+      return '<div class="gps-th">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<div class="gps-nm">📷 ' + esc(f.name) + '（' + kb + 'KB）</div>') +
+             '<span class="gps-no">' + (i + 1) + '</span>' +
+             '<button type="button" class="gps-x" aria-label="この写真を外す" onclick="App.removeGpsFile(' + i + ')">×</button></div>';
+    }).join('') + '</div>';
     var need = gpsCarryCount() > 0 ? 0 : (state.gpsMin - state.gpsFiles.length);
     return html + '<div class="case-info">選択中: ' + state.gpsFiles.length + '/' + state.gpsMax + '枚' +
       (need > 0 ? '<b style="color:var(--c-err)">（あと ' + need + '枚必要）</b>' : '（枚数OK）') + '</div>';
@@ -3986,6 +4380,7 @@ var App = (function() {
           showResult(up.res);
           area.innerHTML = area.innerHTML + '<div class="msg msg-ok">📷 GPS画像 ' + up.saved +
             '枚をGoogleドライブに保存しました。これで報告は完了です。</div>';
+          hapticOk();   // ★#16 報告が全部終わった合図
           area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
           // ★報告そのものは受理済み＝この日はもう送れない（もう一度「報告を送信」を押せる状態に戻さない）
@@ -4094,7 +4489,7 @@ var App = (function() {
         : '';
       var period = r.distStart === r.distEnd ? r.distStart : (r.distStart + '〜' + r.distEnd);
       var badge = pending
-        ? '<span class="st-badge st-AMEND">承認待ち</span>'
+        ? '<span class="st-badge st-AMEND">✏️ 修正の承認待ち</span>'
         : '<span class="st-badge st-' + esc(r.status) + '">' + statusLabel(r.status) + '</span>';
       var qtyTxt = (r.status === 'NODIST') ? '部数の報告なし' : ((r.calcTotal || 0) + '部');
       var gpsTxt = (r.status === 'APPLIED' && r.gpsCount != null) ? ' ／ 📷 ' + r.gpsCount + '枚' : '';
@@ -4104,12 +4499,12 @@ var App = (function() {
         ? '<div class="msg msg-err" style="margin-top:6px">⚠ GPS画像が足りません（' + r.gpsCount + '枚・' + gpsMin +
           '枚必要）。下の「📷 GPS画像を追加」から足してください。</div>'
         : '';
-      return '<div class="rep' + (short ? ' open' : '') + '" id="rep-' + esc(r.reportUuid) + '">' +
+      return '<div class="rep' + (short ? ' open' : '') + (pending ? ' pending' : '') + '" id="rep-' + esc(r.reportUuid) + '">' +
         '<div class="top" onclick="App.toggleRep(\'' + esc(r.reportUuid) + '\')">' +
           '<div><div class="store">' + esc(r.storeClean || r.caseNo) + '</div>' +
           '<div class="meta">' + esc(period) + ' ／ ' + esc(qtyTxt) + esc(gpsTxt) +
           (r.tabName ? ' ／ ' + esc(r.tabName) : '') + '</div>' + gpsWarn + '</div>' +
-          badge +
+          badge + '<span class="rep-chev" aria-hidden="true">›</span>' +
         '</div>' +
         '<div class="actions">' + amendMsg + amendBtn + gpsBtn + '</div>' +
       '</div>';
@@ -4798,12 +5193,15 @@ var App = (function() {
     $('oeResult').innerHTML = '<div class="msg">追加した予定を取り消しました。入力を戻したので、直してから追加し直せます。</div>';
     loadOtherEvents();
   }
-  function deleteOtherEvent(ev) {
+  function deleteOtherEvent(ev, ok) {
     if (!ev) return;
     var box = $('oeNotice');
     if (state.submitting) { box.innerHTML = OE_BUSY; return; }
-    if (!confirm('「' + ev.title + '」（' + ev.base + '・' + oeWhenLabel(ev) + '）を消します。\n' +
-                 'スタッフのカレンダーからも消えます。よろしいですか？')) return;
+    if (ok !== true) {
+      return uiConfirm('「' + ev.title + '」（' + ev.base + '・' + oeWhenLabel(ev) + '）を消します。\n' +
+                 'スタッフのカレンダーからも消えます。よろしいですか？',
+        { ok: '消す', danger: true }, function() { deleteOtherEvent(ev, true); });
+    }
     state.submitting = true;
     closeOtherSheet();
     box.innerHTML = '<div class="msg">消しています…</div>';
@@ -4997,10 +5395,13 @@ var App = (function() {
     return '<div class="oe-grid">' + calHeadHtml() + cells + '</div>';
   }
 
-  function regSetView(v) {
+  function regSetView(v, ok) {
     v = (v === 'list') ? 'list' : 'cal';
     if (v === 'cal' && state.regEdit) {
-      if (!confirm('編集中の内容は、まだ保存されていません。\n編集をやめて、カレンダーに切り替えますか？')) return;
+      if (ok !== true) {
+        return uiConfirm('編集中の内容は、まだ保存されていません。\n編集をやめて、カレンダーに切り替えますか？',
+          { ok: 'カレンダーに切り替える', cancel: '編集を続ける' }, function() { regSetView(v, true); });
+      }
       state.regEdit = null;
     }
     state.regView = v;
@@ -5212,7 +5613,7 @@ var App = (function() {
   }
 
   // 保存＝望む状態を一括送信（報告者を外す場合は確認→force再送）
-  function regDoSave(i, force) {
+  function regDoSave(i, force, townsOk) {
     regEditSyncFields();
     var ed = state.regEdit; if (!ed || ed.i !== i) return;
     if (ed.detailFailed) { alert('この予定の詳細を読み込めませんでした。「↻ 一覧を更新」してからやり直してください（そのまま保存すると世帯数・配布禁止リストが消える恐れがあります）'); return; }
@@ -5230,6 +5631,10 @@ var App = (function() {
     }
     var z = zipTownsHouseholds(ed.townsText, ed.householdsText);   // 町と世帯数を順対応でzip
     var towns = z.towns;
+    if (townsOk !== true) {   // ★#5 町名でない行
+      var badE = suspiciousTownLines(towns);
+      if (badE.length) return uiConfirm(suspiciousTownsMsg(badE), { ok: 'このまま保存する', cancel: '戻って直す' }, function() { regDoSave(i, force, true); });
+    }
     var households = z.households;
     // ★配布の担当がいるのに配布エリア（町）が空なら保存しない（2026-09-13・サーバと同じ決まり）。
     //   空のまま保存すると、その日の配布担当が報告できず、配布禁止物件も「禁止なし」と表示されてしまう。
@@ -5256,8 +5661,8 @@ var App = (function() {
         $('regListResult').innerHTML = '<div class="msg msg-ok">' + esc(res.message || '更新しました') + '</div>';
         loadRegistrations();
       } else if (res.code === 'E_REPORTED' && res.needsConfirm) {
-        if (confirm(res.message)) regDoSave(i, true);
-        else $('regListResult').innerHTML = '';
+        uiConfirm(res.message, { ok: '保存する' }, function() { regDoSave(i, true, true); },
+          function() { $('regListResult').innerHTML = ''; });
       } else {
         $('regListResult').innerHTML = errHtml(res, 'エラー');
       }
@@ -5275,16 +5680,19 @@ var App = (function() {
   }
 
   // 予定ごと取消（担当全員を外す）
-  function deleteRegistration(i, force) {
+  function deleteRegistration(i, force, ask) {
     var r = (state.registrations || [])[i];
     if (!r) return;
     if (!force) {
       var who = (r.staff || []).map(function(s) { return s.name; }).join('、');
       // ★取消の副作用を明記する（U-4）。割当が消えると、その日の報告を本人が
       //   「✏️数字を修正」で直せなくなる（管理者取消が必要になる）。
-      if (!confirm('「' + r.distDate + '　' + r.storeClean + '」の予定を取り消します（担当 ' + who + ' 全員）。よろしいですか？\n\n' +
+      if (ask !== true) {
+        return uiConfirm('「' + r.distDate + '　' + r.storeClean + '」の予定を取り消します（担当 ' + who + ' 全員）。よろしいですか？\n\n' +
                    '・提出済みの報告・集計はそのまま残ります\n' +
-                   '・※この日の報告を本人が直せなくなります（数字の修正は管理者にご依頼ください）')) return;
+                   '・※この日の報告を本人が直せなくなります（数字の修正は管理者にご依頼ください）',
+          { ok: '予定を取り消す', danger: true }, function() { deleteRegistration(i, false, true); });
+      }
     }
     $('regListResult').innerHTML = '<div class="msg">取消中…</div>';
     api({ action: 'deleteAssignEvent', srcEventId: r.srcEventId, srcCal: r.srcCal, force: !!force }).then(function(res) {
@@ -5292,8 +5700,9 @@ var App = (function() {
         $('regListResult').innerHTML = '<div class="msg msg-ok">' + esc(res.message || '取り消しました') + '</div>';
         loadRegistrations();
       } else if (res.code === 'E_REPORTED' && res.needsConfirm) {
-        if (confirm(res.message + '\n\n※この日の報告を本人が直せなくなります（数字の修正は管理者にご依頼ください）')) deleteRegistration(i, true);
-        else $('regListResult').innerHTML = '';
+        uiConfirm(res.message + '\n\n※この日の報告を本人が直せなくなります（数字の修正は管理者にご依頼ください）',
+          { ok: '取り消す', danger: true }, function() { deleteRegistration(i, true); },
+          function() { $('regListResult').innerHTML = ''; });
       } else {
         $('regListResult').innerHTML = errHtml(res, 'エラー');
       }
@@ -5496,7 +5905,27 @@ var App = (function() {
     }
   }
 
-  function submitRegister(force) {
+  /**
+   * ★#5（2026-11-08 社長選択）: 配布エリアに「町名ではなさそうな行」が無いか。
+   *   集計の表から貼り付けると「配布部数合計」「-部/1h」「休憩/1h」「勤務/-h」などの行が混ざり、
+   *   スタッフの報告画面に町として出てしまった（コーナン榛原）。止めはせず、確認を出す。
+   *   ※「東部」「北部」のような実在の町名に引っかからないよう、「部」だけでは判定しない。
+   */
+  function suspiciousTownLines(towns) {
+    return (towns || []).filter(function(t) {
+      var x = String(t || '').trim();
+      if (!x) return false;
+      return /合計|小計|部数|休憩|勤務|時間|\/\s*-?\s*h(?![a-z])|\/\s*1\s*h|^[-－ー―‐・\s]+$|^[\d,，.\s]+$|^-/.test(x);
+    });
+  }
+  function suspiciousTownsMsg(bad) {
+    return '配布エリアに、町名ではなさそうな行があります。\n\n' +
+      bad.slice(0, 10).map(function(t) { return '・' + t; }).join('\n') + (bad.length > 10 ? '\n…ほか ' + (bad.length - 10) + '行' : '') +
+      '\n\n表から貼り付けたときの「合計」「休憩」などの行かもしれません。\n' +
+      'このまま登録すると、スタッフの報告画面に町として出ます。町でなければ消してから登録してください。';
+  }
+
+  function submitRegister(force, townsOk) {
     if (state.submitting) return;
     var base = $('regBase').value;
     if (!base) { alert('拠点を選んでください'); return; }
@@ -5511,6 +5940,11 @@ var App = (function() {
     if (assignments.length === 0) { alert('担当者を1人以上選んでください'); return; }
     var z = zipTownsHouseholds($('regTowns').value, $('regHouseholds').value);   // 町と世帯数を順対応でzip
     var towns = z.towns;
+    // ★#5（2026-11-08）: 表から貼り付けたときに「配布部数合計」「休憩/1h」などの行が混ざるのを止める（スタッフの報告画面に町として出てしまう）
+    if (townsOk !== true) {
+      var badT = suspiciousTownLines(towns);
+      if (badT.length) return uiConfirm(suspiciousTownsMsg(badT), { ok: 'このまま登録する', cancel: '戻って直す' }, function() { submitRegister(force, true); });
+    }
 
     var payload = {
       action: 'registerAssignEvents',
@@ -5551,8 +5985,9 @@ var App = (function() {
         // ★案件番号の打ち間違い防止（総点検 2026-07-27・A-8）。
         //   既存案件の拠点（＝集計の行き先）が変わる登録は、必ず確認してから進める。
         area.innerHTML = '';
-        if (confirm(res.message)) { submitRegister(true); return; }
-        area.innerHTML = '<div class="msg msg-warn">登録を中止しました。案件番号をご確認ください。</div>';
+        uiConfirm(res.message, { ok: '登録する', cancel: 'やめる（案件番号を確かめる）' },
+          function() { submitRegister(true, true); },
+          function() { area.innerHTML = '<div class="msg msg-warn">登録を中止しました。案件番号をご確認ください。</div>'; });
       } else {
         area.innerHTML = errHtml(res, 'エラー');
       }
@@ -5688,9 +6123,9 @@ var App = (function() {
     });
   }
 
-  function rejectReg(reqId) {
+  function rejectReg(reqId, ok) {
     if (state.submitting) return;
-    if (!confirm('この申請を却下しますか？')) return;
+    if (ok !== true) return uiConfirm('この申請を却下しますか？', { ok: '却下する', danger: true }, function() { rejectReg(reqId, true); });
     state.submitting = true;
     $('pendingRegResult').innerHTML = '<div class="msg">処理中…</div>';
     api({ action: 'rejectRegistration', reqId: reqId }).then(function(res) {
@@ -5734,6 +6169,7 @@ var App = (function() {
   }
 
   function renderPendingAmends(list) {
+    var sv = $('staffView'); if (sv) sv.classList.toggle('amend-empty', !list.length);   // ★#19 PCで空きを作らない
     if (!list.length) { $('pendingAmendList').innerHTML = '<div class="empty">承認待ちの修正報告はありません</div>'; return; }
     $('pendingAmendList').innerHTML = list.map(function(r) {
       // 変わった町だけを出す（全町を並べると、どこが変わったのか分からない）
@@ -5765,9 +6201,12 @@ var App = (function() {
     }).join('');
   }
 
-  function approveAmend(reqId) {
+  function approveAmend(reqId, ok) {
     if (state.submitting) return;
-    if (!confirm('この修正内容で承認します。\n\n承認すると、元の報告を取り消して修正後の内容で入れ直します（集計もその場で変わります）。\nよろしいですか？')) return;
+    if (ok !== true) {
+      return uiConfirm('この修正内容で承認します。\n\n承認すると、元の報告を取り消して修正後の内容で入れ直します（集計もその場で変わります）。\nよろしいですか？',
+        { ok: '承認して反映する' }, function() { approveAmend(reqId, true); });
+    }
     state.submitting = true;
     $('pendingAmendResult').innerHTML = '<div class="msg"><span class="spin"></span>反映しています…（数秒かかります）</div>';
     api({ action: 'approveAmend', reqId: reqId }).then(function(res) {
@@ -5956,7 +6395,7 @@ var App = (function() {
     }).join('');
   }
 
-  function saveOvertime(dateIso) {
+  function saveOvertime(dateIso, ok) {
     if (state.submitting) return;
     var staffId = $('otStaff').value;
     if (!staffId) { alert('スタッフを選んでください'); return; }
@@ -5966,8 +6405,11 @@ var App = (function() {
     var note = ($('otN_' + id) || {}).value || '';
     if (!start || !end) { alert('開始と終了の時刻を入れてください'); return; }
     var name = $('otStaff').options[$('otStaff').selectedIndex].text;
-    if (!confirm(name + '\n' + dateIso + ' の勤務時間を\n' + start + '〜' + end + ' に変更します。\n\n' +
-                 'カレンダーの予定の時刻が変わり、名前の右に「•」が付きます。よろしいですか？')) return;
+    if (ok !== true) {
+      return uiConfirm(name + '\n' + dateIso + ' の勤務時間を\n' + start + '〜' + end + ' に変更します。\n\n' +
+                 'カレンダーの予定の時刻が変わり、名前の右に「•」が付きます。よろしいですか？',
+        { ok: '変更する' }, function() { saveOvertime(dateIso, true); });
+    }
     state.submitting = true;
     $('otResult').innerHTML = '<div class="msg"><span class="spin"></span>変更しています…</div>';
     api({ action: 'setOvertime', staffId: staffId, dateIso: dateIso, start: start, end: end, note: note })
@@ -5984,9 +6426,12 @@ var App = (function() {
       });
   }
 
-  function clearOvertime(staffId, dateIso) {
+  function clearOvertime(staffId, dateIso, ok) {
     if (state.submitting) return;
-    if (!confirm(dateIso + ' の勤務時間を元に戻します。\n（カレンダーの時刻が戻り、名前の「•」も消えます）\n\nよろしいですか？')) return;
+    if (ok !== true) {
+      return uiConfirm(dateIso + ' の勤務時間を元に戻します。\n（カレンダーの時刻が戻り、名前の「•」も消えます）\n\nよろしいですか？',
+        { ok: '元に戻す' }, function() { clearOvertime(staffId, dateIso, true); });
+    }
     state.submitting = true;
     $('otResult').innerHTML = '<div class="msg"><span class="spin"></span>戻しています…</div>';
     api({ action: 'clearOvertime', staffId: staffId, dateIso: dateIso }).then(function(res) {
@@ -6133,20 +6578,27 @@ var App = (function() {
   function rbOpenCell(staffId, date) {
     var rb = rbState(); rb.sel = { staffId: staffId, date: date };
     rbRender();
-    var d = $('rbDetail'); if (d && d.scrollIntoView) d.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // PCは表の右に出る（動かさない）。スマホは下に出るので、そこまで動かす
+    var isPc = document.body && document.body.classList && document.body.classList.contains('pc');
+    var d = $('rbDetail'); if (!isPc && d && d.scrollIntoView) d.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
+  function rbCloseDetail() { var rb = rbState(); rb.sel = null; rbRender(); }
   function rbRenderDetail() {
     var rb = rbState(), bd = rb.data, el = $('rbDetail');
     if (!el) return;
+    var split = $('rbSplit');
+    if (split) split.classList.remove('has-detail');
     if (!rb.sel || !bd) { el.innerHTML = ''; return; }
     var r = bd.staff.filter(function(x) { return x.staffId === rb.sel.staffId; })[0];
     if (!r) { el.innerHTML = ''; return; }
+    if (split) split.classList.add('has-detail');
     var d = rb.sel.date, reps = r.reports.filter(function(x) { return x.date === d; });
     var c = r.cells[d] || { marks: [] };
     var note = '';
     if ((c.marks || []).indexOf('未') >= 0) note = '<div class="msg msg-err" style="margin-top:6px">予定があるのに、まだ報告がありません（報告忘れ）。</div>';
     else if ((c.marks || []).indexOf('予') >= 0 && !reps.length) note = '<div class="msg" style="margin-top:6px">これからの予定です。</div>';
-    el.innerHTML = '<div style="margin-top:12px;font-weight:700">' + esc(r.name) + '　' + Number(d.slice(5, 7)) + '/' + Number(d.slice(8, 10)) + '(' + rbDow(d) + ')</div>' +
+    el.innerHTML = '<div style="margin-top:12px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="flex:1">' + esc(r.name) + '　' + Number(d.slice(5, 7)) + '/' + Number(d.slice(8, 10)) + '(' + rbDow(d) + ')</span>' +
+      '<button type="button" class="btn-ghost" style="width:auto;margin:0;padding:4px 10px" onclick="App.rbCloseDetail()" aria-label="閉じる">✕</button></div>' +
       reps.map(rbRepHtml).join('') + note;
   }
 
@@ -6391,14 +6843,16 @@ var App = (function() {
         function() { window.prompt('コピーしてください', v); });
     } else { window.prompt('コピーしてください', v); }
   }
-  function issueStaffLink(staffId) {
+  function issueStaffLink(staffId, ok) {
     if (state.submitting) return;
     var st = (state.roster || []).filter(function(s) { return s.staffId === staffId; })[0];
     var nm = st ? st.name : staffId;
     var ask = (st && st.link)
       ? nm + ' さんの専用リンクを発行し直しますか？\n前のリンクはその場で使えなくなります（本人には新しいリンクを送り直してください）。'
       : nm + ' さんの専用リンクを発行しますか？';
-    if (!confirm(ask)) return;
+    if (ok !== true) {
+      return uiConfirm(ask, { ok: (st && st.link) ? '発行し直す' : '発行する' }, function() { issueStaffLink(staffId, true); });
+    }
     state.submitting = true;
     $('stLinkResult').innerHTML = '<div class="msg">発行中…</div>';
     api({ action: 'issueStaffLink', staffId: staffId }).then(function(res) {
@@ -6420,11 +6874,14 @@ var App = (function() {
         '<br>発行し直しの途中だった場合、前のリンクはもう止まっているかもしれません。もう一度［発行し直す］を押してください。</div>';
     });
   }
-  function revokeStaffLink(staffId) {
+  function revokeStaffLink(staffId, ok) {
     if (state.submitting) return;
     var st = (state.roster || []).filter(function(s) { return s.staffId === staffId; })[0];
     var nm = st ? st.name : staffId;
-    if (!confirm(nm + ' さんの専用リンクを止めますか？\n止めると、そのリンクでは入れなくなります（あとで発行し直せます）。')) return;
+    if (ok !== true) {
+      return uiConfirm(nm + ' さんの専用リンクを止めますか？\n止めると、そのリンクでは入れなくなります（あとで発行し直せます）。',
+        { ok: 'リンクを止める', danger: true }, function() { revokeStaffLink(staffId, true); });
+    }
     state.submitting = true;
     $('stLinkResult').innerHTML = '<div class="msg">処理中…</div>';
     api({ action: 'revokeStaffLink', staffId: staffId }).then(function(res) {
@@ -6452,7 +6909,7 @@ var App = (function() {
     $('lsEmailWrap').classList.toggle('hidden', !emp);
     $('lsSubmit').textContent = emp ? '追加する（Googleでログイン）' : '追加して専用リンクを発行';
   }
-  function addLinkStaff(forceNew) {
+  function addLinkStaff(forceNew, ok) {
     if (state.submitting) return;
     var name = String($('lsName').value || '').trim();
     var base = String($('lsBase').value || '').trim();
@@ -6462,15 +6919,18 @@ var App = (function() {
     if (!name) { alert('氏名を入れてください'); return; }
     if (!base) { alert('拠点を選んでください'); return; }
     if (emp && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('社員はGoogleアカウントのメールを入れてください'); return; }
-    if (forceNew !== true && !confirm(name + ' さん（' + base + '・' + perm + '）を追加' +
-        (emp ? 'しますか？\n本人は ' + email + ' のGoogleアカウントでログインします。' : 'して、専用リンクを発行しますか？'))) return;
+    if (forceNew !== true && ok !== true) {
+      return uiConfirm(name + ' さん（' + base + '・' + perm + '）を追加' +
+        (emp ? 'しますか？\n本人は ' + email + ' のGoogleアカウントでログインします。' : 'して、専用リンクを発行しますか？'),
+        { ok: emp ? '追加する' : '追加してリンクを発行する' }, function() { addLinkStaff(forceNew, true); });
+    }
     state.submitting = true;
     $('lsResult').innerHTML = '<div class="msg">追加中…</div>';
     api({ action: 'addLinkStaff', name: name, homeArea: base, perm: perm, email: email, forceNew: forceNew === true }).then(function(res) {
       state.submitting = false;
       if (res && res.code === 'E_SAME_NAME_EXISTS' && res.needsConfirm) {
         $('lsResult').innerHTML = '';
-        if (confirm(res.message + '\n\n別の人として追加しますか？')) addLinkStaff(true);
+        uiConfirm(res.message + '\n\n別の人として追加しますか？', { ok: '別の人として追加する' }, function() { addLinkStaff(true, true); });
         return;
       }
       if (!res || !res.ok) {
@@ -6489,7 +6949,7 @@ var App = (function() {
   }
 
   // ロスターからスタッフの権限だけを変更する（管理者・付け間違いの修正用）
-  function changeStaffPerm(staffId) {
+  function changeStaffPerm(staffId, ok) {
     if (state.submitting) return;
     var sel = $('rp_' + staffId);
     if (!sel) return;
@@ -6497,7 +6957,9 @@ var App = (function() {
     var st = (state.roster || []).filter(function(s) { return s.staffId === staffId; })[0];
     var nm = st ? st.name : staffId;
     if ((st && (st.perm || '配布員') === perm)) { alert(nm + ' さんの権限は既に「' + perm + '」です'); return; }
-    if (!confirm(nm + ' さんの権限を「' + perm + '」に変更しますか？')) return;
+    if (ok !== true) {
+      return uiConfirm(nm + ' さんの権限を「' + perm + '」に変更しますか？', { ok: '変更する' }, function() { changeStaffPerm(staffId, true); });
+    }
     state.submitting = true;
     $('stPermResult').innerHTML = '<div class="msg">変更中…</div>';
     api({ action: 'updateStaffPerm', staffId: staffId, perm: perm }).then(function(res) {
@@ -6764,6 +7226,56 @@ var App = (function() {
     });
   }
 
+  /**
+   * シフトの「これからの予定」を週（月〜日）ごとに区切って並べる（2026-11-08 社長指示: 出勤と欠勤を見分けやすく）。
+   *   出勤＝緑（札「出勤」＋10:00〜19:00）／欠勤＝灰色で薄く／午前・午後（古いデータ）＝橙。
+   *   週の見出しに「出勤 〇日」。各行の右は「締切前」「申請中（承認待ち）」か［変更を申請］。
+   */
+  function scDayKind(d) {
+    var k = String(d.kubun == null ? '' : d.kubun);
+    if (k === '終日' || d.label === '出勤') return 'on';
+    if (k === '不可' || d.label === '欠勤') return 'off';
+    return 'half';
+  }
+  function scWeekStart(iso) {
+    var p = String(iso || '').split('-');
+    var dt = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    var back = (dt.getDay() + 6) % 7;   // 月曜まで戻る日数
+    dt.setDate(dt.getDate() - back);
+    return dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2) + '-' + ('0' + dt.getDate()).slice(-2);
+  }
+  function scDayListHtml(up) {
+    var html = '', curWeek = '', groups = [];
+    up.forEach(function(d) {
+      var w = scWeekStart(d.date);
+      if (w !== curWeek) { groups.push({ week: w, days: [] }); curWeek = w; }
+      groups[groups.length - 1].days.push(d);
+    });
+    groups.forEach(function(g) {
+      var nOn = g.days.filter(function(d) { return scDayKind(d) === 'on'; }).length;
+      var p = g.week.split('-');
+      var end = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + 6);
+      var endIso = end.getFullYear() + '-' + ('0' + (end.getMonth() + 1)).slice(-2) + '-' + ('0' + end.getDate()).slice(-2);
+      html += '<div class="scd-week"><span>' + esc(fmtMdw(g.week)) + '〜' + esc(fmtMdw(endIso)) + ' の週</span>' +
+        '<span class="scd-wn">出勤 ' + nOn + '日</span></div>';
+      html += g.days.map(function(d) {
+        var kind = scDayKind(d);
+        var can = !d.canSelfEdit && !d.pending;
+        var tag = kind === 'on' ? '出勤' : (kind === 'off' ? '欠勤' : d.label);
+        return '<div class="scd ' + kind + '">' +
+          '<div class="scd-date">' + esc(fmtMdw(d.date)) + '</div>' +
+          '<div class="scd-mid"><span class="scd-tag">' + esc(tag) + '</span>' +
+          (kind === 'on' ? '<span class="scd-time">10:00〜19:00</span>' : '') +
+          (d.canSelfEdit ? '<div class="scd-note">締切前</div>' : '') +
+          (d.pending ? '<div class="scd-note pend">申請中（承認待ち）</div>' : '') +
+          '</div>' +
+          (can ? '<button type="button" class="btn-ghost" onclick="App.scOpenForm(\'' + esc(d.date) + '\')">変更を申請</button>' : '') +
+          '</div>';
+      }).join('');
+    });
+    return html;
+  }
+
   function renderMyShiftChanges() {
     var v = state.scData;
     if (!v || !$('scMine')) return;
@@ -6788,17 +7300,11 @@ var App = (function() {
     if (!up.length) {
       html += '<div class="empty">これからの出勤予定はありません</div>';
     } else {
-      html += up.map(function(d) {
-        var can = !d.canSelfEdit && !d.pending;
-        return '<div class="assign" style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
-          '<div style="flex:1"><b>' + esc(fmtMdw(d.date)) + '</b>　' + esc(d.label) +
-          (d.canSelfEdit ? '<div class="footer-note">まだご自分で直せます（上の「修正する」から）</div>' : '') +
-          (d.pending ? '<div class="footer-note">申請中（承認待ち）</div>' : '') +
-          '</div>' +
-          (can ? '<button type="button" class="btn-ghost" style="width:auto;padding:6px 10px;margin:0" ' +
-                 'onclick="App.scOpenForm(\'' + esc(d.date) + '\')">変更を申請</button>' : '') +
-          '</div>';
-      }).join('');
+      // 締切前の日がある＝上の［修正する］で直せる、の案内は1回だけ（毎行くり返すと読みにくい）
+      if (up.some(function(d) { return d.canSelfEdit; })) {
+        html += '<div class="footer-note" style="margin:0 0 4px">「締切前」の日は、上の［修正する］からご自分で直せます。</div>';
+      }
+      html += scDayListHtml(up);
     }
 
     var done = (v.requests || []).filter(function(r) { return r.state !== '申請中'; }).slice(0, 5);
@@ -6871,7 +7377,7 @@ var App = (function() {
     el.innerHTML = note;
   }
 
-  function submitShiftChange() {
+  function submitShiftChange(ok) {
     if (state.submitting) return;
     var d = ($('scDate') || {}).value || '';
     var k = state.scKubun || '不可';
@@ -6883,8 +7389,11 @@ var App = (function() {
       return;
     }
     var label = (k === '不可') ? '欠勤（出られない）' : '出勤（10:00〜19:00）';
-    if (!confirm(d + ' を「' + label + '」に変更する申請を出します。\n理由: ' + reason + '\n\n' +
-                 '管理者が承認するまで、シフトは変わりません。\nよろしいですか？')) return;
+    if (ok !== true) {
+      return uiConfirm(d + ' を「' + label + '」に変更する申請を出します。\n理由: ' + reason + '\n\n' +
+                 '管理者が承認するまで、シフトは変わりません。\nよろしいですか？',
+        { ok: '申請する' }, function() { submitShiftChange(true); });
+    }
     state.submitting = true;
     var btn = $('scSend'); if (btn) btn.disabled = true;
     $('scResult').innerHTML = '<div class="msg"><span class="spin"></span>申請しています…</div>';
@@ -6893,6 +7402,7 @@ var App = (function() {
       $('scResult').innerHTML = '<div class="msg ' + (res.ok ? 'msg-ok' : 'msg-warn') +
         '" style="white-space:pre-wrap">' + esc(res.message || res.code) + '</div>';
       if (res.ok) {
+        hapticOk();   // ★#16
         var ta = $('scReason'); if (ta) ta.value = '';
         loadMyShiftChanges();
       }
@@ -6903,9 +7413,9 @@ var App = (function() {
     });
   }
 
-  function cancelShiftChange(reqId) {
+  function cancelShiftChange(reqId, ok) {
     if (state.submitting) return;
-    if (!confirm('この申請を取り下げますか？')) return;
+    if (ok !== true) return uiConfirm('この申請を取り下げますか？', { ok: '取り下げる' }, function() { cancelShiftChange(reqId, true); });
     state.submitting = true;
     api({ action: 'cancelShiftChange', reqId: reqId }).then(function(res) {
       state.submitting = false;
@@ -6970,10 +7480,13 @@ var App = (function() {
            '理由: ' + (r.reason || '(記載なし)') + '\n';
   }
 
-  function approveShiftChange(reqId) {
+  function approveShiftChange(reqId, ok) {
     if (state.submitting) return;
-    if (!confirm('この申請を承認します。\n\n' + scReqSummary(reqId) +
-                 '\n承認すると、その日のGoogleカレンダーの予定とシフトが変わります。\nよろしいですか？')) return;
+    if (ok !== true) {
+      return uiConfirm('この申請を承認します。\n\n' + scReqSummary(reqId) +
+                 '\n承認すると、その日のGoogleカレンダーの予定とシフトが変わります。\nよろしいですか？',
+        { ok: '承認する' }, function() { approveShiftChange(reqId, true); });
+    }
     state.submitting = true;
     $('scAdminResult').innerHTML = '<div class="msg"><span class="spin"></span>反映しています…</div>';
     api({ action: 'approveShiftChange', reqId: reqId }).then(function(res) {
@@ -7120,8 +7633,20 @@ var App = (function() {
     var html = '';
     (v.cycles || []).forEach(function(c) { html += warnHtml(c); });
     var top = $('shiftTopWarn'); if (top) top.innerHTML = html;
+    // ★#11（2026-11-08）: 期日の3日前からの警告に加えて、受付中でまだ出していない期間があれば
+    //   報告の画面にも青い帯で知らせる（［シフトを出す］でシフトの画面へ）。下ナビの赤丸は今までどおり警告のときだけ。
+    var info = '';
+    ((v && v.cycles) || []).forEach(function(c) {
+      var st = c.state || {};
+      if (st.warn || st.submitted || st.beforeOpen || st.past || !st.canSubmit || !(v && v.baseConfigured)) return;
+      info += '<div class="warnbox warn-b">📅 ' + esc(c.label) + 'のシフトがまだです（期日 ' + esc(fmtMdw(c.deadlineDate)) + ' ' +
+        esc(shiftDeadlineHm(c)) + (st.countdown ? '・' + esc(st.countdown) : '') + '）</div>';
+    });
     var home = $('homeShiftWarn');
-    if (home) home.innerHTML = html ? html + '<div style="height:10px"></div>' : '';
+    if (home) home.innerHTML = (html || info)
+      ? html + info + '<button type="button" class="btn-ghost" style="margin:8px 0 0" onclick="App.switchTab(\'shift\')">📅 シフトを出す</button>' +
+        '<div style="height:10px"></div>'
+      : '';
     var dot = $('navShiftDot');
     if (dot) dot.classList.toggle('hidden', !html);
   }
@@ -7185,6 +7710,7 @@ var App = (function() {
         '<div class="cyc-row"><span class="k">提出期日</span><span class="v">' + esc(fmtMdw(c.deadlineDate)) + ' ' + esc(shiftDeadlineHm(c)) + chip + '</span></div>' +
         '<div class="cyc-row"><span class="k">勤務期間</span><span class="v">' + esc(fmtMdw(c.periodStart)) + '〜' + esc(fmtMdw(c.periodEnd)) + '<br><span style="font-weight:400;color:var(--c-sub);font-size:12px">' + pdays + '日間</span></span></div>' +
         (st.submitted && c.submittedAt ? '<div class="cyc-row"><span class="k">提出日時</span><span class="v">' + esc(String(c.submittedAt).replace('T', ' ').slice(0, 16)) + '</span></div>' : '') +
+        (st.submitted && c.days ? cycMiniHtml(c) : '') +
         warnHtml(c) + btn +
         '</div></div>';
     }).join('');
@@ -7200,6 +7726,35 @@ var App = (function() {
             (o.kubun && o.kubun !== '終日' ? '（' + esc(o.kubun) + '）' : '') + '</span></div>';
         }).join('') + '</div></div>');
     }
+  }
+
+  /**
+   * ★#12（2026-11-08）: 提出したシフトの中身を小さなカレンダーで見せる（出勤＝緑・出られない日＝灰色）。
+   *   週（月〜日）ごとに1行、右端にその週の出勤日数。
+   */
+  function cycMiniHtml(c) {
+    var dates = periodDatesOf(c);
+    if (!dates.length) return '';
+    var days = c.days || {};
+    var head = '<div class="cm-dow"><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span style="color:#1a73e8">土</span><span style="color:#d93025">日</span><span></span></div>';
+    var weeks = [], cur = null, total = 0;
+    dates.forEach(function(iso) {
+      var w = scWeekStart(iso);
+      if (!cur || cur.w !== w) { cur = { w: w, cells: [null, null, null, null, null, null, null], n: 0 }; weeks.push(cur); }
+      var p = iso.split('-');
+      var dow = (new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getDay() + 6) % 7;
+      var k = String(days[iso] || '');
+      var kind = (k === '終日') ? 'on' : ((k === '午前' || k === '午後') ? 'half' : 'off');
+      if (kind !== 'off') { cur.n++; total++; }
+      cur.cells[dow] = { d: Number(p[2]), kind: kind };
+    });
+    var body = weeks.map(function(wk) {
+      return '<div class="cm-wk">' + wk.cells.map(function(x) {
+        return x ? '<span class="cm-d ' + x.kind + '">' + x.d + '</span>' : '<span class="cm-d blank"></span>';
+      }).join('') + '<span class="cm-n">' + wk.n + '日</span></div>';
+    }).join('');
+    return '<div class="cyc-mini">' + head + body +
+      '<div class="cm-leg">提出した内容: <b style="color:#188038">緑＝出勤</b>（10:00〜19:00）・灰色＝出られない日　出勤 計' + total + '日</div></div>';
   }
 
   function showShiftList() {
@@ -7331,7 +7886,7 @@ var App = (function() {
     renderShiftGrid();
   }
 
-  function submitShiftCycle() {
+  function submitShiftCycle(answered) {
     var f = state.shiftForm;
     if (!f || state.submitting) return;
     // 週5日上限（6日以上の週があると提出不可）。サーバも E_SHIFT_WEEK_OVERFLOW で弾く。
@@ -7350,7 +7905,10 @@ var App = (function() {
       if (shiftSelected(f, iso)) { send[iso] = '終日'; ok++; }
       else { send[iso] = '不可'; ng++; }
     });
-    if (!confirm(f.cycle.label + 'のシフトを提出します。\n\n出勤できる日: ' + ok + '日\n出られない日: ' + ng + '日\n\nよろしいですか？')) return;
+    if (answered !== true) {
+      return uiConfirm(f.cycle.label + 'のシフトを提出します。\n\n出勤できる日: ' + ok + '日\n出られない日: ' + ng + '日\n\nよろしいですか？',
+        { ok: '提出する' }, function() { submitShiftCycle(true); });
+    }
 
     var payload = { action: 'submitShiftCycle', cycleKey: f.key, days: send, note: '' };   // ★色は送らない
     var btn = $('shiftSend');
@@ -7361,6 +7919,7 @@ var App = (function() {
         lsDel(shiftDraftKey(f.key));
         closeShiftForm();
         $('shiftDone').innerHTML = '<div class="msg msg-ok">✅ ' + esc(res.message) + '<br>カレンダーにも自動反映されました。</div>';
+        hapticOk();   // ★#16
         loadShifts();
         window.scrollTo(0, 0);
       } else if (res.code === 'E_SHIFT_PLAN_CHANGED') {
@@ -7405,14 +7964,16 @@ var App = (function() {
     if (state.saForm) { renderSaCal(); }   // 既に選択済みなら再描画
   }
 
-  function onSaStaffChange() {
+  function onSaStaffChange(ok) {
     // ★月移動（saMonth）と同じ2つの門をここにも置く。無いと、保存中に担当者を切り替えたときに
     //   保存の応答が**別人の画面**で再描画を起こし、未保存の変更も黙って消える（2026-08-26 総点検で発見）。
     var prev = state.saForm;
     if (state.submitting) { if (prev) $('saStaff').value = prev.staffId; return; }
-    if (prev && prev.dirty && !confirm('保存していない変更があります。破棄して担当者を切り替えますか？')) {
-      $('saStaff').value = prev.staffId;
-      return;
+    if (prev && prev.dirty && ok !== true) {
+      var want = $('saStaff').value;
+      $('saStaff').value = prev.staffId;   // 答えるまでは元の人のまま
+      return uiConfirm('保存していない変更があります。破棄して担当者を切り替えますか？',
+        { ok: '破棄して切り替える', danger: true }, function() { $('saStaff').value = want; onSaStaffChange(true); });
     }
     var staffId = $('saStaff').value;
     if (!staffId) {
@@ -7469,11 +8030,14 @@ var App = (function() {
     });
   }
 
-  function saMonth(delta) {
+  function saMonth(delta, ok) {
     var f = state.saForm;
     if (!f) return;
     if (state.submitting) return;   // 保存中の月移動は応答レース（保存結果の月取り違え）を招くので無視
-    if (f.dirty && !confirm('保存していない変更があります。破棄して月を移動しますか？')) return;
+    if (f.dirty && ok !== true) {
+      return uiConfirm('保存していない変更があります。破棄して月を移動しますか？',
+        { ok: '破棄して移動する', danger: true }, function() { saMonth(delta, true); });
+    }
     var idx = f.viewY * 12 + f.viewM + delta;
     f.viewY = Math.floor(idx / 12); f.viewM = idx % 12;
     saLoadMonth();
@@ -7903,14 +8467,17 @@ var App = (function() {
   }
 
   /** ［自動の日程を下敷きにする］自動で決まる日程を入力欄に写す（まだ保存はしない） */
-  function spFillFromAuto() {
+  function spFillFromAuto(ok) {
     var f = state.spForm;
     if (!f || !f.data || f.saving) return;
     var auto = f.data.auto || {};
     var cycles = auto.cycles || [];
     if (!cycles.length) { spResult('msg-warn', '自動の日程が取れませんでした。読み込み直してください。'); return; }
     spSyncFromDom();
-    if (f.slots.length && !confirm('いま入力している日程を、自動の日程で置き換えます。よろしいですか？')) return;
+    if (f.slots.length && ok !== true) {
+      return uiConfirm('いま入力している日程を、自動の日程で置き換えます。よろしいですか？',
+        { ok: '置き換える' }, function() { spFillFromAuto(true); });
+    }
     f.slots = cycles.map(function(c, i) {
       return { slot: (c.no == null ? i + 1 : Number(c.no)), opensOn: auto.opensOn || '',
                deadlineDate: c.deadlineDate || '', periodStart: c.periodStart || '', periodEnd: c.periodEnd || '' };
@@ -7964,23 +8531,29 @@ var App = (function() {
   }
 
   /** ［自動の日程に戻す］手入力を消して、自動で決まる日程に戻す */
-  function spResetToAuto() {
+  function spResetToAuto(ok) {
     var f = state.spForm;
     if (!f || f.loading || !f.data || f.saving) return;
     if (state.submitting) { spResult('msg-warn', 'ほかの処理をしています。少しお待ちください。'); return; }
-    if (!confirm('この月の日程を消して、自動で決まる日程に戻します。よろしいですか？')) return;
+    if (ok !== true) {
+      return uiConfirm('この月の日程を消して、自動で決まる日程に戻します。よろしいですか？',
+        { ok: '自動の日程に戻す' }, function() { spResetToAuto(true); });
+    }
     spSend([], 'spReset', '自動の日程に戻す');
   }
 
-  function spSetBase(base) {
+  function spSetBase(base, ok) {
     var f = state.spForm;
     if (!f || f.loading || f.saving || state.submitting) return;
     if (base === f.base) return;
-    if (spDirty() && !confirm('入力中の日程は、まだ保存されていません。破棄して拠点を切り替えますか？')) return;
+    if (spDirty() && ok !== true) {
+      return uiConfirm('入力中の日程は、まだ保存されていません。破棄して拠点を切り替えますか？',
+        { ok: '破棄して切り替える', danger: true }, function() { spSetBase(base, true); });
+    }
     loadShiftPlan(base, f.ym);
   }
 
-  function spMonth(delta) {
+  function spMonth(delta, ok) {
     var f = state.spForm;
     if (!f || f.loading || f.saving || state.submitting || !f.ym) return;
     var target;
@@ -7991,7 +8564,10 @@ var App = (function() {
       target = Math.floor(idx / 12) + '-' + ('0' + (idx % 12 + 1)).slice(-2);
     }
     if (target === f.ym) return;
-    if (spDirty() && !confirm('入力中の日程は、まだ保存されていません。破棄して月を移動しますか？')) return;
+    if (spDirty() && ok !== true) {
+      return uiConfirm('入力中の日程は、まだ保存されていません。破棄して月を移動しますか？',
+        { ok: '破棄して移動する', danger: true }, function() { spMonth(delta, true); });
+    }
     loadShiftPlan(f.base, target);
   }
 
@@ -8122,6 +8698,9 @@ var App = (function() {
   // ─── 初期化 ───
   function init() {
     try { document.addEventListener('click', noteClickedButton, true); } catch (e) {}   // ★押したボタンを「保存中…」にするため
+    try {   // ★#13 確認の窓は Esc で「やめる」
+      document.addEventListener('keydown', function(ev) { if (ucOpen() && (ev.key === 'Escape' || ev.key === 'Esc')) ucAnswer(false); });
+    } catch (e) {}
     state.deviceId = lsGet('hipos_device_id');
     if (!state.deviceId) { state.deviceId = uuid(); lsSet('hipos_device_id', state.deviceId); }
     $('distStart').value = todayIso();
@@ -8148,6 +8727,7 @@ var App = (function() {
 
   return {
     submit: submit,
+    ucAnswer: ucAnswer,   // ★#13 確認の窓のボタン（2026-11-08）
     openInstallGuide: openInstallGuide, closeInstallGuide: closeInstallGuide,
     onGpsSelect: onGpsSelect, removeGpsFile: removeGpsFile, retryGps: retryGps,
     switchTab: switchTab, pickCase: pickCase,
@@ -8189,10 +8769,11 @@ var App = (function() {
     regToggle: regToggle, regSetRole: regSetRole, regRemove: regRemove, regToggleShiftAll: regToggleShiftAll,
     loadStaff: loadStaff,
     loadReportBoard: loadReportBoard, rbBase: rbBase, rbMonth: rbMonth, rbMode: rbMode,
-    rbOpenCell: rbOpenCell, rbOpenStaff: rbOpenStaff, rbToggleStaff: rbToggleStaff,
+    rbOpenCell: rbOpenCell, rbOpenStaff: rbOpenStaff, rbToggleStaff: rbToggleStaff, rbCloseDetail: rbCloseDetail,
     openShiftForm: openShiftForm, closeShiftForm: closeShiftForm, toggleShiftDay: toggleShiftDay,
     submitShiftCycle: submitShiftCycle, pickMyColor: pickMyColor, toggleColorPalette: toggleColorPalette,
     updateCph: updateCph,   // ★配布時間の欄（時間・分）から呼ぶ（2026-09-11）
+    dockGo: dockGo,         // ★#3 下の固定バーの「足りないもの」を押したとき（2026-11-08）
     saMonth: saMonth, toggleSaDay: toggleSaDay, saSave: saSave,
     // シフトの日程（管理者）
     saSubTab: saSubTab, loadShiftPlan: loadShiftPlan, spSetBase: spSetBase, spMonth: spMonth,
