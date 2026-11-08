@@ -66,6 +66,11 @@
   dl.faq dt { font-weight: 700; margin-top: 10px; }
   dl.faq dt::before { content: "Q. "; color: var(--c-primary); }
   dl.faq dd { margin: 2px 0 0 0; padding-left: 1.6em; }
+  figure.shot { margin: 8px 0 14px; text-align: center; }
+  figure.shot img { display: block; width: 100%; max-width: 360px; height: auto; margin: 0 auto; border: 1px solid #dadce0;
+                    border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  figure.shot figcaption { font-size: 13px; color: var(--c-sub); margin-top: 6px; }
+  figure.shot figcaption b { color: #c5221f; }
   footer { text-align: center; font-size: 13px; color: var(--c-sub); margin-top: 16px; }
 </style>
 <script>
@@ -111,6 +116,8 @@
       <div><b>📅 シフト</b>出勤できる日を出す</div>
     </div>
     <p class="note">右上の丸いアイコン → ログイン情報・ログアウト・このマニュアル</p>
+    <figure class="shot"><img src="manual/account.png" alt="右上のアイコンを押した画面。マニュアルを見るボタンがある" width="720" height="716" loading="lazy">
+      <figcaption><b>赤丸</b>の右上のアイコン →<b>［📖 マニュアルを見る］</b>で、このマニュアルがいつでも開けます</figcaption></figure>
   </section>
 
   <section id="login">
@@ -160,11 +167,25 @@
     <h2><span class="no">4</span>配布報告のやり方</h2>
     <p><span class="ui">📝 報告</span> を開くと、今日の担当の案件が出ます。上から順に入れていきます。</p>
     <ol class="steps">
-      <li><b>① 本日の案件</b>　お店の名前と配るエリアを確かめます。</li>
-      <li><b>② 町×部数</b>　町ごとに<b>配った部数</b>を入れます。<b>配らなかった町は空欄のまま</b>でOK。合計は自動で出ます。</li>
-      <li><b>③ 勤務実績</b>　<b>配布時間</b>に、ランキーパーに出た時間をそのまま（時間と分）入れます。勤務時間は、いつもと違う日だけ直します。</li>
-      <li><b>④ GPS軌跡画像</b>　GPSアプリの軌跡のスクリーンショットを<b>4枚以上</b>つけます（足りないと送れません）。</li>
-      <li><span class="ui">報告を送信</span> を押します。<b class="em">「これで報告は完了です」と出るまで、画面を閉じないでください</b>（写真を1枚ずつ保存しています）。</li>
+      <li><b>① 本日の案件</b>　お店の名前と配るエリアを確かめます。
+        <figure class="shot"><img src="manual/report-1-case.png" alt="本日の担当と① 本日の案件の画面" width="720" height="747" loading="lazy">
+          <figcaption><b>赤枠</b>：今日のお店・エリア・報告する日を確かめます</figcaption></figure></li>
+      <li><b>② 町×部数</b>　町ごとに<b>配った部数</b>を入れます。<b>配らなかった町は空欄のまま</b>でOK。合計は自動で出ます。
+        <figure class="shot"><img src="manual/report-2-towns.png" alt="② 町×部数に部数を入れた画面" width="720" height="735" loading="lazy">
+          <figcaption><b>赤枠</b>：配った町の右に部数を入れます（配らなかった町は空欄のまま）</figcaption></figure></li>
+      <li><b>③ 勤務実績</b>　<b>配布時間</b>に、ランキーパーに出た時間をそのまま（時間と分）入れます。勤務時間は、いつもと違う日だけ直します。
+        <figure class="shot"><img src="manual/report-runkeeper.jpg" alt="ランキーパーの結果画面。タイム 2:57:10 に赤丸" width="720" height="430" loading="lazy">
+          <figcaption>ランキーパーの結果画面の<b>「タイム」</b>を見ます（この例は 2:57:10）</figcaption></figure>
+        <figure class="shot"><img src="manual/report-3-time.png" alt="③ 勤務実績の配布時間に 2時間57分 と入れた画面" width="720" height="698" loading="lazy">
+          <figcaption><b>赤枠</b>：時間と分に分けて入れます（2:57:10 → 「2」時間「57」分。秒は入れません）</figcaption></figure></li>
+      <li><b>④ GPS軌跡画像</b>　GPSアプリの軌跡のスクリーンショットを<b>4枚以上</b>つけます（足りないと送れません）。
+        <figure class="shot"><img src="manual/report-4-gps.png" alt="④ GPS軌跡画像を5枚付けて、報告を送信ボタンが見える画面" width="720" height="1082" loading="lazy">
+          <figcaption><b>赤枠</b>：［ファイル選択］で写真を選ぶ →「枚数OK」になったら［報告を送信］</figcaption></figure></li>
+      <li><span class="ui">報告を送信</span> を押します。<b class="em">「これで報告は完了です」と出るまで、画面を閉じないでください</b>（写真を1枚ずつ保存しています）。
+        <figure class="shot"><img src="manual/report-5-saving.png" alt="まだ終わっていません、と出ている送信中の画面" width="720" height="495" loading="lazy">
+          <figcaption>この黄色の表示が出ている間は<b>まだ途中</b>です。画面を閉じたり、ほかのアプリに切り替えたりしないでください</figcaption></figure>
+        <figure class="shot"><img src="manual/report-6-done.png" alt="これで報告は完了です、と出た画面" width="720" height="495" loading="lazy">
+          <figcaption>緑の<b>「これで報告は完了です」</b>が出たら完了です</figcaption></figure></li>
     </ol>
     <h3>こんなときは</h3>
     <ul>
@@ -184,9 +205,15 @@
     <h2><span class="no">5</span>配布禁止エリア</h2>
     <p>「チラシお断り」などで、<b>配ってはいけない家</b>があります。<span class="ui">📍 配布禁止</span> に、今日の案件のぶんが出ます。</p>
     <ol class="steps">
-      <li>配布エリアに着いたら、リストの<b>住所を確認</b>します。</li>
-      <li>その家を避けたら <span class="ui">☐ 回避したらタップ</span> を押します。</li>
-      <li>リストの住所が見つからない・実際と違うときは <span class="ui">誤表記</span> を押します。</li>
+      <li>配布エリアに着いたら、リストの<b>住所を確認</b>します。<span class="ui">🗾 〇〇 の配布禁止マップを開く</span> で、地図でも場所が見られます。
+        <figure class="shot"><img src="manual/ban-1-list.png" alt="配布禁止タブ。今日の案件の禁止住所が並んでいる（住所はぼかしています）" width="720" height="1305" loading="lazy">
+          <figcaption><b>赤枠</b>：マップで場所を確認 → 避けたら［☐ 回避したらタップ］（右の小さい［誤表記］は手順3）。<br>※この写真の住所はぼかしています</figcaption></figure></li>
+      <li>その家を避けたら <span class="ui">☐ 回避したらタップ</span> を押します。
+        <figure class="shot"><img src="manual/ban-2-avoided.png" alt="回避したらタップを押したあと。緑色になり、名前と時刻が出ている" width="720" height="1305" loading="lazy">
+          <figcaption><b>赤枠</b>：緑色になり「〇〇 〇時〇分 に回避済み」と出ます。間違えて押したときは、もう一度押すと取り消せます</figcaption></figure></li>
+      <li><b>町名が同じだけで、別の都道府県など、配布エリアと関係のない住所</b>が出ているときは、小さな <span class="ui">誤表記</span> を押し、確認が出たら［OK］を押します。
+        <figure class="shot"><img src="manual/ban-3-mislisted.png" alt="誤表記を押したときの確認の画面" width="720" height="1070" loading="lazy">
+          <figcaption><b>赤枠</b>：「誤表記として報告しますか？」→［OK］。配布エリアの中の住所なら、誤表記ではなく「回避した」を押してください</figcaption></figure></li>
       <li>全部チェックすると<b>「すべて回避済み」</b>になります。</li>
     </ol>
     <p class="note">同じ案件のメンバーで<b>リストは共有</b>です。誰かがチェックすると、ほかの人の画面にも「回避済み」と出ます。</p>
@@ -197,25 +224,53 @@
 
   <section id="history">
     <h2><span class="no">6</span>報告を直したいとき</h2>
-    <p><span class="ui">📋 履歴</span> に、これまで送った報告が並んでいます。</p>
-    <ul>
-      <li><b>数字を間違えた</b>：その報告を押して <span class="ui">✏️ 数字を修正</span> → 直して申請します。<b>管理者が承認すると反映</b>されます（承認までは前の数字のまま）。送った日から7日以内なら直せます。</li>
-      <li><b>GPSの写真が足りない（⚠）</b>：<span class="ui">📷 GPS画像を追加</span> から足せます。</li>
-    </ul>
+    <p><span class="ui">📋 履歴</span> に、これまで送った報告が並んでいます（直近60日）。</p>
+    <h3>数字を間違えたとき</h3>
+    <ol class="steps">
+      <li><span class="ui">📋 履歴</span> で、直したい報告を押します。
+        <figure class="shot"><img src="manual/hist-1-list.png" alt="報告履歴の一覧" width="720" height="540" loading="lazy">
+          <figcaption><b>赤枠</b>：直したい報告を押す</figcaption></figure></li>
+      <li><span class="ui">✏️ 数字を修正</span> を押します。
+        <figure class="shot"><img src="manual/hist-2-open.png" alt="報告を開くと、数字を修正とGPS画像を追加のボタンが出る" width="720" height="540" loading="lazy">
+          <figcaption><b>赤枠</b>：上が［✏️ 数字を修正］、下が［📷 GPS画像を追加］</figcaption></figure></li>
+      <li>報告の画面に前の数字が入った状態で開きます。<b>違うところだけ直して</b>、いちばん下の<b>［修正内容を申請する］</b>を押します。
+        <figure class="shot"><img src="manual/hist-3-amend.png" alt="配布時間を直して申請しているところ" width="720" height="1153" loading="lazy">
+          <figcaption><b>赤枠</b>：直したところ（この例は配布時間）→ 黄色の案内 →［修正内容を申請する］（押すと「申請中…」になります）</figcaption></figure></li>
+      <li>緑の<b>「修正内容を申請しました」</b>が出たら申請完了です。<b>管理者が承認すると反映</b>されます（承認までは前の数字のまま）。
+        <figure class="shot"><img src="manual/hist-4-sent.png" alt="修正内容を申請しました、と出た画面" width="720" height="490" loading="lazy">
+          <figcaption><b>赤枠</b>：申請できた表示。反映は管理者の承認のあとです</figcaption></figure></li>
+    </ol>
+    <p class="note">送った日から7日以内なら直せます。</p>
+    <h3>GPSの写真が足りないとき（⚠）</h3>
+    <p>手順2の画面で <span class="ui">📷 GPS画像を追加</span> を押すと、写真を足せます。</p>
     <div class="why"><span class="t">💡 なぜ承認が必要？</span>
       部数は反響率の計算に使われる大事な数字なので、直すときは管理者が確かめてから反映します。</div>
   </section>
 
   <section id="shift">
     <h2><span class="no">7</span>シフトの出し方</h2>
-    <p><span class="ui">📅 シフト</span> で、日ごとに <b>終日・午前・午後・不可</b> を選んで <span class="ui">この内容で提出</span> を押します。</p>
+    <ol class="steps">
+      <li><span class="ui">📅 シフト</span> を開くと、出す期間が並んでいます（関西は ①前半・②後半 など）。<b>提出期日と勤務期間</b>を確かめて <span class="ui">この期間を提出する</span> を押します。
+        <figure class="shot"><img src="manual/shift-1-top.png" alt="シフトタブの最初の画面。前半と後半の提出期日と勤務期間" width="720" height="1025" loading="lazy">
+          <figcaption><b>赤枠</b>：提出期日・勤務期間を確かめて［この期間を提出する］</figcaption></figure></li>
+      <li><b>出勤できる日をタップ</b>して選びます（青くなります。もう一度タップで取り消し）。<b>選ばなかった日は「出られない日」</b>になります。勤務時間は 10:00〜19:00 です。
+        <figure class="shot"><img src="manual/shift-2-select.png" alt="出勤できる日をタップして選んでいるところ" width="720" height="1015" loading="lazy">
+          <figcaption><b>赤枠</b>：出られる日をタップ（青＝出勤）→［この内容で提出］</figcaption></figure>
+        <p>1週間（月〜日）に出勤できるのは<b>5日まで</b>です。6日以上選ぶと赤く出て、提出できません。</p>
+        <figure class="shot"><img src="manual/shift-3-over5.png" alt="1週間に6日選んで、赤い注意が出ているところ" width="720" height="645" loading="lazy">
+          <figcaption><b>赤枠</b>：右の「計」が6になった週は、どこか1日を外してください</figcaption></figure></li>
+      <li><span class="ui">この内容で提出</span> を押します。<b>「シフトを提出しました」</b>と出て、<b>「提出済み ✓」</b>になったら完了です。期日までは <span class="ui">修正する（締切まで可）</span> で直せます。
+        <figure class="shot"><img src="manual/shift-4-done.png" alt="シフトを提出しました、と出て提出済みになった画面" width="720" height="535" loading="lazy">
+          <figcaption><b>赤枠</b>：提出できた表示・「提出済み ✓」・期日までは［修正する］で直せます</figcaption></figure></li>
+    </ol>
     <div class="rule"><b class="head">関西</b>
       2週間ずつ出します。<b>提出期日は毎月 第3日曜・第4日曜の19時</b>（月によって3回）。</div>
     <div class="rule"><b class="head">東戸塚・稲毛・五香・豊田</b>
       月1回、<b>毎月19日の19時までに、翌月1か月分</b>を出します。</div>
     <ul>
-      <li>1週間（月〜日）に出勤できるのは<b>5日まで</b>です。</li>
-      <li>締切のあとで変えたいとき：<span class="ui">🔄 シフト変更の申請</span>（前日まで・出勤か欠勤か）→ 管理者が承認すると変わります。<b>当日の変更</b>はアプリではできないので、担当者に連絡してください。</li>
+      <li>締切のあとで変えたいとき：シフト画面の下の <span class="ui">🔄 シフト変更の申請</span> で、<b>日にち・出勤か欠勤か・理由</b>を入れて <span class="ui">この内容で申請する</span> を押します（<b>前日まで</b>）。管理者が承認すると変わります。<b>当日の変更</b>はアプリではできないので、担当者に連絡してください。
+        <figure class="shot"><img src="manual/shift-5-change.png" alt="シフト変更の申請の画面。対象日・変更後・理由を入れる" width="720" height="711" loading="lazy">
+          <figcaption><b>赤枠</b>：対象日 → 欠勤か出勤か → 理由（ひとことでOK）→［この内容で申請する］</figcaption></figure></li>
       <li class="em"><b>提出が間に合わないとき・期日を過ぎてから変えたいときは、必ず北山さんまたは遠山まで連絡してください。</b></li>
     </ul>
     <div class="why"><span class="t">💡 なぜ期日が大事？</span>
