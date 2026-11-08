@@ -4767,23 +4767,63 @@ var App = (function() {
     while (hh.length && hh[hh.length - 1] === '') hh.pop();
     return { towns: towns, households: anyHh ? hh : [] };
   }
-  /** 世帯数の合計＋町数一致を表示（新規登録・regHhInfo）。実送信と同じzipで判定。 */
+  /**
+   * ★2026-11-09 社長指示: 配布エリアと世帯数の「行数」をそろえる。そろっていないと登録・保存できない。
+   *   ・数えるのは中身のある行。世帯数を1行も入れない（世帯数を使わない案件）ときは止めない。
+   *   ・行数が同じでも、空の行の位置がずれていると町と世帯数が1行ずれて並ぶ（zipTownsHouseholds は行の位置で組む）ので、それも止める。
+   *   戻り値 { ok, towns:町の行数, hh:世帯数の行数, empty:世帯数なし, row:ずれている行（1始まり） }
+   */
+  function regHhLineCheck(townsText, hhText) {
+    var tl = String(townsText || '').split(/\r?\n/), hl = String(hhText || '').split(/\r?\n/);
+    var has = function(x) { return String(x == null ? '' : x).trim() !== ''; };
+    var nt = tl.filter(has).length, nh = hl.filter(has).length;
+    if (nh === 0) return { ok: true, towns: nt, hh: 0, empty: true };
+    if (nt !== nh) return { ok: false, towns: nt, hh: nh };
+    var n = Math.max(tl.length, hl.length);
+    for (var i = 0; i < n; i++) {
+      if (has(tl[i]) !== has(hl[i])) return { ok: false, towns: nt, hh: nh, row: i + 1 };
+    }
+    return { ok: true, towns: nt, hh: nh };
+  }
+  /** 行数の表示（各入力欄の下）。{ html, cls } */
+  function regHhLineInfo(townsText, hhText, verb) {
+    var c = regHhLineCheck(townsText, hhText);
+    if (!c.towns && !c.hh) return { html: '', cls: 'case-info' };
+    var head = '配布エリア <b>' + c.towns + '行</b> ／ 世帯数 <b>' + (c.empty ? 'なし' : c.hh + '行') + '</b>';
+    if (!c.ok) {
+      var why = c.row
+        ? c.row + '行目で、片方だけが空になっています（このままだと町と世帯数が1行ずれて並びます）。空の行を消すか、「－」を入れてください。'
+        : '行数が合っていません。世帯数が分からない町には「－」を入れて、同じ行数にしてください。';
+      return { html: '⚠️ ' + head + '<br>' + why + '<br><b>このままでは' + verb + 'できません。</b>', cls: 'msg msg-err' };
+    }
+    if (c.empty) return { html: head + '（世帯数を使わないときは空のままで大丈夫です）', cls: 'case-info' };
+    var z = zipTownsHouseholds(townsText, hhText);
+    var total = 0, hasNum = false, hasUnknown = false;
+    z.households.forEach(function(x) { var n = hhNum(x); if (n == null) hasUnknown = true; else { total += n; hasNum = true; } });
+    var tot = hasNum ? '・計 ' + total.toLocaleString('en-US') + ' 世帯' + (hasUnknown ? '（一部 －）' : '') : '';
+    return { html: '✅ ' + head + tot + '（各町名の横に表示されます）', cls: 'case-info' };
+  }
+  /** 止めるときの案内（alert） */
+  function regHhLineAlert(c) {
+    return '配布エリアと世帯数の行数がそろっていません。\n\n' +
+      '配布エリア ' + c.towns + '行 ／ 世帯数 ' + c.hh + '行\n\n' +
+      (c.row ? c.row + '行目で、片方だけが空になっています。空の行を消すか、「－」を入れてください。'
+             : '世帯数が分からない町には「－」を入れて、同じ行数にしてください。\n（世帯数を使わないときは、世帯数の欄を空にしてください）');
+  }
+  /** 世帯数の合計＋行数の一致を表示（新規登録・regHhInfo）。 */
   function updateRegHh() {
     var info = $('regHhInfo'); if (!info) return;
-    var z = zipTownsHouseholds($('regTowns').value, $('regHouseholds').value);
-    var towns = z.towns, hh = z.households;
-    if (hh.length === 0) { info.textContent = ''; info.className = 'case-info'; return; }
-    var total = 0, hasNum = false, hasUnknown = false;
-    hh.forEach(function(x) { var n = hhNum(x); if (n == null) hasUnknown = true; else { total += n; hasNum = true; } });
-    if (hh.length !== towns.length) {
-      // 数が合わないときだけ注意（数字が無い行は「－」でOK＝任意）
-      info.innerHTML = '⚠️ 町 ' + towns.length + '件 に対し世帯数 ' + hh.length + '件（数が合いません。町名の横に出すには同数にするか、無い行は「－」を入れてください）';
-      info.className = 'msg msg-warn';
-    } else {
-      var tot = hasNum ? '計 ' + total.toLocaleString('en-US') + ' 世帯' + (hasUnknown ? '（一部 － ）' : '') : '（世帯数なし）';
-      info.innerHTML = '✅ ' + towns.length + '町・' + tot + '（各町名の横に表示されます）';
-      info.className = 'case-info';
-    }
+    var r = regHhLineInfo($('regTowns').value, $('regHouseholds').value, '登録');
+    info.innerHTML = r.html;
+    info.className = r.cls;
+  }
+  /** 登録済みの編集でも同じ表示（入力のたびに・再描画しない＝入力中の欄から外れない） */
+  function updateRegEditHh() {
+    var info = $('regEditHhInfo'); if (!info) return;
+    var t = $('regEditTowns'), h = $('regEditHouseholds');
+    var r = regHhLineInfo(t ? t.value : '', h ? h.value : '', '保存');
+    info.innerHTML = r.html;
+    info.className = r.cls;
   }
 
   // 選択中の拠点×配布日で「シフトのあるスタッフ」を取得し、担当ピッカーを絞る
@@ -5488,7 +5528,7 @@ var App = (function() {
              '</div>';
     }).join('');
     var cur = {}; (ed.members || []).forEach(function(m) { cur[m.staffId] = 1; });
-    var opts = (state.staffList || []).filter(function(s) { return !cur[s.staffId]; })
+    var opts = (state.staffList || []).filter(function(s) { return !cur[s.staffId] && regAssignable(s); })   // ★管理者（配布しない）は出さない
       .filter(function(s) { return ed.area ? (String(s.homeArea || '') === ed.area) : true; })   // その案件の拠点の担当だけ
       .slice().sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || '')); })
       .map(function(s) { return '<option value="' + esc(s.staffId) + '">' + esc(s.name) + '</option>'; }).join('');
@@ -5500,9 +5540,11 @@ var App = (function() {
            '<label>案件名など（1行目が店名・複数行OK）</label>' +
            '<textarea id="regEditLabel" rows="2">' + esc(ed.label || '') + '</textarea>' +
            '<label style="margin-top:8px">予定町（1行に1町）</label>' +
-           '<textarea id="regEditTowns" rows="4">' + esc(ed.townsText || '') + '</textarea>' +
+           '<textarea id="regEditTowns" rows="4" oninput="App.updateRegEditHh()">' + esc(ed.townsText || '') + '</textarea>' +
            '<label style="margin-top:8px">世帯数（予定町と同じ順で1行1件・数字が無い行は「－」）</label>' +
-           '<textarea id="regEditHouseholds" rows="4">' + esc(ed.householdsText || '') + '</textarea>' +
+           '<textarea id="regEditHouseholds" rows="4" oninput="App.updateRegEditHh()">' + esc(ed.householdsText || '') + '</textarea>' +
+           (function() { var r = regHhLineInfo(ed.townsText || '', ed.householdsText || '', '保存');
+             return '<div id="regEditHhInfo" class="' + r.cls + '" style="margin-top:4px">' + r.html + '</div>'; })() +
            '<label style="margin-top:8px">配布禁止リスト（複数可）</label>' +
            '<div class="banpick">' + regEditBanListHtml() + '</div>' +
            '<label style="margin-top:8px">連絡事項（任意）</label>' +
@@ -5629,6 +5671,9 @@ var App = (function() {
             '（採番し直す前の古い予定の可能性があります）');
       return;
     }
+    // ★2026-11-09 社長指示: 配布エリアと世帯数の行数がそろっていないと保存しない
+    var hhcE = regHhLineCheck(ed.townsText, ed.householdsText);
+    if (!hhcE.ok) { updateRegEditHh(); alert(regHhLineAlert(hhcE)); var eh = $('regEditHouseholds'); if (eh && eh.focus) eh.focus(); return; }
     var z = zipTownsHouseholds(ed.townsText, ed.householdsText);   // 町と世帯数を順対応でzip
     var towns = z.towns;
     if (townsOk !== true) {   // ★#5 町名でない行
@@ -5714,6 +5759,12 @@ var App = (function() {
   }
 
   // ①拠点×③配布日で「シフトのあるスタッフ」だけをタップ選択（全員表示トグルで解除可）
+  /**
+   * ★予定登録で担当に選べる人（2026-11-09 社長指示）: 「管理者」（配布しない社員）は出さない。管理者（配布者）・配布員は出す。
+   *   判定はサーバの canReport（ログインと同じ決まり）。canReport が無い古いサーバの応答なら、今まで通り全員出す。
+   */
+  function regAssignable(s) { return !!s && s.canReport !== false; }
+
   function renderRegStaff() {
     var base = state.regBase || REG_BASES[0];
     var sel = state.regSel || {};
@@ -5732,7 +5783,7 @@ var App = (function() {
     };
     // 全員表示モード（フォールバック）＝拠点の全スタッフ
     if (state.regShiftAll) {
-      var all = (state.staffList || []).filter(function(s) { return regBaseOf(s) === base; });
+      var all = (state.staffList || []).filter(function(s) { return regBaseOf(s) === base && regAssignable(s); });
       el.innerHTML = (all.length ? chips(all) : note('「' + esc(base) + '」の拠点にスタッフがいません。')) + toggleBtn(true);
       return;
     }
@@ -5741,7 +5792,7 @@ var App = (function() {
     if (!date) { el.innerHTML = note('<b>③配布日</b>を選ぶと、その日にシフトが入っているスタッフが出ます。') + toggleBtn(false); return; }
     if (state.regShiftStaff === null) { el.innerHTML = note('シフトを確認中…'); return; }
     var set = {}; state.regShiftStaff.forEach(function(id) { set[id] = 1; });
-    var mem = (state.staffList || []).filter(function(s) { return set[s.staffId]; });
+    var mem = (state.staffList || []).filter(function(s) { return set[s.staffId] && regAssignable(s); });
     if (!mem.length) {
       el.innerHTML = note('<b>' + esc(date) + '</b> にシフトが入っている「' + esc(base) + '」のスタッフはいません。<br>シフト提出をご確認いただくか、下のボタンで全員から選べます。') + toggleBtn(false);
       return;
@@ -5938,6 +5989,9 @@ var App = (function() {
     var sel = state.regSel || {};
     var assignments = regSelectedOrder().map(function(id) { return { staffId: id, role: sel[id] || '配布' }; });
     if (assignments.length === 0) { alert('担当者を1人以上選んでください'); return; }
+    // ★2026-11-09 社長指示: 配布エリアと世帯数の行数がそろっていないと登録しない
+    var hhc = regHhLineCheck($('regTowns').value, $('regHouseholds').value);
+    if (!hhc.ok) { updateRegHh(); alert(regHhLineAlert(hhc)); var rh = $('regHouseholds'); if (rh && rh.focus) rh.focus(); return; }
     var z = zipTownsHouseholds($('regTowns').value, $('regHouseholds').value);   // 町と世帯数を順対応でzip
     var towns = z.towns;
     // ★#5（2026-11-08）: 表から貼り付けたときに「配布部数合計」「休憩/1h」などの行が混ざるのを止める（スタッフの報告画面に町として出てしまう）
@@ -8728,6 +8782,7 @@ var App = (function() {
   return {
     submit: submit,
     ucAnswer: ucAnswer,   // ★#13 確認の窓のボタン（2026-11-08）
+    updateRegEditHh: updateRegEditHh,   // ★登録済みの編集で行数を表示（2026-11-09）
     openInstallGuide: openInstallGuide, closeInstallGuide: closeInstallGuide,
     onGpsSelect: onGpsSelect, removeGpsFile: removeGpsFile, retryGps: retryGps,
     switchTab: switchTab, pickCase: pickCase,
