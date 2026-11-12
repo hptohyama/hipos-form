@@ -204,6 +204,8 @@
   .banpick label.on { background: var(--c-ok-bg); border-color: var(--c-ok); font-weight: 600; }
   .banpick input { width: 18px; height: 18px; flex: none; }
   .banpick .kw { font-size: 11px; color: var(--c-sub); margin-left: auto; }
+  .banpick label.bancat { flex-wrap: wrap; }
+  .banpick label.bancat .bc-sub { flex-basis: 100%; padding-left: 26px; font-size: 12px; color: var(--c-sub); font-weight: 400; }
   .hh { color: var(--c-sub); font-weight: 400; }
   .hhref { border: 1px solid var(--c-border); background: #f8f9fa; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; font-size: 13px; }
   /* ログイン期限切れの告知バー（画面下に固定・無言で古い情報を見せ続けない） */
@@ -1249,8 +1251,8 @@ body.pc .rb-mx th, body.pc .rb-mx td { padding: 7px 5px; }
       </div>
 
       <div class="card" id="regBanCard">
-        <h2>⑦ 配布禁止リスト（複数選択可）</h2>
-        <div class="case-info">この案件で使う配布禁止リストを選びます。<b>案件名から自動でおすすめ</b>にチェックが入ります（調整できます）。配布員の報告時の回避チェック・「本日の配布禁止」に反映されます。</div>
+        <h2>⑦ 配布禁止リスト（FunGuys案件／外部案件）</h2>
+        <div class="case-info">この案件が<b>FunGuys案件（自社案件）</b>か<b>外部案件（自社以外）</b>かを選びます。案件名に「共済」が入っていると<b>自動で外部案件</b>になります（選び直せます）。配布員の「本日の配布禁止」に反映されます。</div>
         <div id="regBanList" class="banpick"><div class="empty">読み込み中…</div></div>
       </div>
 
@@ -4702,15 +4704,60 @@ var App = (function() {
   // ─── ⑦ 配布禁止リストの選択（複数可・自動おすすめ）＋世帯数インジケータ ───
   function normJ(s) { return String(s == null ? '' : s).normalize('NFKC').replace(/\s+/g, ''); }
 
-  /** 案件名から配布禁止リストを自動おすすめ（storeKwが案件名に含まれる＋店名キーワード空=常時ON）。手動調整後は触らない。 */
+  // ★2026-11-12 社長決定: 配布禁止は「FunGuys案件（自社案件）」か「外部案件（自社以外）」の2択。
+  //   保存する値は 'FunGuys案件' / '外部案件'（案件台帳にもこの言葉で入る）。どのリストを使うかはサーバが決める
+  //   （BanSync.listsForCase: FunGuys案件＝店名キーワードが空のリスト／外部案件＝店名キーワードがあるリスト）。
+  //   最初は案件名で自動: 「共済」（または外部リストの店名キーワード）が入っていれば外部案件、それ以外は FunGuys案件。
+  var BAN_CAT_OWN = 'FunGuys案件', BAN_CAT_EXT = '外部案件';
+  var BAN_CATS = [
+    { key: BAN_CAT_OWN, label: 'FunGuys案件（自社案件）' },
+    { key: BAN_CAT_EXT, label: '外部案件（自社以外）' }
+  ];
+  function banChoiceCat(c) { return (c && c.category) || ((c && c.storeKw) ? BAN_CAT_EXT : BAN_CAT_OWN); }
+  /** 案件名から種類を決める（サーバの BanSync.categoryOfStore と同じ決まり） */
+  function banCatOfLabel(label) {
+    var l = normJ(label);
+    if (l.indexOf('共済') >= 0) return BAN_CAT_EXT;
+    var ext = (state.banListChoices || []).some(function(c) {
+      var kw = normJ(c.storeKw);
+      return banChoiceCat(c) === BAN_CAT_EXT && kw && l.indexOf(kw) >= 0;
+    });
+    return ext ? BAN_CAT_EXT : BAN_CAT_OWN;
+  }
+  /** 保存されている選択（'FunGuys案件'/'外部案件'・以前のリスト名）から種類を読む。読めなければ案件名から（サーバの categoryOfSaved と同じ） */
+  function banCatOfSaved(names, label) {
+    var own = false, ext = false;
+    var byName = {}; (state.banListChoices || []).forEach(function(c) { byName[normJ(c.name)] = c; });
+    (names || []).forEach(function(n) {
+      var k = normJ(n); if (!k) return;
+      if (k === normJ(BAN_CAT_EXT) || k === '外部') { ext = true; return; }
+      if (k === normJ(BAN_CAT_OWN) || k === 'FunGuys' || k === '自社') { own = true; return; }
+      var c = byName[k];
+      if (c) { if (banChoiceCat(c) === BAN_CAT_EXT) ext = true; else own = true; return; }
+      if (k.indexOf('共済') >= 0) ext = true; else if (k.indexOf('自社') >= 0) own = true;
+    });
+    return ext ? BAN_CAT_EXT : (own ? BAN_CAT_OWN : banCatOfLabel(label));
+  }
+  /** 選択肢のHTML（新規登録・登録済みの編集で共通）。cur＝いま選ばれている種類 */
+  function banCatPickHtml(cur, onclickOf) {
+    var choices = state.banListChoices || [];
+    return BAN_CATS.map(function(b) {
+      var on = (cur === b.key);
+      var names = choices.filter(function(c) { return banChoiceCat(c) === b.key; }).map(function(c) { return c.name; });
+      return '<label class="bancat' + (on ? ' on' : '') + '">' +
+        '<input type="radio" name="' + (onclickOf === 'edit' ? 'regEditBanCat' : 'regBanCat') + '" ' + (on ? 'checked' : '') +
+        ' onchange="App.' + (onclickOf === 'edit' ? 'regEditSetBanCat' : 'setRegBanCat') + '(\'' + b.key + '\')">' +
+        '<span>' + esc(b.label) + '</span>' +
+        (b.key === BAN_CAT_EXT ? '<span class="kw">「共済」で自動</span>' : '') +
+        '<span class="bc-sub">使う禁止リスト: ' + (names.length ? esc(names.join('・')) : '（未設定）') + '</span>' +
+        '</label>';
+    }).join('');
+  }
+
+  /** 案件名から種類を自動で選ぶ（手で選び直したあとは触らない） */
   function regSuggestBanLists() {
     if (state.regBanTouched) { renderRegBanList(); return; }
-    var label = normJ($('regLabel') ? $('regLabel').value : '');
-    var sel = {};
-    (state.banListChoices || []).forEach(function(c) {
-      var kw = normJ(c.storeKw);
-      if (!kw || (label && label.indexOf(kw) >= 0)) sel[c.name] = true;   // storeKw空=自社共通は常時ON
-    });
+    var sel = {}; sel[banCatOfLabel($('regLabel') ? $('regLabel').value : '')] = true;
     state.regBanSel = sel;
     renderRegBanList();
   }
@@ -4719,20 +4766,15 @@ var App = (function() {
     var box = $('regBanList'); if (!box) return;
     var choices = state.banListChoices || [];
     if (choices.length === 0) { box.innerHTML = '<div class="empty">配布禁止リストは未設定です（管理者が設定後に選べます）</div>'; return; }
-    box.innerHTML = choices.map(function(c, i) {
-      var on = !!state.regBanSel[c.name];
-      return '<label class="' + (on ? 'on' : '') + '">' +
-        '<input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="App.toggleRegBan(' + i + ')">' +
-        '<span>' + esc(c.name) + '</span>' +
-        (c.storeKw ? '<span class="kw">「' + esc(c.storeKw) + '」で自動</span>' : '<span class="kw">全案件共通</span>') +
-        '</label>';
-    }).join('');
+    var cur = state.regBanSel && state.regBanSel[BAN_CAT_EXT] ? BAN_CAT_EXT : BAN_CAT_OWN;
+    box.innerHTML = banCatPickHtml(cur, 'new');
   }
 
-  function toggleRegBan(i) {
-    var c = (state.banListChoices || [])[i]; if (!c) return;
-    state.regBanTouched = true;   // 以降は自動おすすめしない（管理者の意思を尊重）
-    if (state.regBanSel[c.name]) delete state.regBanSel[c.name]; else state.regBanSel[c.name] = true;
+  function setRegBanCat(cat) {
+    if (cat !== BAN_CAT_OWN && cat !== BAN_CAT_EXT) return;
+    state.regBanTouched = true;   // 以降は自動で切り替えない（管理者の意思を尊重）
+    var sel = {}; sel[cat] = true;
+    state.regBanSel = sel;
     renderRegBanList();
   }
 
@@ -5545,7 +5587,7 @@ var App = (function() {
            '<textarea id="regEditHouseholds" rows="4" oninput="App.updateRegEditHh()">' + esc(ed.householdsText || '') + '</textarea>' +
            (function() { var r = regHhLineInfo(ed.townsText || '', ed.householdsText || '', '保存');
              return '<div id="regEditHhInfo" class="' + r.cls + '" style="margin-top:4px">' + r.html + '</div>'; })() +
-           '<label style="margin-top:8px">配布禁止リスト（複数可）</label>' +
+           '<label style="margin-top:8px">配布禁止リスト（FunGuys案件／外部案件）</label>' +
            '<div class="banpick">' + regEditBanListHtml() + '</div>' +
            '<label style="margin-top:8px">連絡事項（任意）</label>' +
            '<textarea id="regEditNote" rows="2">' + esc(ed.note || '') + '</textarea>' +
@@ -5559,24 +5601,18 @@ var App = (function() {
            '</div>';
   }
 
-  // 編集フォームの配布禁止リスト チェックリスト（ed.banSel）
+  // 編集フォームの配布禁止（FunGuys案件／外部案件・ed.banSel は {種類: true}）
   function regEditBanListHtml() {
     var ed = state.regEdit || {}, bs = ed.banSel || {};
     var choices = state.banListChoices || [];
     if (choices.length === 0) return '<div class="empty">配布禁止リストは未設定です</div>';
-    return choices.map(function(c, i) {
-      var on = !!bs[c.name];
-      return '<label class="' + (on ? 'on' : '') + '">' +
-        '<input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="App.regEditToggleBan(' + i + ')">' +
-        '<span>' + esc(c.name) + '</span></label>';
-    }).join('');
+    return banCatPickHtml(bs[BAN_CAT_EXT] ? BAN_CAT_EXT : BAN_CAT_OWN, 'edit');
   }
-  function regEditToggleBan(i) {
+  function regEditSetBanCat(cat) {
     var ed = state.regEdit; if (!ed) return;
+    if (cat !== BAN_CAT_OWN && cat !== BAN_CAT_EXT) return;
     regEditSyncFields();   // 他のtextarea値を退避してから再描画（入力消失防止）
-    if (!ed.banSel) ed.banSel = {};
-    var c = (state.banListChoices || [])[i]; if (!c) return;
-    if (ed.banSel[c.name]) delete ed.banSel[c.name]; else ed.banSel[c.name] = true;
+    ed.banSel = {}; ed.banSel[cat] = true;
     renderRegistrations();
   }
 
@@ -5605,7 +5641,8 @@ var App = (function() {
         state.regEdit.label = res.label || '';
         state.regEdit.townsText = (res.towns || []).join('\n');
         state.regEdit.householdsText = (res.households || []).join('\n');
-        state.regEdit.banSel = {}; (res.banLists || []).forEach(function(n) { state.regEdit.banSel[n] = true; });
+        // ★保存されている選択（以前のリスト名も）を FunGuys案件／外部案件 に読み替える（2026-11-12）
+        state.regEdit.banSel = {}; state.regEdit.banSel[banCatOfSaved(res.banLists || [], res.label || '')] = true;
         state.regEdit.note = res.note || '';
         // missing＝名簿に無い staff_id（古い予定に旧IDが残っている）。赤字表示＋保存ブロックに使う。
         state.regEdit.members = (res.members || []).map(function(m) { return { staffId: m.staffId, name: m.name, role: m.role || '', missing: !!m.missing }; });
@@ -8796,7 +8833,7 @@ var App = (function() {
     issueStaffLink: issueStaffLink, revokeStaffLink: revokeStaffLink, addLinkStaff: addLinkStaff, copyStaffLink: copyStaffLink, closeIssuedLink: closeIssuedLink,
     submitRegister: submitRegister,
     gotoBanTab: gotoBanTab, loadBanAdmin: loadBanAdmin, toggleAvoid: toggleAvoid, toggleMislisted: toggleMislisted, onLinkStaffPerm: onLinkStaffPerm,
-    toggleRegBan: toggleRegBan, updateRegHh: updateRegHh,
+    setRegBanCat: setRegBanCat, updateRegHh: updateRegHh,
     loadPendingAmends: loadPendingAmends, approveAmend: approveAmend, rejectAmend: rejectAmend,
     loadOvertime: loadOvertime, saveOvertime: saveOvertime, clearOvertime: clearOvertime, otMonth: otMonth,
     loadOvertimeDays: loadOvertimeDays, otRange: otRange,
@@ -8810,7 +8847,7 @@ var App = (function() {
     loadRegistrations: loadRegistrations, deleteRegistration: deleteRegistration,
     regStartEdit: regStartEdit, regCancelEdit: regCancelEdit, regDoSave: regDoSave,
     regEditSetRole: regEditSetRole, regEditRemoveMember: regEditRemoveMember, regEditAddMember: regEditAddMember,
-    regEditToggleBan: regEditToggleBan,
+    regEditSetBanCat: regEditSetBanCat,
     regSubTab: regSubTab, toggleRegHelp: toggleRegHelp,
     submitOtherEvent: submitOtherEvent, pickOtherColor: pickOtherColor,
     loadOtherEvents: loadOtherEvents, oeMonth: oeMonth, oeSetFilter: oeSetFilter,
