@@ -331,6 +331,10 @@
   .rb-warn { background: #fef3e0; color: #b06000; font-weight: 700; }
   .rb-plan { background: #f8f9fa; color: #80868b; }
   .rb-nod { background: #e8f0fe; color: #1967d2; }
+  .rb-absent { background: #eceff1; color: #5f6368; font-weight: 700; }   /* 欠＝当日欠勤（2026-11-13） */
+  .rolebtn.absent.on { background: #c5221f; border-color: #c5221f; color: #fff; }
+  .reg-member.is-absent .reg-member-name { color: #c5221f; }
+  .reg-member.is-absent .reg-member-name::before { content: '✖ '; }
   .rb-mx td.rb-sel { outline: 2px solid var(--c-primary); outline-offset: -2px; }
   .rb-mx tr.rb-sumrow td { font-weight: 700; background: #f1f3f4; }
   .rb-staff { border: 1px solid var(--c-border); border-radius: 10px; margin: 8px 0; overflow: hidden; }
@@ -5358,6 +5362,10 @@ var App = (function() {
 
   function regView() { return state.regView || (state.regView = viewPref('reg')); }
   function regRoleSuffix(s) { var rl = s.roleLabel || '配布'; return rl === '配布' ? '' : '（' + esc(rl) + '）'; }
+  /** 一覧で名前を出す（当日欠勤は ✖ を付けて赤く・2026-11-13） */
+  function regStaffName(s) {
+    return (s && s.roleLabel === '当日欠勤') ? '<span style="color:#c5221f;font-weight:700">✖ ' + esc(s.name) + '</span>' : esc(s.name);
+  }
 
   function renderRegistrations() {
     regFilterInit();
@@ -5437,7 +5445,7 @@ var App = (function() {
       var r = x.r, i = x.i;
       var townsNote = (r.towns && r.towns.length) ? '（' + r.towns.length + '町）' : '';
       var names = (r.staff || []).map(function(s) {
-        return esc(s.name) + regRoleSuffix(s) + (s.reported ? ' <span class="badge-inline badge-done">報告済</span>' : '');
+        return regStaffName(s) + regRoleSuffix(s) + (s.reported ? ' <span class="badge-inline badge-done">報告済</span>' : '');
       }).join('、');
       var editForm = (ed && ed.i === i) ? regEditFormHtml(i) : '';
       var baseLabel = regBaseLabel(r);
@@ -5506,7 +5514,7 @@ var App = (function() {
     state.regSheet = i;
     var b = regBaseLabel(r);
     var staff = (r.staff || []).map(function(s) {
-      return '<li>' + esc(s.name) + regRoleSuffix(s) + (s.reported ? ' <span class="badge-inline badge-done">報告済</span>' : '') + '</li>';
+      return '<li>' + regStaffName(s) + regRoleSuffix(s) + (s.reported ? ' <span class="badge-inline badge-done">報告済</span>' : '') + '</li>';
     }).join('');
     var towns = r.towns || [];
     $('regSheetBody').innerHTML =
@@ -5557,11 +5565,13 @@ var App = (function() {
     var ROLES = ['配布', '送迎', '現場指導'];
     var memberRows = (ed.members || []).map(function(m) {
       var sid = jsStr(m.staffId);
-      var cur = m.role === '送迎' ? '送迎' : (m.role === '現場指導' ? '現場指導' : '配布');
-      var roleBtns = ROLES.map(function(role) {
-        return '<button type="button" class="rolebtn' + (cur === role ? ' on' : '') + '" onclick="App.regEditSetRole(' + sid + ',\'' + role + '\')">' + role + '</button>';
+      var cur = m.role === '送迎' ? '送迎' : (m.role === '現場指導' ? '現場指導' : (m.role === '当日欠勤' ? '当日欠勤' : '配布'));
+      // ★当日欠勤（2026-11-13 社長依頼）: 外さずに名前を残したまま、欠勤と分かるようにする（もう一度ほかの役割を押すと戻る）
+      var roleBtns = ROLES.concat(['当日欠勤']).map(function(role) {
+        return '<button type="button" class="rolebtn' + (role === '当日欠勤' ? ' absent' : '') + (cur === role ? ' on' : '') +
+          '" onclick="App.regEditSetRole(' + sid + ',\'' + role + '\')">' + role + '</button>';
       }).join('');
-      return '<div class="reg-member">' +
+      return '<div class="reg-member' + (cur === '当日欠勤' ? ' is-absent' : '') + '">' +
                '<div class="reg-member-name' + (m.missing ? ' missing' : '') + '">' + esc(m.name) + '</div>' +
                '<div class="reg-member-ops">' +
                  '<span class="reg-role-label">役割</span><span class="rolebtns">' + roleBtns + '</span>' +
@@ -5650,7 +5660,7 @@ var App = (function() {
         state.regEdit.detailFailed = true;   // このまま保存すると世帯数・禁止リストを空で上書きしてしまうので保存はブロック
         state.regEdit.townsText = (r.towns || []).join('\n');
         state.regEdit.members = (r.staff || []).map(function(s) {
-          return { staffId: s.staffId, name: s.name, role: (s.roleLabel === '送迎' ? '送迎' : (s.roleLabel === '現場指導' ? '現場指導' : '')) };
+          return { staffId: s.staffId, name: s.name, role: (s.roleLabel === '送迎' ? '送迎' : (s.roleLabel === '現場指導' ? '現場指導' : (s.roleLabel === '当日欠勤' ? '当日欠勤' : ''))) };
         });
       }
       state.regEdit.loading = false;
@@ -6613,6 +6623,7 @@ var App = (function() {
     if (c.marks && c.marks.indexOf('未') >= 0) cls = 'rb-miss';
     else if (c.warn) cls = 'rb-warn';
     else if (c.qty || c.applied) cls = 'rb-ok';
+    else if (c.marks && c.marks.indexOf('欠') >= 0) cls = 'rb-absent';   // 当日欠勤（2026-11-13）
     else if (c.marks && c.marks.some(function(m) { return m === '送迎' || m === '指導' || m === '配布なし'; })) cls = 'rb-nod';
     else if (c.marks && c.marks.indexOf('予') >= 0) cls = 'rb-plan';
     return { t: t.join(' ') + (c.warn ? ' ⚠' : ''), cls: cls };
@@ -6625,7 +6636,7 @@ var App = (function() {
     $('rbSummary').innerHTML = '<div class="rb-sum">合計 <b>' + (tt.qty || 0).toLocaleString() + '部</b> ／ 報告 <b>' + (tt.reports || 0) + '件</b>' +
       (tt.missed ? ' ／ <span style="color:#c5221f;font-weight:700">報告忘れ ' + tt.missed + '件</span>' : '') +
       (tt.gpsShort ? ' ／ <span style="color:#b06000;font-weight:700">⚠GPS不足 ' + tt.gpsShort + '件</span>' : '') +
-      '<br><span style="font-size:12px">数字＝部数・送迎/指導＝配布なし・<span style="color:#c5221f">未＝報告忘れ</span>・予＝これからの予定・⚠＝GPS画像が足りない</span></div>';
+      '<br><span style="font-size:12px">数字＝部数・送迎/指導＝配布なし・<span style="color:#c5221f">未＝報告忘れ</span>・<span style="color:#c5221f">欠＝当日欠勤</span>・予＝これからの予定・⚠＝GPS画像が足りない</span></div>';
     if (!bd.staff.length) { $('rbBody').innerHTML = '<div class="empty">この月・この拠点の報告や予定はまだありません</div>'; return; }
     if (rb.mode === 'staff') { rbRenderStaff(); return; }
     var head = '<tr><th class="rb-nm">氏名</th><th>月合計</th>' + bd.days.map(function(d) {
@@ -6687,6 +6698,7 @@ var App = (function() {
     var c = r.cells[d] || { marks: [] };
     var note = '';
     if ((c.marks || []).indexOf('未') >= 0) note = '<div class="msg msg-err" style="margin-top:6px">予定があるのに、まだ報告がありません（報告忘れ）。</div>';
+    else if ((c.marks || []).indexOf('欠') >= 0) note = '<div class="msg" style="margin-top:6px">✖ 当日欠勤の日です（報告は要りません）。</div>';
     else if ((c.marks || []).indexOf('予') >= 0 && !reps.length) note = '<div class="msg" style="margin-top:6px">これからの予定です。</div>';
     el.innerHTML = '<div style="margin-top:12px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="flex:1">' + esc(r.name) + '　' + Number(d.slice(5, 7)) + '/' + Number(d.slice(8, 10)) + '(' + rbDow(d) + ')</span>' +
       '<button type="button" class="btn-ghost" style="width:auto;margin:0;padding:4px 10px" onclick="App.rbCloseDetail()" aria-label="閉じる">✕</button></div>' +
